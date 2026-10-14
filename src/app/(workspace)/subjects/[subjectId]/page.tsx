@@ -11,14 +11,12 @@ import { SubjectIcon } from "@/components/academic/subject-icon";
 import { ResourceCard } from "@/components/academic/resource-card";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { Button } from "@/components/ui/button";
+import { ResourceFilters } from "@/components/resources/resource-filters";
 import {
   UploadCloud,
   FileText,
-  Search,
-  BookOpen,
   FileEdit,
   GraduationCap,
-  Sparkles,
 } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -30,6 +28,7 @@ interface SubjectWorkspaceProps {
   searchParams: Promise<{
     category?: string;
     search?: string;
+    session?: string;
   }>;
 }
 
@@ -38,7 +37,7 @@ export default async function SubjectWorkspace({
   searchParams,
 }: SubjectWorkspaceProps) {
   const { subjectId } = await params;
-  const { category: activeCategorySlug, search } = await searchParams;
+  const { category: activeCategorySlug, search, session } = await searchParams;
 
   const subject = await getSubjectBySlugOrId(subjectId);
   if (!subject) {
@@ -48,11 +47,15 @@ export default async function SubjectWorkspace({
   const categories = await getCategories();
   const activeCategory = categories.find((c) => c.slug === activeCategorySlug);
 
-  const allResources = await getResources({
+  let allResources = await getResources({
     subjectId: subject.id,
     categoryId: activeCategory?.id,
     search: search,
   });
+
+  if (session) {
+    allResources = allResources.filter((r) => r.exam_session === session);
+  }
 
   const relatedNotes = await getNotes();
   const subjectNotes = relatedNotes.filter((n) => n.subject_id === subject.id);
@@ -109,69 +112,41 @@ export default async function SubjectWorkspace({
         </div>
       </div>
 
-      {/* Category Tabs & Filter Navigation */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between gap-4 overflow-x-auto pb-1 scrollbar-none border-b border-[#e6e3da]">
-          <div className="flex items-center space-x-1.5 shrink-0">
-            <Link
-              href={`/subjects/${subject.slug}`}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                !activeCategorySlug
-                  ? "bg-[#3730a3] text-white"
-                  : "text-stone-600 hover:text-stone-900 hover:bg-[#edebe3]"
-              }`}
-            >
-              All Categories
-            </Link>
-            {categories.map((cat) => {
-              const isActive = activeCategorySlug === cat.slug;
-              return (
-                <Link
-                  key={cat.id}
-                  href={`/subjects/${subject.slug}?category=${cat.slug}`}
-                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors shrink-0 ${
-                    isActive
-                      ? "bg-[#3730a3] text-white"
-                      : "text-stone-600 hover:text-stone-900 hover:bg-[#edebe3]"
-                  }`}
-                >
-                  {cat.name}
-                </Link>
-              );
-            })}
-          </div>
-        </div>
+      {/* Live Resource Filters (Search, Category Pills, Exam Session) */}
+      <ResourceFilters
+        categories={categories}
+        totalResults={allResources.length}
+      />
 
-        {/* Resources Grid */}
-        <div className="pt-2">
-          {allResources.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {allResources.map((res) => (
-                <ResourceCard key={res.id} resource={res} />
-              ))}
+      {/* Resources Grid */}
+      <div className="space-y-4">
+        {allResources.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {allResources.map((res) => (
+              <ResourceCard key={res.id} resource={res} />
+            ))}
+          </div>
+        ) : (
+          <div className="bg-white border border-[#e6e3da] rounded-xl p-12 text-center">
+            <FileText className="w-10 h-10 text-stone-400 mx-auto mb-3" />
+            <h3 className="text-sm font-semibold text-stone-900">
+              No documents found
+            </h3>
+            <p className="text-xs text-stone-500 mt-1 max-w-sm mx-auto">
+              {activeCategory
+                ? `There are currently no uploaded documents under "${activeCategory.name}" matching your criteria.`
+                : "No documents have been uploaded matching your search."}
+            </p>
+            <div className="mt-4">
+              <Link href={`/library?action=upload&subjectId=${subject.id}`}>
+                <Button size="sm" variant="outline">
+                  <UploadCloud className="w-3.5 h-3.5 mr-1" />
+                  <span>Upload first document</span>
+                </Button>
+              </Link>
             </div>
-          ) : (
-            <div className="bg-white border border-[#e6e3da] rounded-xl p-12 text-center">
-              <FileText className="w-10 h-10 text-stone-400 mx-auto mb-3" />
-              <h3 className="text-sm font-semibold text-stone-900">
-                No documents found
-              </h3>
-              <p className="text-xs text-stone-500 mt-1 max-w-sm mx-auto">
-                {activeCategory
-                  ? `There are currently no uploaded documents under "${activeCategory.name}" for this subject.`
-                  : "No documents have been uploaded for this subject yet."}
-              </p>
-              <div className="mt-4">
-                <Link href={`/library?action=upload&subjectId=${subject.id}`}>
-                  <Button size="sm" variant="outline">
-                    <UploadCloud className="w-3.5 h-3.5 mr-1" />
-                    <span>Upload first document</span>
-                  </Button>
-                </Link>
-              </div>
-            </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Related Notes & Quizzes */}
@@ -188,7 +163,7 @@ export default async function SubjectWorkspace({
                 {subjectNotes.map((note) => (
                   <Link
                     key={note.id}
-                    href={`/notes/${note.id}`}
+                    href={`/notes`}
                     className="block bg-white border border-[#e6e3da] p-3.5 rounded-lg hover:border-stone-400 transition-colors shadow-2xs"
                   >
                     <div className="font-semibold text-xs text-stone-900 mb-1">
@@ -216,7 +191,7 @@ export default async function SubjectWorkspace({
                 {relatedQuizzes.map((quiz) => (
                   <Link
                     key={quiz.id}
-                    href={`/quizzes/${quiz.id}`}
+                    href={`/quizzes`}
                     className="block bg-white border border-[#e6e3da] p-3.5 rounded-lg hover:border-stone-400 transition-colors shadow-2xs"
                   >
                     <div className="flex items-center justify-between">

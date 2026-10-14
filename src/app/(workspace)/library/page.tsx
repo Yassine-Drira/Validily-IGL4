@@ -2,14 +2,15 @@ import { getSubjects, getCategories, getResources } from "@/lib/supabase/reposit
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { ResourceCard } from "@/components/academic/resource-card";
 import { Button } from "@/components/ui/button";
+import { UploadDropzone } from "@/components/resources/upload-dropzone";
 import {
   UploadCloud,
   FolderArchive,
   Search,
   Filter,
-  Shield,
-  FileCheck,
+  CheckCircle2,
 } from "lucide-react";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
@@ -17,11 +18,12 @@ interface LibraryPageProps {
   searchParams: Promise<{
     action?: string;
     subjectId?: string;
+    uploaded?: string;
   }>;
 }
 
 export default async function LibraryPage({ searchParams }: LibraryPageProps) {
-  const { action, subjectId } = await searchParams;
+  const { action, subjectId, uploaded } = await searchParams;
   const subjects = await getSubjects("sem-1");
   const categories = await getCategories();
   const resources = await getResources();
@@ -43,137 +45,46 @@ export default async function LibraryPage({ searchParams }: LibraryPageProps) {
           </p>
         </div>
 
-        <a href="?action=upload">
-          <Button size="md" variant="primary">
-            <UploadCloud className="w-4 h-4" />
-            <span>Upload New Document</span>
-          </Button>
-        </a>
+        {!isUploadModalOpen && (
+          <Link href="/library?action=upload">
+            <Button size="md" variant="primary">
+              <UploadCloud className="w-4 h-4" />
+              <span>Upload New Document</span>
+            </Button>
+          </Link>
+        )}
       </div>
 
-      {/* Upload Modal Drawer / Dialog (Inline or conditional) */}
+      {uploaded && (
+        <div className="p-3.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center space-x-2">
+          <CheckCircle2 className="w-4 h-4 shrink-0" />
+          <span>
+            Document uploaded successfully and registered in your library!
+          </span>
+        </div>
+      )}
+
+      {/* Drag & Drop Upload Panel */}
       {isUploadModalOpen && (
-        <div className="bg-white border-2 border-[#3730a3]/20 rounded-xl p-6 shadow-sm space-y-4">
-          <div className="flex items-center justify-between border-b border-stone-100 pb-3">
-            <div className="flex items-center space-x-2">
-              <UploadCloud className="w-5 h-5 text-[#3730a3]" />
-              <h2 className="font-semibold text-sm text-stone-900">
-                Upload Revision Document (PDF)
-              </h2>
-            </div>
-            <a href="/library" className="text-xs text-stone-400 hover:text-stone-700">
-              Close
-            </a>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-stone-900 flex items-center space-x-2">
+              <UploadCloud className="w-4 h-4 text-[#3730a3]" />
+              <span>Upload Revision Document (PDF)</span>
+            </h2>
+            <Link
+              href="/library"
+              className="text-xs text-stone-400 hover:text-stone-700"
+            >
+              Cancel
+            </Link>
           </div>
 
-          <form className="space-y-4" action="/api/upload" method="POST" encType="multipart/form-data">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-medium text-stone-700 mb-1">
-                  Subject Module *
-                </label>
-                <select
-                  name="subjectId"
-                  defaultValue={subjectId || ""}
-                  required
-                  className="w-full bg-[#f4f3ed] border border-[#dedad0] rounded-md px-3 py-2 text-xs text-stone-900 focus:outline-none focus:border-stone-400"
-                >
-                  <option value="" disabled>Select Subject</option>
-                  {subjects.map((sub) => (
-                    <option key={sub.id} value={sub.id}>
-                      {sub.name} (Semester 1)
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-stone-700 mb-1">
-                  Resource Category *
-                </label>
-                <select
-                  name="categoryId"
-                  required
-                  className="w-full bg-[#f4f3ed] border border-[#dedad0] rounded-md px-3 py-2 text-xs text-stone-900 focus:outline-none focus:border-stone-400"
-                >
-                  <option value="" disabled>Select Category</option>
-                  {categories.map((cat) => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-medium text-stone-700 mb-1">
-                  Document Title *
-                </label>
-                <input
-                  type="text"
-                  name="title"
-                  placeholder="e.g. Flutter State Management & BLoC Patterns"
-                  required
-                  className="w-full bg-[#f4f3ed] border border-[#dedad0] rounded-md px-3 py-2 text-xs text-stone-900 focus:outline-none focus:border-stone-400"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-stone-700 mb-1">
-                  Instructor / Professor (Optional)
-                </label>
-                <input
-                  type="text"
-                  name="instructor"
-                  placeholder="e.g. Dr. Ben Ammar"
-                  className="w-full bg-[#f4f3ed] border border-[#dedad0] rounded-md px-3 py-2 text-xs text-stone-900 focus:outline-none focus:border-stone-400"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-stone-700 mb-1">
-                Select PDF File * (Max 50MB)
-              </label>
-              <div className="border border-dashed border-stone-300 rounded-md p-6 text-center hover:bg-stone-50 transition-colors">
-                <input
-                  type="file"
-                  name="file"
-                  accept="application/pdf"
-                  required
-                  className="block w-full text-xs text-stone-500 file:mr-4 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-[#3730a3] hover:file:bg-indigo-100 cursor-pointer"
-                />
-                <p className="text-[11px] text-stone-400 mt-2">
-                  Strictly validated for valid PDF format. Securely stored in private Supabase Storage bucket.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between pt-2">
-              <div className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  id="submitShared"
-                  name="submitShared"
-                  className="rounded border-stone-300 text-[#3730a3] focus:ring-0"
-                />
-                <label htmlFor="submitShared" className="text-xs text-stone-600 cursor-pointer">
-                  Submit for class shared library review (Keep private if unchecked)
-                </label>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <a href="/library">
-                  <Button type="button" size="sm" variant="ghost">Cancel</Button>
-                </a>
-                <Button type="submit" size="sm" variant="primary">
-                  Upload Document
-                </Button>
-              </div>
-            </div>
-          </form>
+          <UploadDropzone
+            subjects={subjects}
+            categories={categories}
+            defaultSubjectId={subjectId}
+          />
         </div>
       )}
 

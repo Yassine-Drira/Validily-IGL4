@@ -4,19 +4,15 @@ import { getResourceById, getResources } from "@/lib/supabase/repository";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { CategoryBadge } from "@/components/academic/category-badge";
 import { formatBytes, formatDate } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
+import { PdfViewer } from "@/components/pdf/pdf-viewer";
+import { ResourceActionsBar } from "@/components/resources/resource-actions-bar";
+import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import {
-  Download,
-  Bookmark,
-  CheckCircle2,
   Calendar,
   User,
-  Layers,
   FileText,
-  Share2,
-  Clock,
-  ArrowLeft,
-  ExternalLink,
+  Layers,
+  Sparkles,
 } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -37,9 +33,27 @@ export default async function ResourceDetailPage({
     notFound();
   }
 
+  // Generate signed viewing URL if Supabase is configured
+  let viewUrl: string | undefined = undefined;
+  if (isSupabaseConfigured() && resource.storage_path) {
+    try {
+      const supabase = await createClient();
+      const { data } = await supabase.storage
+        .from("academic-resources")
+        .createSignedUrl(resource.storage_path, 900); // 15 mins
+      if (data?.signedUrl) {
+        viewUrl = data.signedUrl;
+      }
+    } catch (err) {
+      console.error("Could not create signed view URL:", err);
+    }
+  }
+
+  const downloadEndpoint = `/api/download/${resource.id}`;
+
   const related = await getResources({
     subjectId: resource.subject_id,
-    limit: 3,
+    limit: 4,
   });
   const filteredRelated = related.filter((r) => r.id !== resource.id);
 
@@ -110,84 +124,27 @@ export default async function ResourceDetailPage({
             </div>
           </div>
 
-          {/* Action buttons */}
-          <div className="flex items-center space-x-2 shrink-0">
-            <button
-              type="button"
-              className="p-2 border border-stone-200 rounded-md bg-stone-50 hover:bg-stone-100 text-stone-600 transition-colors"
-              title="Bookmark Document"
-            >
-              <Bookmark className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              className="px-3 py-1.5 border border-emerald-300 rounded-md bg-emerald-50 text-emerald-800 text-xs font-medium hover:bg-emerald-100 flex items-center space-x-1.5 transition-colors"
-            >
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>Mark Revised</span>
-            </button>
-            <a
-              href={`/api/download/${resource.id}`}
-              download={resource.original_filename}
-            >
-              <Button size="sm" variant="primary">
-                <Download className="w-3.5 h-3.5" />
-                <span>Download PDF</span>
-              </Button>
-            </a>
-          </div>
+          {/* Interactive Bookmark, Revision Status & Download */}
+          <ResourceActionsBar
+            resourceId={resource.id}
+            initialBookmarked={resource.is_bookmarked}
+            initialStatus={resource.revision_status}
+            downloadUrl={downloadEndpoint}
+            filename={resource.original_filename}
+          />
         </div>
       </div>
 
       {/* In-App Reader Interface */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* PDF Reader Frame */}
-        <div className="lg:col-span-3 bg-stone-900 border border-stone-800 rounded-xl overflow-hidden shadow-md flex flex-col min-h-[650px]">
-          {/* Reader Controls Toolbar */}
-          <div className="bg-stone-950 text-stone-300 px-4 py-2.5 flex items-center justify-between text-xs border-b border-stone-800">
-            <div className="flex items-center space-x-3">
-              <span className="font-mono text-stone-400 truncate max-w-xs">
-                {resource.original_filename}
-              </span>
-            </div>
-            <div className="flex items-center space-x-3">
-              <span className="text-[11px] font-mono text-stone-400 bg-stone-800 px-2 py-0.5 rounded">
-                PDF Preview Mode
-              </span>
-            </div>
-          </div>
-
-          {/* Document Preview Area */}
-          <div className="flex-1 bg-stone-800 flex flex-col items-center justify-center p-8 text-center text-stone-300">
-            <FileText className="w-16 h-16 text-stone-500 mb-4" />
-            <h3 className="text-base font-semibold text-stone-100 mb-1">
-              {resource.title}
-            </h3>
-            <p className="text-xs text-stone-400 max-w-md mb-6 leading-relaxed">
-              Official document: <span className="font-mono">{resource.original_filename}</span> ({formatBytes(resource.file_size_bytes)}).
-              When connected to your Supabase Storage bucket (<code className="text-indigo-300">academic-resources</code>), authenticated signed stream URLs render inline.
-            </p>
-
-            <div className="flex items-center space-x-3">
-              <a
-                href={`/api/download/${resource.id}`}
-                download={resource.original_filename}
-              >
-                <Button size="md" variant="primary">
-                  <Download className="w-4 h-4" />
-                  <span>Download Full Document</span>
-                </Button>
-              </a>
-              {resource.subject && (
-                <Link href={`/subjects/${resource.subject.slug}`}>
-                  <Button size="md" variant="outline" className="text-stone-300 bg-stone-900 border-stone-700 hover:bg-stone-800">
-                    <ArrowLeft className="w-4 h-4" />
-                    <span>Return to Subject</span>
-                  </Button>
-                </Link>
-              )}
-            </div>
-          </div>
+        <div className="lg:col-span-3">
+          <PdfViewer
+            url={viewUrl}
+            filename={resource.original_filename}
+            title={resource.title}
+            downloadUrl={downloadEndpoint}
+          />
         </div>
 
         {/* Sidebar: Metadata & Related Documents */}
