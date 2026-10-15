@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { getServiceSupabase, getEffectiveUserId } from "@/lib/supabase/admin";
 import { RevisionStatus, AcademicResource } from "@/types/database";
+import { logAuditEvent } from "@/lib/audit/audit-logger";
 
 function safeRevalidate(path: string) {
   try {
@@ -327,6 +328,15 @@ export async function deleteResource(resourceId: string): Promise<{ success?: bo
       return { error: deleteError.message };
     }
 
+    // Record audit event
+    await logAuditEvent({
+      actor_id: "authenticated_user",
+      action: "RESOURCE_DELETE",
+      target_id: resourceId,
+      target_type: "resource",
+      metadata: { storage_path: resource.storage_path },
+    });
+
     // 4. Revalidate all dependent routes
     safeRevalidate("/library");
     safeRevalidate("/subjects");
@@ -346,3 +356,63 @@ export async function deleteResource(resourceId: string): Promise<{ success?: bo
     return { error: err.message || "Échec de la suppression de la ressource." };
   }
 }
+
+/**
+ * Updates resource visibility (public / shared / private) with authorization check & audit log
+ */
+export async function updateResourceVisibility(
+  resourceId: string,
+  visibility: "public" | "private" | "shared"
+): Promise<{ success?: boolean; error?: string }> {
+  try {
+    if (!isSupabaseConfigured()) {
+      return { success: true };
+    }
+
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    const serviceSupabase = getServiceSupabase();
+    const { data: resource, error: fetchErr } = await serviceSupabase
+      .from("resources")
+      .select("id, owner_id, title")
+      .eq("id", resourceId)
+      .single();
+
+    if (fetchErr || !resource) {
+      return { error: "Ressource introuvable." };
+    }
+
+    // Permission: Only owner can modify visibility
+    if (user && resource.owner_id && user.id !== resource.owner_id) {
+      return { error: "Seul le propriétaire de ce document peut modifier sa visibilité." };
+    }
+
+    const { error: updateErr } = await serviceSupabase
+      .from("resources")
+      .update({ visibility, updated_at: new Date().toISOString() })
+      .eq("id", resourceId);
+
+    if (updateErr) {
+      return { error: updateErr.message };
+    }
+
+    await logAuditEvent({
+      actor_id: user?.id || "guest",
+      action: visibility === "shared" ? "RESOURCE_SHARED" : "RESOURCE_VISIBILITY_CHANGE",
+      target_id: resourceId,
+      target_type: "resource",
+      metadata: { new_visibility: visibility, title: resource.title },
+    });
+
+    safeRevalidate(`/resources/${resourceId}`);
+    safeRevalidate("/library");
+    safeRevalidate("/subjects");
+    return { success: true };
+  } catch (err: any) {
+    return { error: err.message || "Échec de modification de la visibilité." };
+  }
+}
+

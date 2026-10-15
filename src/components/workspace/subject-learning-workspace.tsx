@@ -1178,7 +1178,13 @@ ${resources.map((r) => `<li><strong>${r.title}</strong> (${r.mime_type}) - ${r.s
   );
 }
 
-// Subcomponent: Modal to create a Quiz with Question & Choices
+// Subcomponent: Modal to create a Multi-Question Quiz
+interface AuthoringQuestion {
+  question_text: string;
+  explanation: string;
+  options: { text: string; isCorrect: boolean }[];
+}
+
 function CreateQuizModal({
   subjectId,
   onClose,
@@ -1191,54 +1197,139 @@ function CreateQuizModal({
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [difficulty, setDifficulty] = useState<"beginner" | "intermediate" | "advanced">("intermediate");
-  const [questionText, setQuestionText] = useState("");
-  const [explanation, setExplanation] = useState("");
-  const [options, setOptions] = useState([
-    { text: "", isCorrect: true },
-    { text: "", isCorrect: false },
-    { text: "", isCorrect: false },
+  const [questions, setQuestions] = useState<AuthoringQuestion[]>([
+    {
+      question_text: "",
+      explanation: "",
+      options: [
+        { text: "", isCorrect: true },
+        { text: "", isCorrect: false },
+        { text: "", isCorrect: false },
+        { text: "", isCorrect: false },
+      ],
+    },
   ]);
+  const [activeQIndex, setActiveQIndex] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
-  const handleOptionTextChange = (index: number, text: string) => {
-    setOptions(options.map((opt, i) => (i === index ? { ...opt, text } : opt)));
+  const currentQ = questions[activeQIndex] || questions[0];
+
+  const updateCurrentQuestion = (updater: (q: AuthoringQuestion) => AuthoringQuestion) => {
+    setQuestions((prev) =>
+      prev.map((q, idx) => (idx === activeQIndex ? updater(q) : q))
+    );
   };
 
-  const handleSetCorrect = (index: number) => {
-    setOptions(options.map((opt, i) => ({ ...opt, isCorrect: i === index })));
+  const handleAddQuestion = () => {
+    const newQ: AuthoringQuestion = {
+      question_text: "",
+      explanation: "",
+      options: [
+        { text: "", isCorrect: true },
+        { text: "", isCorrect: false },
+        { text: "", isCorrect: false },
+        { text: "", isCorrect: false },
+      ],
+    };
+    setQuestions([...questions, newQ]);
+    setActiveQIndex(questions.length);
+  };
+
+  const handleRemoveQuestion = (idxToRemove: number) => {
+    if (questions.length <= 1) return;
+    const updated = questions.filter((_, i) => i !== idxToRemove);
+    setQuestions(updated);
+    setActiveQIndex(Math.max(0, idxToRemove - 1));
+  };
+
+  const handleOptionTextChange = (optIdx: number, text: string) => {
+    updateCurrentQuestion((q) => ({
+      ...q,
+      options: q.options.map((opt, i) => (i === optIdx ? { ...opt, text } : opt)),
+    }));
+  };
+
+  const handleSetCorrect = (optIdx: number) => {
+    updateCurrentQuestion((q) => ({
+      ...q,
+      options: q.options.map((opt, i) => ({ ...opt, isCorrect: i === optIdx })),
+    }));
+  };
+
+  const handleAddOption = () => {
+    if (currentQ.options.length >= 6) return;
+    updateCurrentQuestion((q) => ({
+      ...q,
+      options: [...q.options, { text: "", isCorrect: false }],
+    }));
+  };
+
+  const handleRemoveOption = (optIdx: number) => {
+    if (currentQ.options.length <= 2) return;
+    updateCurrentQuestion((q) => {
+      const filtered = q.options.filter((_, i) => i !== optIdx);
+      const hasCorrect = filtered.some((o) => o.isCorrect);
+      if (!hasCorrect && filtered.length > 0) {
+        filtered[0].isCorrect = true;
+      }
+      return { ...q, options: filtered };
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim() || !questionText.trim()) return;
-
-    const validOptions = options.filter((o) => o.text.trim().length > 0);
-    if (validOptions.length < 2) {
-      setErrorMsg("Veuillez renseigner au moins 2 options de réponse.");
+    if (!title.trim()) {
+      setErrorMsg("Veuillez renseigner le titre du quiz.");
       return;
+    }
+
+    // Validate each question
+    for (let i = 0; i < questions.length; i++) {
+      const q = questions[i];
+      if (!q.question_text.trim()) {
+        setErrorMsg(`La question ${i + 1} n'a pas d'énoncé.`);
+        setActiveQIndex(i);
+        return;
+      }
+      const validOptions = q.options.filter((o) => o.text.trim().length > 0);
+      if (validOptions.length < 2) {
+        setErrorMsg(`La question ${i + 1} doit avoir au moins 2 options valides.`);
+        setActiveQIndex(i);
+        return;
+      }
+      if (!validOptions.some((o) => o.isCorrect)) {
+        setErrorMsg(`Veuillez cocher la bonne réponse pour la question ${i + 1}.`);
+        setActiveQIndex(i);
+        return;
+      }
     }
 
     setIsSubmitting(true);
     setErrorMsg("");
 
     try {
+      const payloadQuestions = questions.map((q, qIndex) => {
+        const validOptions = q.options.filter((o) => o.text.trim().length > 0);
+        return {
+          question_text: q.question_text.trim(),
+          explanation: q.explanation.trim() || undefined,
+          question_type: "single_choice" as const,
+          sort_order: qIndex,
+          options: validOptions.map((o, optIndex) => ({
+            option_text: o.text.trim(),
+            is_correct: o.isCorrect,
+            sort_order: optIndex,
+          })),
+        };
+      });
+
       const res = await createQuiz({
         subject_id: subjectId,
         title: title.trim(),
         description: description.trim() || undefined,
         difficulty,
-        questions: [
-          {
-            question_text: questionText.trim(),
-            explanation: explanation.trim() || undefined,
-            question_type: "single_choice",
-            options: validOptions.map((o) => ({
-              option_text: o.text.trim(),
-              is_correct: o.isCorrect,
-            })),
-          },
-        ],
+        questions: payloadQuestions,
       });
 
       if (res.error) {
@@ -1246,13 +1337,18 @@ function CreateQuizModal({
       } else if (res.quiz) {
         onCreated({
           ...res.quiz,
-          questions: [
-            {
-              question_text: questionText,
-              explanation,
-              options: validOptions.map((o, idx) => ({ id: `opt-${idx}`, option_text: o.text, is_correct: o.isCorrect })),
-            },
-          ],
+          questions: questions.map((q, idx) => ({
+            id: `q-local-${idx}`,
+            question_text: q.question_text,
+            explanation: q.explanation,
+            options: q.options
+              .filter((o) => o.text.trim().length > 0)
+              .map((o, oIdx) => ({
+                id: `opt-${idx}-${oIdx}`,
+                option_text: o.text,
+                is_correct: o.isCorrect,
+              })),
+          })),
         });
       }
     } catch (err: any) {
@@ -1264,12 +1360,17 @@ function CreateQuizModal({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 shadow-xl border border-[#E4E8F0] space-y-4">
+      <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[92vh] overflow-y-auto p-6 shadow-2xl border border-[#E4E8F0] space-y-4">
         <div className="flex items-center justify-between pb-3 border-b border-[#E4E8F0]">
-          <h3 className="font-bold text-sm text-[#111A2E]">
-            Créer un nouveau Quiz
-          </h3>
-          <button type="button" onClick={onClose} className="text-[#68748A] hover:text-[#111A2E]">
+          <div>
+            <h3 className="font-bold text-sm text-[#111A2E]">
+              Créer un Quiz Multi-Questions
+            </h3>
+            <p className="text-xs text-[#68748A]">
+              Rédigez votre série de QCM sur-mesure pour réviser avec vos camarades.
+            </p>
+          </div>
+          <button type="button" onClick={onClose} className="text-[#68748A] hover:text-[#111A2E] p-1">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -1281,95 +1382,186 @@ function CreateQuizModal({
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
-          <div>
-            <label className="block font-medium text-[#111A2E] mb-1">
-              Titre du Quiz *
-            </label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g. QCM Révision - Chapitre 1"
-              required
-              className="w-full bg-[#FAFBFD] border border-[#E4E8F0] rounded-xl px-3 py-2 text-[#111A2E] focus:outline-none focus:border-[#2855D9]"
-            />
+        <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block font-medium text-[#111A2E] mb-1">
+                Titre du Quiz *
+              </label>
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Ex: Fondamentaux & Widgets Flutter"
+                required
+                className="w-full bg-[#FAFBFD] border border-[#E4E8F0] rounded-xl px-3 py-2 text-[#111A2E] focus:outline-none focus:border-[#2855D9]"
+              />
+            </div>
+
+            <div>
+              <label className="block font-medium text-[#111A2E] mb-1">
+                Niveau de difficulté
+              </label>
+              <select
+                value={difficulty}
+                onChange={(e) => setDifficulty(e.target.value as any)}
+                className="w-full bg-[#FAFBFD] border border-[#E4E8F0] rounded-xl px-3 py-2 text-[#111A2E] focus:outline-none focus:border-[#2855D9]"
+              >
+                <option value="beginner">Débutant (Notions de base)</option>
+                <option value="intermediate">Intermédiaire (TD & TP)</option>
+                <option value="advanced">Avancé (Niveau Examen)</option>
+              </select>
+            </div>
           </div>
 
-          <div>
-            <label className="block font-medium text-[#111A2E] mb-1">
-              Niveau de difficulté
-            </label>
-            <select
-              value={difficulty}
-              onChange={(e) => setDifficulty(e.target.value as any)}
-              className="w-full bg-[#FAFBFD] border border-[#E4E8F0] rounded-xl px-3 py-2 text-[#111A2E] focus:outline-none focus:border-[#2855D9]"
-            >
-              <option value="beginner">Débutant</option>
-              <option value="intermediate">Intermédiaire</option>
-              <option value="advanced">Avancé</option>
-            </select>
-          </div>
-
+          {/* Question Navigator Tabs */}
           <div className="pt-2 border-t border-[#E4E8F0]">
-            <label className="block font-medium text-[#111A2E] mb-1">
-              Première Question *
-            </label>
-            <textarea
-              rows={2}
-              value={questionText}
-              onChange={(e) => setQuestionText(e.target.value)}
-              placeholder="Énoncez clairement la question..."
-              required
-              className="w-full bg-[#FAFBFD] border border-[#E4E8F0] rounded-xl p-2.5 text-[#111A2E] focus:outline-none focus:border-[#2855D9]"
-            />
+            <div className="flex items-center justify-between mb-2">
+              <span className="font-bold text-[#111A2E] text-xs">
+                Questions ({questions.length})
+              </span>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={handleAddQuestion}
+                className="text-xs h-7 px-2"
+              >
+                <Plus className="w-3 h-3 mr-1" />
+                <span>Ajouter une question</span>
+              </Button>
+            </div>
+
+            <div className="flex items-center space-x-1.5 overflow-x-auto pb-1 scrollbar-thin">
+              {questions.map((q, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => setActiveQIndex(idx)}
+                  className={cn(
+                    "px-3 py-1 rounded-lg text-xs font-medium transition-colors shrink-0 flex items-center space-x-1 cursor-pointer",
+                    activeQIndex === idx
+                      ? "bg-[#2855D9] text-white shadow-2xs font-semibold"
+                      : "bg-[#F4F6FA] text-[#68748A] hover:bg-[#E4E8F0] hover:text-[#111A2E]"
+                  )}
+                >
+                  <span>Q{idx + 1}</span>
+                  {q.question_text.trim() && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
+                  )}
+                </button>
+              ))}
+            </div>
           </div>
 
-          <div className="space-y-2">
-            <label className="block font-medium text-[#111A2E]">
-              Options de réponse (Cochez la bonne réponse) *
-            </label>
-            {options.map((opt, i) => (
-              <div key={i} className="flex items-center space-x-2">
-                <input
-                  type="radio"
-                  name="correct-opt"
-                  checked={opt.isCorrect}
-                  onChange={() => handleSetCorrect(i)}
-                  className="cursor-pointer"
-                />
-                <input
-                  type="text"
-                  value={opt.text}
-                  onChange={(e) => handleOptionTextChange(i, e.target.value)}
-                  placeholder={`Option ${i + 1}`}
-                  required={i < 2}
-                  className="flex-1 bg-[#FAFBFD] border border-[#E4E8F0] rounded-xl px-3 py-1.5 text-[#111A2E] focus:outline-none focus:border-[#2855D9]"
-                />
+          {/* Active Question Editor Card */}
+          <div className="bg-[#FAFBFD] border border-[#E4E8F0] rounded-xl p-3.5 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="font-semibold text-xs text-[#2855D9]">
+                Édition Question {activeQIndex + 1} sur {questions.length}
+              </span>
+              {questions.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => handleRemoveQuestion(activeQIndex)}
+                  className="text-xs text-rose-600 hover:text-rose-800 cursor-pointer"
+                >
+                  Supprimer cette question
+                </button>
+              )}
+            </div>
+
+            <div>
+              <label className="block font-medium text-[#111A2E] mb-1">
+                Énoncé de la question *
+              </label>
+              <textarea
+                rows={2}
+                value={currentQ.question_text}
+                onChange={(e) =>
+                  updateCurrentQuestion((q) => ({ ...q, question_text: e.target.value }))
+                }
+                placeholder="Ex: Quelle méthode du cycle de vie d'un StatefulWidget est appelée une seule fois ?"
+                required
+                className="w-full bg-white border border-[#E4E8F0] rounded-xl p-2.5 text-[#111A2E] focus:outline-none focus:border-[#2855D9]"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="block font-medium text-[#111A2E]">
+                  Choix de réponse (Cochez la bonne réponse) *
+                </label>
+                {currentQ.options.length < 6 && (
+                  <button
+                    type="button"
+                    onClick={handleAddOption}
+                    className="text-[11px] text-[#2855D9] font-medium hover:underline cursor-pointer"
+                  >
+                    + Ajouter une option
+                  </button>
+                )}
               </div>
-            ))}
+
+              {currentQ.options.map((opt, optIdx) => (
+                <div key={optIdx} className="flex items-center space-x-2">
+                  <input
+                    type="radio"
+                    name={`correct-opt-${activeQIndex}`}
+                    checked={opt.isCorrect}
+                    onChange={() => handleSetCorrect(optIdx)}
+                    className="cursor-pointer text-[#2855D9]"
+                    title="Cocher comme bonne réponse"
+                  />
+                  <input
+                    type="text"
+                    value={opt.text}
+                    onChange={(e) => handleOptionTextChange(optIdx, e.target.value)}
+                    placeholder={`Option ${optIdx + 1}${optIdx < 2 ? " *" : " (Optionnel)"}`}
+                    className="flex-1 bg-white border border-[#E4E8F0] rounded-xl px-3 py-1.5 text-[#111A2E] focus:outline-none focus:border-[#2855D9]"
+                  />
+                  {currentQ.options.length > 2 && (
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveOption(optIdx)}
+                      className="text-stone-400 hover:text-rose-600 p-1"
+                      title="Supprimer cette option"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div>
+              <label className="block font-medium text-[#111A2E] mb-1">
+                Explication pédagogique (Affichée après la réponse)
+              </label>
+              <input
+                type="text"
+                value={currentQ.explanation}
+                onChange={(e) =>
+                  updateCurrentQuestion((q) => ({ ...q, explanation: e.target.value }))
+                }
+                placeholder="Ex: initState() est exécutée une unique fois lors de l'insertion du widget dans l'arborescence."
+                className="w-full bg-white border border-[#E4E8F0] rounded-xl px-3 py-2 text-[#111A2E] focus:outline-none focus:border-[#2855D9]"
+              />
+            </div>
           </div>
 
-          <div>
-            <label className="block font-medium text-[#111A2E] mb-1">
-              Explication de la réponse (Optionnel)
-            </label>
-            <input
-              type="text"
-              value={explanation}
-              onChange={(e) => setExplanation(e.target.value)}
-              placeholder="Expliquez pourquoi cette réponse est la bonne..."
-              className="w-full bg-[#FAFBFD] border border-[#E4E8F0] rounded-xl px-3 py-2 text-[#111A2E] focus:outline-none focus:border-[#2855D9]"
-            />
-          </div>
-
-          <div className="flex items-center justify-end space-x-2 pt-3 border-t border-[#E4E8F0]">
-            <Button type="button" size="sm" variant="ghost" onClick={onClose}>
-              Annuler
-            </Button>
-            <Button type="submit" size="sm" variant="primary" disabled={isSubmitting}>
-              {isSubmitting ? "Enregistrement..." : "Créer le Quiz"}
-            </Button>
+          <div className="flex items-center justify-between pt-3 border-t border-[#E4E8F0]">
+            <div className="text-[11px] text-[#68748A]">
+              Total : <strong className="text-[#111A2E]">{questions.length}</strong> question{questions.length > 1 ? "s" : ""}
+            </div>
+            <div className="flex items-center space-x-2">
+              <Button type="button" size="sm" variant="ghost" onClick={onClose}>
+                Annuler
+              </Button>
+              <Button type="submit" size="sm" variant="primary" disabled={isSubmitting}>
+                {isSubmitting ? "Enregistrement..." : `Publier le Quiz (${questions.length} Q)`}
+              </Button>
+            </div>
           </div>
         </form>
       </div>

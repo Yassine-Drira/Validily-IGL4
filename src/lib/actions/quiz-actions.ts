@@ -230,3 +230,88 @@ export async function submitQuizAttempt(data: {
     return { error: err.message || "Erreur lors de la soumission de la tentative." };
   }
 }
+
+/**
+ * Fetch authenticated student's quiz attempt history with scores & completion dates
+ */
+export async function getStudentQuizAttempts(userId?: string) {
+  try {
+    if (!isSupabaseConfigured()) return [];
+
+    let targetUserId = userId;
+    if (!targetUserId) {
+      const supabase = await createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      targetUserId = user?.id;
+    }
+
+    if (!targetUserId) return [];
+
+    const serviceSupabase = getServiceSupabase();
+    const { data: attempts, error } = await serviceSupabase
+      .from("quiz_attempts")
+      .select("*, quiz:quizzes(*, subject:subjects(*))")
+      .eq("user_id", targetUserId)
+      .order("completed_at", { ascending: false })
+      .limit(20);
+
+    if (error || !attempts) return [];
+    return attempts;
+  } catch (err) {
+    console.error("getStudentQuizAttempts error:", err);
+    return [];
+  }
+}
+
+/**
+ * Fetch recent questions missed by the student for mistake review & targeted practice
+ */
+export async function getStudentMistakes(userId?: string) {
+  try {
+    if (!isSupabaseConfigured()) return [];
+
+    let targetUserId = userId;
+    if (!targetUserId) {
+      const supabase = await createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      targetUserId = user?.id;
+    }
+
+    if (!targetUserId) return [];
+
+    const serviceSupabase = getServiceSupabase();
+    // 1. Get user's recent attempts
+    const { data: recentAttempts } = await serviceSupabase
+      .from("quiz_attempts")
+      .select("id, quiz_id, completed_at, quiz:quizzes(title, subject:subjects(name))")
+      .eq("user_id", targetUserId)
+      .order("completed_at", { ascending: false })
+      .limit(10);
+
+    if (!recentAttempts || recentAttempts.length === 0) return [];
+    const attemptIds = recentAttempts.map((a: any) => a.id);
+
+    // 2. Query incorrect answers
+    const { data: wrongAnswers, error } = await serviceSupabase
+      .from("quiz_attempt_answers")
+      .select("*, question:quiz_questions(*, options:quiz_options(*))")
+      .in("attempt_id", attemptIds)
+      .eq("is_correct", false)
+      .limit(15);
+
+    if (error || !wrongAnswers) return [];
+
+    return wrongAnswers.map((item: any) => ({
+      ...item,
+      attempt: recentAttempts.find((a: any) => a.id === item.attempt_id),
+    }));
+  } catch (err) {
+    console.error("getStudentMistakes error:", err);
+    return [];
+  }
+}
+

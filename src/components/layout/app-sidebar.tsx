@@ -30,10 +30,11 @@ const navItems = [
   { label: "Semestres", href: "/semesters", icon: Calendar },
   { label: "Matières", href: "/subjects", icon: BookOpen },
   { label: "Examens", href: "/library?category=exams", icon: GraduationCap },
-  { label: "Fichiers", href: "/library", icon: FolderArchive },
+  { label: "Bibliothèque", href: "/library", icon: FolderArchive },
   { label: "Quiz & QCM", href: "/quizzes", icon: Sparkles },
   { label: "Fiches de révision", href: "/notes", icon: FileEdit },
-  { label: "Mes espaces", href: "/bookmarks", icon: Bookmark },
+  { label: "Favoris", href: "/bookmarks", icon: Bookmark },
+  { label: "Mon Espace", href: "/my-space", icon: User },
   { label: "Paramètres", href: "/admin", icon: Settings },
 ];
 
@@ -74,7 +75,7 @@ export function AppSidebar({ subjects = [] }: AppSidebarProps) {
           {navItems.map((item) => {
             const Icon = item.icon;
             const isExamItem = item.label === "Examens";
-            const isLibraryItem = item.label === "Fichiers";
+            const isLibraryItem = item.label === "Bibliothèque" || item.label === "Fichiers";
 
             let isActive = false;
             if (item.href === "/") {
