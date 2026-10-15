@@ -162,3 +162,9 @@ The test suite verifies:
 - Verification of the 9 controlled resource categories.
 - Semester 2 non-population constraint.
 - Strict RLS and storage policy definitions.
+
+---
+
+## 8. License
+
+This project is proprietary and source-available. Copying, using, modifying, or distributing any part of this repository requires prior written permission from Yassine Drira. Attribution to Yassine Drira is mandatory, and copyright notices plus the `LICENSE` file must be preserved in any permitted copy or derivative.
