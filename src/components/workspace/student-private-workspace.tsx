@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   User,
   Shield,
@@ -85,6 +86,8 @@ export function StudentPrivateWorkspace({
     targetVisibility: "private" | "shared" | "public";
   } | null>(null);
 
+  const router = useRouter();
+
   // Profile Management State
   const [displayName, setDisplayName] = useState(user?.display_name || "");
   const [avatarPreview, setAvatarPreview] = useState<string | null>(user?.avatar_url || null);
@@ -93,12 +96,18 @@ export function StudentPrivateWorkspace({
   const [profileError, setProfileError] = useState("");
   const [isSavingProfile, setIsSavingProfile] = useState(false);
 
+  // Sync profile state when server user prop updates
+  useEffect(() => {
+    if (user?.display_name) setDisplayName(user.display_name);
+    if (user?.avatar_url !== undefined) setAvatarPreview(user.avatar_url);
+  }, [user?.display_name, user?.avatar_url]);
+
   const showFeedback = (msg: string) => {
     setFeedback(msg);
     setTimeout(() => setFeedback(""), 4000);
   };
 
-  // Avatar Selection & Client Validation
+  // Avatar Selection, Client Validation & Optimized Canvas Compression
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setProfileError("");
     const file = e.target.files?.[0];
@@ -109,16 +118,52 @@ export function StudentPrivateWorkspace({
       return;
     }
 
-    if (file.size > 2 * 1024 * 1024) {
-      setProfileError("L'image ne doit pas dépasser 2 Mo.");
+    if (file.size > 5 * 1024 * 1024) {
+      setProfileError("L'image ne doit pas dépasser 5 Mo.");
       return;
     }
 
     const reader = new FileReader();
     reader.onload = (event) => {
-      const result = event.target?.result as string;
-      setAvatarPreview(result);
-      setSelectedAvatarFile(result);
+      const rawDataUrl = event.target?.result as string;
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const canvas = document.createElement("canvas");
+          const maxDim = 256;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > maxDim) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            }
+          } else {
+            if (height > maxDim) {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          ctx?.drawImage(img, 0, 0, width, height);
+          const compressed = canvas.toDataURL("image/jpeg", 0.85);
+
+          setAvatarPreview(compressed);
+          setSelectedAvatarFile(compressed);
+        } catch {
+          setAvatarPreview(rawDataUrl);
+          setSelectedAvatarFile(rawDataUrl);
+        }
+      };
+      img.onerror = () => {
+        setAvatarPreview(rawDataUrl);
+        setSelectedAvatarFile(rawDataUrl);
+      };
+      img.src = rawDataUrl;
     };
     reader.readAsDataURL(file);
   };
@@ -140,6 +185,7 @@ export function StudentPrivateWorkspace({
       } else {
         setProfileMsg("Profil et photo mis à jour avec succès !");
         showFeedback("Profil enregistré avec succès.");
+        router.refresh();
       }
     } catch (err: any) {
       setProfileError(err?.message || "Erreur lors de la mise à jour.");
@@ -157,6 +203,7 @@ export function StudentPrivateWorkspace({
       await removeUserAvatar();
       setProfileMsg("Photo de profil retirée.");
       showFeedback("Photo de profil retirée.");
+      router.refresh();
     } catch (err: any) {
       setProfileError(err?.message || "Erreur lors de la suppression de la photo.");
     } finally {

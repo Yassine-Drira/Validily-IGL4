@@ -236,37 +236,6 @@ export function AppSidebar({ subjects = [], isAdmin = false }: AppSidebarProps) 
           </div>
         )}
       </div>
-
-      {/* Footer Student Status (Fully Clickable to Auth/Account) */}
-      <Link
-        href="/login"
-        onClick={closeMobile}
-        className="p-3 border-t border-[#E4E8F0] bg-white hover:bg-[#F4F6FA] transition-colors cursor-pointer group block"
-        title="Accéder au compte étudiant"
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2.5">
-            <div className="relative">
-              <div className="w-8 h-8 rounded-full bg-[#EDF2FF] border border-[#2855D9]/30 flex items-center justify-center text-[#2855D9] group-hover:scale-105 transition-transform">
-                <User className="w-4 h-4 text-[#2855D9]" />
-              </div>
-              <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white" />
-            </div>
-            <div>
-              <div className="text-xs font-semibold text-[#111A2E] leading-tight group-hover:text-[#2855D9] transition-colors">
-                Étudiant
-              </div>
-              <div className="flex items-center space-x-1 text-[10px] text-emerald-600 font-medium">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                <span>En ligne</span>
-              </div>
-            </div>
-          </div>
-          <div className="text-[10px] font-mono text-[#68748A] bg-[#F4F6FA] px-2 py-0.5 rounded border border-[#E4E8F0] group-hover:border-[#2855D9]/30 transition-colors">
-            IGL4
-          </div>
-        </div>
-      </Link>
     </>
   );
 

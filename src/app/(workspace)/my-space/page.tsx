@@ -28,15 +28,22 @@ export default async function MySpacePage() {
       } = await supabase.auth.getUser();
 
       if (authUser?.id) {
+        const service = getServiceSupabase();
+
+        // 0. Fetch persisted student profile from database
+        const { data: profile } = await service
+          .from("profiles")
+          .select("display_name, avatar_url")
+          .eq("id", authUser.id)
+          .maybeSingle();
+
         user = {
           id: authUser.id,
           email: authUser.email,
-          display_name: authUser.user_metadata?.display_name || authUser.email?.split("@")[0] || "Étudiant",
-          avatar_url: authUser.user_metadata?.avatar_url || null,
+          display_name: profile?.display_name || authUser.user_metadata?.display_name || authUser.email?.split("@")[0] || "Étudiant",
+          avatar_url: profile?.avatar_url || authUser.user_metadata?.avatar_url || null,
         };
         isGuest = false;
-
-        const service = getServiceSupabase();
 
         // 1. Fetch student's personal notes
         const { data: notesData } = await service

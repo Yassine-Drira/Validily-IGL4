@@ -67,5 +67,21 @@ export async function updateUserProfile(data: {
 }
 
 export async function removeUserAvatar(): Promise<{ success?: boolean; error?: string }> {
-  return updateUserProfile({ displayName: "Étudiant", avatarUrl: null });
+  try {
+    const requester = await getRequesterUser();
+    if (!requester) {
+      return { error: "Authentification requise pour modifier votre photo." };
+    }
+    const serviceSupabase = getServiceSupabase();
+    const { data: profile } = await serviceSupabase
+      .from("profiles")
+      .select("display_name")
+      .eq("id", requester.id)
+      .maybeSingle();
+
+    const currentName = profile?.display_name || "Étudiant";
+    return updateUserProfile({ displayName: currentName, avatarUrl: null });
+  } catch (err: any) {
+    return { error: err.message || "Échec de suppression de la photo." };
+  }
 }

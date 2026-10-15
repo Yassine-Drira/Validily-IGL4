@@ -12,21 +12,29 @@ export function AppHeader() {
   const router = useRouter();
   const { toggleMobile } = useSidebar();
   const [searchQuery, setSearchQuery] = useState("");
-  const [user, setUser] = useState<{ id: string; name: string; email?: string } | null>(null);
+  const [user, setUser] = useState<{ id: string; name: string; email?: string; avatarUrl?: string | null } | null>(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   useEffect(() => {
     try {
       const supabase = createClient();
-      supabase.auth.getUser().then(({ data }: any) => {
+      supabase.auth.getUser().then(async ({ data }: any) => {
         if (data?.user) {
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("display_name, avatar_url")
+            .eq("id", data.user.id)
+            .maybeSingle();
+
           setUser({
             id: data.user.id,
             name:
+              profile?.display_name ||
               data.user.user_metadata?.display_name ||
               data.user.email?.split("@")[0] ||
               "Étudiant",
             email: data.user.email,
+            avatarUrl: profile?.avatar_url || data.user.user_metadata?.avatar_url || null,
           });
         }
       });
@@ -105,9 +113,17 @@ export function AppHeader() {
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
               className="flex items-center space-x-2 p-1.5 rounded-xl hover:bg-[#F4F6FA] transition-colors cursor-pointer"
             >
-              <div className="w-7 h-7 rounded-lg bg-[#EDF2FF] border border-[#2855D9]/20 text-[#2855D9] font-bold text-xs flex items-center justify-center">
-                {user.name.slice(0, 2).toUpperCase()}
-              </div>
+              {user.avatarUrl ? (
+                <img
+                  src={user.avatarUrl}
+                  alt={user.name}
+                  className="w-7 h-7 rounded-lg object-cover border border-[#2855D9]/20 shadow-2xs"
+                />
+              ) : (
+                <div className="w-7 h-7 rounded-lg bg-[#EDF2FF] border border-[#2855D9]/20 text-[#2855D9] font-bold text-xs flex items-center justify-center">
+                  {user.name.slice(0, 2).toUpperCase()}
+                </div>
+              )}
               <span className="text-xs font-semibold text-[#182235] hidden sm:inline max-w-[100px] truncate">
                 {user.name}
               </span>
