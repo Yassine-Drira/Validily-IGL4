@@ -2,6 +2,8 @@ import { getSubjects, getSemesters } from "@/lib/supabase/repository";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { SubjectsDirectoryView } from "@/components/academic/subjects-directory-view";
 
+import { getRequesterUser } from "@/lib/auth/authorization";
+
 export const dynamic = "force-dynamic";
 
 interface SubjectsPageProps {
@@ -15,8 +17,9 @@ export default async function SubjectsPage({
   searchParams,
 }: SubjectsPageProps) {
   const { semester } = await searchParams;
+  const requester = await getRequesterUser();
   const [subjects, semesters] = await Promise.all([
-    getSubjects(semester),
+    getSubjects(semester, requester?.id),
     getSemesters(),
   ]);
 

@@ -134,8 +134,8 @@ export default async function HomePage() {
 
   const [metrics, s1Subjects, s2Subjects, recentResources, categories] = await Promise.all([
     getDashboardMetrics(),
-    getSubjects("sem-1"),
-    getSubjects("sem-2"),
+    getSubjects("sem-1", currentUser?.id),
+    getSubjects("sem-2", currentUser?.id),
     getResources({ limit: 4, userId: currentUser?.id }),
     getCategories(),
   ]);

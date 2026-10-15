@@ -23,13 +23,12 @@ export default async function SubjectWorkspace({
   params,
 }: SubjectWorkspaceProps) {
   const { subjectId } = await params;
-  const subject = await getSubjectBySlugOrId(subjectId);
+  const requester = await getRequesterUser();
+  const subject = await getSubjectBySlugOrId(subjectId, requester?.id);
 
   if (!subject) {
     notFound();
   }
-
-  const requester = await getRequesterUser();
 
   const [categories, resources, allNotes, quizzes, folders] = await Promise.all([
     getCategories(),

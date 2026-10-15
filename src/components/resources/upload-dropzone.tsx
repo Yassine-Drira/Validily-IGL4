@@ -139,6 +139,7 @@ export function UploadDropzone({
       if (academicYear) formData.append("academicYear", academicYear);
       if (examSession) formData.append("examSession", examSession);
       if (chapter.trim()) formData.append("chapter", chapter.trim());
+      formData.append("visibility", submitShared ? "public" : "private");
       if (submitShared) formData.append("submitShared", "on");
 
       const response = await fetch("/api/upload", {

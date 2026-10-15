@@ -29,7 +29,8 @@ interface LibraryPageProps {
 
 export default async function LibraryPage({ searchParams }: LibraryPageProps) {
   const { action, subjectId, categoryId, category, q, uploaded } = await searchParams;
-  const subjects = await getSubjects();
+  const requester = await getRequesterUser();
+  const subjects = await getSubjects(undefined, requester?.id);
   const categories = await getCategories();
 
   // Support both slug (category=exams) and ID (categoryId=uuid)
@@ -45,8 +46,6 @@ export default async function LibraryPage({ searchParams }: LibraryPageProps) {
     : null;
 
   const targetCategoryId = matchedCategory ? matchedCategory.id : effectiveCategoryParam;
-
-  const requester = await getRequesterUser();
 
   // Dynamic PostgreSQL query with search and filters (strict privacy boundary)
   const resources = await getResources({

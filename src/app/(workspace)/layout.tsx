@@ -11,8 +11,8 @@ export default async function WorkspaceLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const subjects = await getSubjects();
   const user = await getRequesterUser();
+  const subjects = await getSubjects(undefined, user?.id);
   const isAdmin = user ? user.role === "admin" || (await isUserAdmin(user.id)) : false;
 
   return (

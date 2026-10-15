@@ -11,9 +11,13 @@ import { invalidateRepositoryCache } from "@/lib/supabase/repository";
 function safeRevalidate(path: string) {
   try {
     revalidatePath(path);
-    invalidateRepositoryCache();
   } catch {
     // Outside active Next.js request context
+  }
+  try {
+    invalidateRepositoryCache();
+  } catch {
+    // Ignore cache failure
   }
 }
 

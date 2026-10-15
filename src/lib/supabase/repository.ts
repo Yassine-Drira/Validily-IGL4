@@ -105,8 +105,8 @@ export async function getSemesterById(idOrSlug: string): Promise<Semester | null
   }
 }
 
-export async function getSubjects(semesterId?: string): Promise<Subject[]> {
-  const cacheKey = `subjects_${semesterId || "all"}`;
+export async function getSubjects(semesterId?: string, userId?: string): Promise<Subject[]> {
+  const cacheKey = `subjects_${semesterId || "all"}_${userId || "anon"}`;
   const cached = getFromCache<Subject[]>(cacheKey);
   if (cached) return cached;
 
@@ -114,7 +114,7 @@ export async function getSubjects(semesterId?: string): Promise<Subject[]> {
     const supabase = await getDbClient();
     let query = supabase
       .from("subjects")
-      .select("*, semester:semesters(*), resources:resources(count)")
+      .select("*, semester:semesters(*)")
       .eq("is_active", true)
       .order("sort_order", { ascending: true });
 
@@ -128,15 +128,34 @@ export async function getSubjects(semesterId?: string): Promise<Subject[]> {
       }
     }
 
-    const { data, error } = await query;
+    // Query resource counts filtered strictly by requester visibility
+    let resQuery = supabase.from("resources").select("subject_id");
+    if (userId) {
+      resQuery = resQuery.or(`visibility.eq.public,owner_id.eq.${userId}`);
+    } else {
+      resQuery = resQuery.eq("visibility", "public");
+    }
+
+    const [{ data, error }, { data: resData }] = await Promise.all([
+      query,
+      resQuery,
+    ]);
+
     if (error || !data) {
       console.error("Database query error [getSubjects]:", error);
       return [];
     }
 
+    const countMap = new Map<string, number>();
+    (resData || []).forEach((r: any) => {
+      if (r.subject_id) {
+        countMap.set(r.subject_id, (countMap.get(r.subject_id) || 0) + 1);
+      }
+    });
+
     const result = data.map((item: any) => ({
       ...item,
-      resource_count: item.resources?.[0]?.count ?? 0,
+      resource_count: countMap.get(item.id) ?? 0,
     }));
     setToCache(cacheKey, result, 20000);
     return result;
@@ -146,8 +165,8 @@ export async function getSubjects(semesterId?: string): Promise<Subject[]> {
   }
 }
 
-export async function getSubjectBySlugOrId(idOrSlug: string): Promise<Subject | null> {
-  const cacheKey = `subject_single_${idOrSlug}`;
+export async function getSubjectBySlugOrId(idOrSlug: string, userId?: string): Promise<Subject | null> {
+  const cacheKey = `subject_single_${idOrSlug}_${userId || "anon"}`;
   const cached = getFromCache<Subject>(cacheKey);
   if (cached) return cached;
 
@@ -155,7 +174,7 @@ export async function getSubjectBySlugOrId(idOrSlug: string): Promise<Subject | 
     const supabase = await getDbClient();
     let query = supabase
       .from("subjects")
-      .select("*, semester:semesters(*), resources:resources(count)");
+      .select("*, semester:semesters(*)");
 
     if (UUID_REGEX.test(idOrSlug)) {
       query = query.or(`id.eq.${idOrSlug},slug.eq.${idOrSlug}`);
@@ -169,9 +188,23 @@ export async function getSubjectBySlugOrId(idOrSlug: string): Promise<Subject | 
       return null;
     }
 
+    // Count visible resources for this specific subject
+    let resCountQuery = supabase
+      .from("resources")
+      .select("id", { count: "exact", head: true })
+      .eq("subject_id", data.id);
+
+    if (userId) {
+      resCountQuery = resCountQuery.or(`visibility.eq.public,owner_id.eq.${userId}`);
+    } else {
+      resCountQuery = resCountQuery.eq("visibility", "public");
+    }
+
+    const { count: resCount } = await resCountQuery;
+
     const result = {
       ...data,
-      resource_count: data.resources?.[0]?.count ?? 0,
+      resource_count: resCount ?? 0,
     };
     setToCache(cacheKey, result, 20000);
     return result;

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/supabase/server";
 import { getServiceSupabase, getEffectiveUserId } from "@/lib/supabase/admin";
+import { invalidateRepositoryCache } from "@/lib/supabase/repository";
 
 export async function POST(req: NextRequest) {
   try {
@@ -10,6 +11,7 @@ export async function POST(req: NextRequest) {
     const categoryId = formData.get("categoryId") as string;
     const title = formData.get("title") as string;
     const instructor = formData.get("instructor") as string | null;
+    const visibilityParam = formData.get("visibility") as string | null;
     const submitShared = formData.get("submitShared") === "on";
 
     const folderId = (formData.get("folderId") as string | null) || (formData.get("chapter") as string | null);
@@ -81,7 +83,15 @@ export async function POST(req: NextRequest) {
     }
 
     // 5. Insert database record
-    const visibility = submitShared ? "shared" : "public";
+    let visibility: "public" | "shared" | "private" = "public";
+    if (visibilityParam === "private" || visibilityParam === "shared" || visibilityParam === "public") {
+      visibility = visibilityParam;
+    } else if (submitShared) {
+      visibility = "public";
+    } else if (formData.has("submitShared") && !submitShared) {
+      // In upload-dropzone, unchecked submitShared explicitly means "Keep as Personal Private Resource"
+      visibility = "private";
+    }
     const publication_status = "published";
 
     const { data: resource, error: dbError } = await serviceSupabase
@@ -114,6 +124,9 @@ export async function POST(req: NextRequest) {
         { status: 500 }
       );
     }
+
+    // Invalidate repository cache so subject counts, library, and workspace lists refresh immediately
+    invalidateRepositoryCache();
 
     const redirectPath = resource?.subject?.slug
       ? `/subjects/${resource.subject.slug}`

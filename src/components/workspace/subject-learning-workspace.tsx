@@ -63,6 +63,8 @@ import {
   Folder,
   ShieldCheck,
   Loader2,
+  Lock,
+  Globe,
 } from "lucide-react";
 
 interface SubjectLearningWorkspaceProps {
@@ -1290,6 +1292,45 @@ ${resources.map((r) => `<li><strong>${r.title}</strong> (${r.mime_type}) - ${r.s
                   placeholder="e.g. Prof. IGL4"
                   className="w-full bg-[#FAFBFD] border border-[#E4E8F0] rounded-xl px-3 py-2 text-[#111A2E] focus:outline-none focus:border-[#2855D9]"
                 />
+              </div>
+
+              <div>
+                <label className="block font-medium text-[#111A2E] mb-1.5">
+                  Visibilité du document *
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="flex items-center space-x-2.5 p-3 rounded-xl border border-[#E4E8F0] hover:border-[#2855D9]/40 bg-[#FAFBFD] cursor-pointer transition-colors">
+                    <input
+                      type="radio"
+                      name="visibility"
+                      value="public"
+                      defaultChecked
+                      className="text-[#2855D9] focus:ring-[#2855D9]"
+                    />
+                    <div className="flex items-center space-x-1.5">
+                      <Globe className="w-3.5 h-3.5 text-[#2855D9] shrink-0" />
+                      <div>
+                        <div className="text-xs font-semibold text-[#182235]">Public</div>
+                        <div className="text-[10px] text-[#68748A]">Visible par la classe</div>
+                      </div>
+                    </div>
+                  </label>
+                  <label className="flex items-center space-x-2.5 p-3 rounded-xl border border-[#E4E8F0] hover:border-[#2855D9]/40 bg-[#FAFBFD] cursor-pointer transition-colors">
+                    <input
+                      type="radio"
+                      name="visibility"
+                      value="private"
+                      className="text-[#2855D9] focus:ring-[#2855D9]"
+                    />
+                    <div className="flex items-center space-x-1.5">
+                      <Lock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                      <div>
+                        <div className="text-xs font-semibold text-[#182235]">Privé</div>
+                        <div className="text-[10px] text-[#68748A]">Uniquement pour vous</div>
+                      </div>
+                    </div>
+                  </label>
+                </div>
               </div>
 
               <div className="flex items-center justify-end space-x-2 pt-3 border-t border-[#E4E8F0]">
