@@ -1020,6 +1020,93 @@ export function SubjectFileLibrary({
           }}
         />
       )}
+      {/* --- MODAL: CONFIRMATION SUPPRESSION RESSOURCE --- */}
+      {resourceToDelete && (
+        <DeleteConfirmModal
+          isOpen={true}
+          title="Supprimer la ressource"
+          itemName={resourceToDelete.title}
+          itemType="resource"
+          itemFormat={
+            resourceToDelete.storage_path.startsWith("http")
+              ? resourceToDelete.storage_path.includes("drive.google.com")
+                ? "Google Drive"
+                : "Lien externe"
+              : resourceToDelete.mime_type?.includes("pdf")
+              ? "PDF"
+              : "Fichier"
+          }
+          onClose={() => setResourceToDelete(null)}
+          onConfirm={async () => {
+            const res = await deleteResource(resourceToDelete.id);
+            if (!res.success) {
+              throw new Error(res.error || "Échec de la suppression.");
+            }
+            onResourcesChange((prev) => prev.filter((r) => r.id !== resourceToDelete.id));
+            setResourceToDelete(null);
+            showFeedback(`Ressource "${resourceToDelete.title}" supprimée.`);
+          }}
+        />
+      )}
+
+      {/* --- MODAL: CONFIRMATION SUPPRESSION DOSSIER --- */}
+      {folderToDelete && (
+        <DeleteConfirmModal
+          isOpen={true}
+          title="Supprimer le dossier"
+          itemName={folderToDelete.name}
+          itemType="folder"
+          hasChildren={
+            folders.some((f) => f.parent_id === folderToDelete.id) ||
+            resources.some((r) => r.chapter === folderToDelete.id)
+          }
+          childCount={
+            folders.filter((f) => f.parent_id === folderToDelete.id).length +
+            resources.filter((r) => r.chapter === folderToDelete.id).length
+          }
+          onClose={() => setFolderToDelete(null)}
+          onConfirm={async (options) => {
+            const res = await deleteFolderAction({
+              folder_id: folderToDelete.id,
+              subject_id: subject.id,
+              deleteContents: options?.deleteContents ?? false,
+            });
+            if (!res.success) {
+              throw new Error(res.error || "Échec de la suppression du dossier.");
+            }
+            if (options?.deleteContents) {
+              const descendantIds = new Set(getDescendantFolderIds(folderToDelete.id, folders));
+              descendantIds.add(folderToDelete.id);
+              onFoldersChange((prev) => prev.filter((f) => !descendantIds.has(f.id)));
+              onResourcesChange((prev) =>
+                prev.filter((r) => !r.chapter || !descendantIds.has(r.chapter))
+              );
+            } else {
+              onFoldersChange((prev) =>
+                prev
+                  .filter((f) => f.id !== folderToDelete.id)
+                  .map((f) =>
+                    f.parent_id === folderToDelete.id
+                      ? { ...f, parent_id: folderToDelete.parent_id }
+                      : f
+                  )
+              );
+              onResourcesChange((prev) =>
+                prev.map((r) =>
+                  r.chapter === folderToDelete.id
+                    ? { ...r, chapter: folderToDelete.parent_id }
+                    : r
+                )
+              );
+            }
+            if (currentFolderId === folderToDelete.id) {
+              setCurrentFolderId(folderToDelete.parent_id || null);
+            }
+            setFolderToDelete(null);
+            showFeedback(`Dossier "${folderToDelete.name}" supprimé.`);
+          }}
+        />
+      )}
     </div>
   );
 }

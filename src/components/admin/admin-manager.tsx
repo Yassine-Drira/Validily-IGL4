@@ -20,6 +20,7 @@ import {
   deleteSubject,
   createSemester,
 } from "@/lib/actions/admin-actions";
+import { DeleteConfirmModal } from "@/components/ui/delete-confirm-modal";
 
 interface AdminManagerProps {
   initialSemesters: Semester[];
@@ -37,6 +38,7 @@ export function AdminManager({
   const [semesters, setSemesters] = useState<Semester[]>(initialSemesters);
   const [subjects, setSubjects] = useState<Subject[]>(initialSubjects);
   const [categories, setCategories] = useState<ResourceCategory[]>(initialCategories);
+  const [subjectToDelete, setSubjectToDelete] = useState<Subject | null>(null);
 
   // Subject Modal State
   const [isSubjectModalOpen, setIsSubjectModalOpen] = useState(false);
@@ -136,37 +138,20 @@ export function AdminManager({
     }
   };
 
-  const handleDelete = async (subjectId: string, subjectName: string) => {
-    if (!confirm(`Delete subject "${subjectName}" and all related resources? This action is permanent.`)) return;
-    try {
-      const res = await deleteSubject(subjectId);
-      if (res.error) {
-        alert(res.error);
-        return;
-      }
-      setSubjects(subjects.filter((s) => s.id !== subjectId));
-      setFeedbackMsg(`Subject "${subjectName}" permanently removed.`);
-      setTimeout(() => setFeedbackMsg(""), 4000);
-    } catch (err: any) {
-      alert(err?.message || "Failed to delete subject.");
-    }
-  };
-
   const handleArchive = async (subjectId: string, subjectName: string) => {
-    if (!confirm(`Archive module "${subjectName}" from active listings?`)) return;
     try {
       const res = await updateSubject(subjectId, { name: subjectName });
       if (res.error) {
-        alert(res.error);
+        setErrorMsg(res.error);
         return;
       }
       setSubjects(
         subjects.map((s) => (s.id === subjectId ? { ...s, is_active: false } : s))
       );
-      setFeedbackMsg(`Subject "${subjectName}" archived.`);
+      setFeedbackMsg(`Matière "${subjectName}" archivée.`);
       setTimeout(() => setFeedbackMsg(""), 4000);
     } catch (err: any) {
-      console.error(err);
+      setErrorMsg(err?.message || "Échec de l'archivage.");
     }
   };
 
@@ -380,7 +365,7 @@ export function AdminManager({
                     <td className="py-2.5 px-3 text-right space-x-2">
                       <button
                         type="button"
-                        onClick={() => handleDelete(sub.id, sub.name)}
+                        onClick={() => setSubjectToDelete(sub)}
                         className="text-rose-600 hover:text-rose-800 text-xs font-medium transition-colors cursor-pointer"
                       >
                         Delete
@@ -568,6 +553,28 @@ export function AdminManager({
             </form>
           </div>
         </div>
+      )}
+
+      {/* Modal: Delete Subject Confirmation */}
+      {subjectToDelete && (
+        <DeleteConfirmModal
+          isOpen={true}
+          title={`Supprimer la matière ${subjectToDelete.name}`}
+          itemName={subjectToDelete.name}
+          itemType="subject"
+          warningMessage="Cette action supprimera définitivement cette matière ainsi que tous ses dossiers, ressources, QCM, mémos et données de révision."
+          onClose={() => setSubjectToDelete(null)}
+          onConfirm={async () => {
+            const res = await deleteSubject(subjectToDelete.id);
+            if (res.error) {
+              throw new Error(res.error);
+            }
+            setSubjects((prev) => prev.filter((s) => s.id !== subjectToDelete.id));
+            setFeedbackMsg(`Matière "${subjectToDelete.name}" définitivement supprimée.`);
+            setTimeout(() => setFeedbackMsg(""), 4000);
+            setSubjectToDelete(null);
+          }}
+        />
       )}
     </div>
   );

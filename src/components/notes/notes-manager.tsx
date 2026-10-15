@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { formatDate } from "@/lib/utils";
 import { Note, Subject } from "@/types/database";
 import { createNote, updateNote, deleteNote } from "@/lib/actions/note-actions";
+import { DeleteConfirmModal } from "@/components/ui/delete-confirm-modal";
 
 interface NotesManagerProps {
   initialNotes: Note[];
@@ -33,6 +34,7 @@ export function NotesManager({
   defaultSubjectId,
 }: NotesManagerProps) {
   const [notes, setNotes] = useState<Note[]>(initialNotes);
+  const [noteToDelete, setNoteToDelete] = useState<Note | null>(null);
   const [search, setSearch] = useState<string>("");
   const [selectedSubject, setSelectedSubject] = useState<string>("");
 
@@ -138,15 +140,7 @@ export function NotesManager({
     }
   };
 
-  const handleDelete = async (noteId: string) => {
-    if (!confirm("Are you sure you want to delete this cheat sheet?")) return;
-    try {
-      await deleteNote(noteId);
-      setNotes((prev) => prev.filter((n) => n.id !== noteId));
-    } catch (err) {
-      console.error("Delete note error:", err);
-    }
-  };
+
 
   const filteredNotes = notes.filter((n) => {
     const matchesSearch =
@@ -386,7 +380,7 @@ export function NotesManager({
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleDelete(note.id)}
+                      onClick={() => setNoteToDelete(note)}
                       className="hover:text-rose-600 p-1 cursor-pointer"
                       title="Delete note"
                     >
@@ -441,6 +435,25 @@ export function NotesManager({
             </Button>
           </div>
         </div>
+      )}
+
+      {/* Modal: Confirmation suppression fiche mémo */}
+      {noteToDelete && (
+        <DeleteConfirmModal
+          isOpen={true}
+          title="Supprimer la fiche mémo"
+          itemName={noteToDelete.title}
+          itemType="note"
+          onClose={() => setNoteToDelete(null)}
+          onConfirm={async () => {
+            const res = await deleteNote(noteToDelete.id);
+            if (res.error) {
+              throw new Error(res.error);
+            }
+            setNotes((prev) => prev.filter((n) => n.id !== noteToDelete.id));
+            setNoteToDelete(null);
+          }}
+        />
       )}
     </div>
   );

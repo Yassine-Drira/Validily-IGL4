@@ -11,10 +11,11 @@ export interface DeleteConfirmModalProps {
   onConfirm: (options?: { deleteContents?: boolean }) => Promise<void>;
   title?: string;
   itemName: string;
-  itemType?: "resource" | "folder" | "quiz" | "note";
+  itemType?: "resource" | "folder" | "quiz" | "note" | "subject";
   itemFormat?: string; // e.g. "PDF", "Google Drive", "Markdown"
   hasChildren?: boolean;
   childCount?: number;
+  warningMessage?: string;
 }
 
 export function DeleteConfirmModal({
@@ -27,6 +28,7 @@ export function DeleteConfirmModal({
   itemFormat,
   hasChildren = false,
   childCount = 0,
+  warningMessage,
 }: DeleteConfirmModalProps) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string>("");
@@ -41,6 +43,8 @@ export function DeleteConfirmModal({
       ? "Supprimer le quiz"
       : itemType === "note"
       ? "Supprimer la note"
+      : itemType === "subject"
+      ? "Supprimer la matière"
       : "Supprimer la ressource";
 
   const handleConfirm = async () => {
@@ -97,6 +101,8 @@ export function DeleteConfirmModal({
           <div className="flex items-center space-x-2.5 min-w-0 flex-1">
             {itemType === "folder" ? (
               <Folder className="w-4 h-4 text-amber-500 fill-amber-500/20 shrink-0" />
+            ) : itemType === "subject" ? (
+              <Layers className="w-4 h-4 text-indigo-600 shrink-0" />
             ) : itemFormat?.includes("Drive") ? (
               <HardDrive className="w-4 h-4 text-emerald-600 shrink-0" />
             ) : (
@@ -162,7 +168,7 @@ export function DeleteConfirmModal({
           </div>
         ) : (
           <p className="text-xs text-[#68748A] leading-relaxed">
-            Cette action est irréversible. L'élément sera définitivement supprimé de la base de données.
+            {warningMessage || "Cette action est irréversible. L'élément sera définitivement supprimé de la base de données."}
           </p>
         )}
 

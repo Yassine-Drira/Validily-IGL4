@@ -171,21 +171,91 @@ export async function deleteSubject(subjectId: string): Promise<{ success?: bool
     }
 
     const serviceSupabase = getServiceSupabase();
+
+    // 1. Fetch and clean up all resources belonging to this subject
+    const { data: resources } = await serviceSupabase
+      .from("resources")
+      .select("id, storage_path")
+      .eq("subject_id", subjectId);
+
+    if (resources && resources.length > 0) {
+      const resourceIds = resources.map((r: any) => r.id);
+
+      // Clean up bookmarks & revision progress
+      await serviceSupabase.from("bookmarks").delete().in("resource_id", resourceIds);
+      await serviceSupabase.from("revision_progress").delete().in("resource_id", resourceIds);
+
+      // Clean up local storage files
+      const storagePaths = resources
+        .map((r: any) => r.storage_path)
+        .filter((p: string) => p && !p.startsWith("http"));
+
+      if (storagePaths.length > 0) {
+        await serviceSupabase.storage
+          .from("academic-resources")
+          .remove(storagePaths);
+      }
+
+      // Delete resources
+      await serviceSupabase.from("resources").delete().eq("subject_id", subjectId);
+    }
+
+    // 2. Fetch and clean up all quizzes belonging to this subject
+    const { data: quizzes } = await serviceSupabase
+      .from("quizzes")
+      .select("id")
+      .eq("subject_id", subjectId);
+
+    if (quizzes && quizzes.length > 0) {
+      const quizIds = quizzes.map((q: any) => q.id);
+
+      // Delete quiz attempts
+      await serviceSupabase.from("quiz_attempts").delete().in("quiz_id", quizIds);
+
+      // Delete questions and options
+      const { data: questions } = await serviceSupabase
+        .from("quiz_questions")
+        .select("id")
+        .in("quiz_id", quizIds);
+
+      if (questions && questions.length > 0) {
+        const questionIds = questions.map((q: any) => q.id);
+        await serviceSupabase.from("quiz_options").delete().in("question_id", questionIds);
+        await serviceSupabase.from("quiz_questions").delete().in("id", questionIds);
+      }
+
+      // Delete quizzes
+      await serviceSupabase.from("quizzes").delete().eq("subject_id", subjectId);
+    }
+
+    // 3. Delete notes belonging to this subject
+    await serviceSupabase.from("notes").delete().eq("subject_id", subjectId);
+
+    // 4. Delete subject folders
+    await serviceSupabase.from("subject_folders").delete().eq("subject_id", subjectId);
+
+    // 5. Delete the subject itself
     const { error } = await serviceSupabase
       .from("subjects")
       .delete()
       .eq("id", subjectId);
 
     if (error) {
+      console.error("Delete subject error:", error);
       return { error: error.message };
     }
 
     safeRevalidate("/admin");
     safeRevalidate("/subjects");
     safeRevalidate("/semesters");
+    safeRevalidate("/library");
+    safeRevalidate("/bookmarks");
+    safeRevalidate("/quizzes");
+    safeRevalidate("/notes");
     safeRevalidate("/");
     return { success: true };
   } catch (err: any) {
+    console.error("deleteSubject uncaught exception:", err);
     return { error: err.message || "Failed to delete subject." };
   }
 }
