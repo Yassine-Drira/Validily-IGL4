@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 
 interface SubjectCardProps {
   subject: Subject;
-  variant?: "compact" | "full";
+  variant?: "compact" | "full" | "list";
 }
 
 export function SubjectCard({ subject, variant = "full" }: SubjectCardProps) {
@@ -33,6 +33,54 @@ export function SubjectCard({ subject, variant = "full" }: SubjectCardProps) {
         <span className="text-[10px] text-[#68748A] mt-1 font-mono">
           {subject.resource_count ?? 0} docs
         </span>
+      </Link>
+    );
+  }
+
+  if (variant === "list") {
+    return (
+      <Link
+        href={`/subjects/${subject.slug}`}
+        className="group p-4 hover:bg-[#FAFBFD] transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#F1F4F9] last:border-b-0 cursor-pointer"
+      >
+        <div className="flex items-center space-x-3.5 min-w-0 flex-1">
+          <div
+            className={cn(
+              "w-11 h-11 rounded-xl border flex items-center justify-center shrink-0 transition-transform duration-200 group-hover:scale-105 shadow-2xs",
+              visual.bgLight,
+              visual.borderLight
+            )}
+          >
+            <IconComponent className={cn("w-5 h-5", visual.color)} />
+          </div>
+
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center space-x-2 flex-wrap gap-y-1 mb-1">
+              <span className="font-bold text-sm text-[#111A2E] group-hover:text-[#2855D9] transition-colors">
+                {subject.name}
+              </span>
+              <span className="font-mono text-[10px] text-[#68748A] bg-[#FAFAF7] border border-[#E4E8F0] px-1.5 py-0.2 rounded-md">
+                {subject.slug}
+              </span>
+            </div>
+            <p className="text-xs text-[#68748A] line-clamp-1">
+              {subject.description || "Supports de cours, fiches mémo et quiz de préparation aux examens."}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center space-x-3 shrink-0 self-end sm:self-center">
+          <div className="flex items-center space-x-1.5 text-xs text-[#68748A] font-mono bg-[#FAFAF7] border border-[#E4E8F0] px-2.5 py-1 rounded-lg">
+            <FileText className="w-3.5 h-3.5 text-[#2855D9]" />
+            <span className="font-semibold text-[#111A2E]">{subject.resource_count ?? 0}</span>
+            <span>ressources</span>
+          </div>
+
+          <span className="text-xs font-semibold text-[#2855D9] group-hover:text-[#1E40AF] flex items-center space-x-1 transition-colors">
+            <span className="hidden md:inline">Ouvrir</span>
+            <ArrowRight className="w-3.5 h-3.5 transform group-hover:translate-x-0.5 transition-transform" />
+          </span>
+        </div>
       </Link>
     );
   }

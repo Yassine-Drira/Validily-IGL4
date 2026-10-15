@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { Subject } from "@/types/database";
 import { ValidilyLogo } from "@/components/brand/validily-logo";
+import { SubjectIcon } from "@/components/academic/subject-icon";
 import { useSidebar } from "./workspace-shell";
 
 const navItems = [
@@ -151,14 +152,17 @@ export function AppSidebar({ subjects = [] }: AppSidebarProps) {
                       href={subHref}
                       onClick={closeMobile}
                       className={cn(
-                        "flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs transition-colors cursor-pointer",
+                        "flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs transition-colors cursor-pointer group",
                         isSubActive
                           ? "bg-[#EDF2FF] text-[#2855D9] font-medium"
                           : "text-[#68748A] hover:text-[#182235] hover:bg-[#F4F6FA]"
                       )}
                     >
-                      <span className="truncate pr-1">{sub.name}</span>
-                      <span className="text-[10px] text-[#68748A] font-mono font-tabular">
+                      <div className="flex items-center space-x-2 truncate pr-1">
+                        <SubjectIcon name={sub.name} slug={sub.slug} className="w-3.5 h-3.5 shrink-0" />
+                        <span className="truncate">{sub.name}</span>
+                      </div>
+                      <span className="text-[10px] text-[#68748A] font-mono font-tabular shrink-0">
                         {sub.resource_count ?? 0}
                       </span>
                     </Link>
@@ -202,14 +206,17 @@ export function AppSidebar({ subjects = [] }: AppSidebarProps) {
                       href={subHref}
                       onClick={closeMobile}
                       className={cn(
-                        "flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs transition-colors cursor-pointer",
+                        "flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs transition-colors cursor-pointer group",
                         isSubActive
                           ? "bg-[#EDF2FF] text-[#2855D9] font-medium"
                           : "text-[#68748A] hover:text-[#182235] hover:bg-[#F4F6FA]"
                       )}
                     >
-                      <span className="truncate pr-1">{sub.name}</span>
-                      <span className="text-[10px] text-[#68748A] font-mono font-tabular">
+                      <div className="flex items-center space-x-2 truncate pr-1">
+                        <SubjectIcon name={sub.name} slug={sub.slug} className="w-3.5 h-3.5 shrink-0" />
+                        <span className="truncate">{sub.name}</span>
+                      </div>
+                      <span className="text-[10px] text-[#68748A] font-mono font-tabular shrink-0">
                         {sub.resource_count ?? 0}
                       </span>
                     </Link>

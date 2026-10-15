@@ -10,8 +10,9 @@ import {
   Quiz,
   RevisionStatus,
 } from "@/types/database";
-import { CategoryBadge } from "@/components/academic/category-badge";
-import { SubjectIcon } from "@/components/academic/subject-icon";
+import { CategoryBadge, getCategoryVisual } from "@/components/academic/category-badge";
+import { SubjectIcon, getSubjectVisual } from "@/components/academic/subject-icon";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { PdfViewer } from "@/components/pdf/pdf-viewer";
 import { QuizRunner } from "@/components/quizzes/quiz-runner";
@@ -51,6 +52,11 @@ import {
   Maximize2,
   RotateCcw,
   Play,
+  List,
+  LayoutGrid,
+  Filter,
+  Folder,
+  ShieldCheck,
 } from "lucide-react";
 
 interface SubjectLearningWorkspaceProps {
@@ -73,8 +79,12 @@ export function SubjectLearningWorkspace({
   const [notes, setNotes] = useState<Note[]>(initialNotes);
   const [quizzes, setQuizzes] = useState<any[]>(initialQuizzes);
 
+  // Filters & Layout
   const [activeCategoryFilter, setActiveCategoryFilter] = useState<string>("all");
+  const [activeStatusFilter, setActiveStatusFilter] = useState<string>("all");
   const [resourceSearch, setResourceSearch] = useState<string>("");
+  const [viewMode, setViewMode] = useState<"grouped_list" | "cards">("grouped_list");
+  const [preselectedCategoryId, setPreselectedCategoryId] = useState<string | undefined>(undefined);
 
   // In-app Viewer Modals
   const [viewingResource, setViewingResource] = useState<AcademicResource | null>(null);
@@ -102,6 +112,12 @@ export function SubjectLearningWorkspace({
     setTimeout(() => setFeedback(""), 4000);
   };
 
+  // Subject Visual Theme (Icon Glyph & tailored colors)
+  const subjectVisual = React.useMemo(() => {
+    return getSubjectVisual(subject.slug || subject.name);
+  }, [subject.slug, subject.name]);
+  const SubjectGlyph = subjectVisual.icon;
+
   // --- DERIVED METRICS FOR PRACTICAL PROGRESS TRACKER ---
   const cheatSheets = notes.filter((n) => n.tags?.includes("cheat-sheet"));
   const regularNotes = notes.filter((n) => !n.tags?.includes("cheat-sheet"));
@@ -121,12 +137,52 @@ export function SubjectLearningWorkspace({
       activeCategoryFilter === "all" ||
       r.category?.slug === activeCategoryFilter ||
       r.category_id === activeCategoryFilter;
+    const matchesStatus =
+      activeStatusFilter === "all" ||
+      r.revision_status === activeStatusFilter ||
+      (!r.revision_status && activeStatusFilter === "not_started");
     const matchesSearch =
       !resourceSearch.trim() ||
       r.title.toLowerCase().includes(resourceSearch.toLowerCase()) ||
-      r.description?.toLowerCase().includes(resourceSearch.toLowerCase());
-    return matchesCategory && matchesSearch;
+      r.description?.toLowerCase().includes(resourceSearch.toLowerCase()) ||
+      r.original_filename?.toLowerCase().includes(resourceSearch.toLowerCase());
+    return matchesCategory && matchesStatus && matchesSearch;
   });
+
+  // Grouped resources by category sections (for structured list view)
+  const groupedResourceSections = React.useMemo(() => {
+    const activeCats =
+      activeCategoryFilter === "all"
+        ? categories
+        : categories.filter((c) => c.slug === activeCategoryFilter || c.id === activeCategoryFilter);
+
+    const sections = activeCats.map((cat) => {
+      const items = filteredResources.filter(
+        (r) => r.category?.slug === cat.slug || r.category_id === cat.id
+      );
+      return {
+        category: cat,
+        items,
+      };
+    });
+
+    const uncategorizedItems = filteredResources.filter((r) => !r.category_id && !r.category);
+    if (uncategorizedItems.length > 0 && activeCategoryFilter === "all") {
+      sections.push({
+        category: {
+          id: "uncategorized",
+          name: "Ressources Générales",
+          slug: "other-resources",
+          description: null,
+          sort_order: 99,
+          is_active: true,
+        },
+        items: uncategorizedItems,
+      });
+    }
+
+    return sections;
+  }, [categories, filteredResources, activeCategoryFilter]);
 
   // --- HANDLERS: RESOURCES ---
   const handleToggleRevision = async (resourceId: string, currentStatus?: RevisionStatus) => {
@@ -270,20 +326,45 @@ ${resources.map((r) => `<li><strong>${r.title}</strong> (${r.mime_type}) - ${r.s
       )}
 
       {/* TOP HERO HEADER */}
-      <div className="bg-white border border-[#E4E8F0] rounded-2xl p-6 md:p-8 shadow-xs">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+      <div className="bg-white border border-[#E4E8F0] rounded-2xl p-6 md:p-8 shadow-xs relative overflow-hidden">
+        {/* Subtle background glow tailored to subject theme */}
+        <div
+          className={cn(
+            "absolute -right-20 -top-20 w-80 h-80 rounded-full blur-3xl opacity-20 pointer-events-none",
+            subjectVisual.bgLight
+          )}
+        />
+
+        <div className="relative flex flex-col lg:flex-row lg:items-center justify-between gap-6">
           <div className="flex items-start space-x-4">
-            <div className="w-14 h-14 rounded-2xl bg-[#EDF2FF] border border-[#2855D9]/20 text-[#2855D9] flex items-center justify-center shrink-0 shadow-xs">
-              <SubjectIcon name={subject.icon} className="w-7 h-7" />
+            <div
+              className={cn(
+                "w-16 h-16 rounded-2xl border flex items-center justify-center shrink-0 shadow-sm transition-transform duration-200 group-hover:scale-105",
+                subjectVisual.bgLight,
+                subjectVisual.borderLight
+              )}
+            >
+              <SubjectGlyph className={cn("w-9 h-9", subjectVisual.color)} />
             </div>
             <div>
               <div className="flex items-center space-x-2 mb-1.5 flex-wrap gap-y-1">
-                <span className="bg-[#2855D9] text-white text-[11px] font-semibold px-2.5 py-0.5 rounded-full shadow-xs">
+                <span
+                  className={cn(
+                    "text-[11px] font-semibold px-2.5 py-0.5 rounded-full border shadow-2xs font-mono",
+                    subjectVisual.badgeBg,
+                    subjectVisual.borderLight
+                  )}
+                >
                   {subject.semester?.name || (subject.semester_id === "22222222-2222-2222-2222-222222222222" ? "Semestre 2" : "Semestre 1")}
                 </span>
                 <span className="text-xs text-[#68748A]">•</span>
                 <span className="text-xs font-mono text-[#68748A]">
                   Code : {subject.slug}
+                </span>
+                <span className="text-xs text-[#68748A]">•</span>
+                <span className="text-[11px] text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 flex items-center space-x-1">
+                  <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                  <span>Module IGL4</span>
                 </span>
               </div>
               <h1 className="text-2xl sm:text-3xl font-bold text-[#111A2E] tracking-tight">
@@ -296,23 +377,26 @@ ${resources.map((r) => `<li><strong>${r.title}</strong> (${r.mime_type}) - ${r.s
           </div>
 
           {/* Quick Actions */}
-          <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
             <button
               type="button"
-              onClick={() => setIsAddResourceModalOpen(true)}
+              onClick={() => {
+                setPreselectedCategoryId(undefined);
+                setIsAddResourceModalOpen(true);
+              }}
               className="bg-[#2855D9] hover:bg-[#1E40AF] text-white text-xs font-semibold px-3.5 py-2.5 rounded-xl shadow-xs flex items-center space-x-2 transition-all cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>Ajouter Ressource</span>
+              <span>Ajouter Document</span>
             </button>
 
             <button
               type="button"
-              onClick={() => setIsAddQuizModalOpen(true)}
-              className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-xs font-semibold px-3.5 py-2.5 rounded-xl shadow-xs flex items-center space-x-2 transition-all cursor-pointer"
+              onClick={() => setIsImportQuizModalOpen(true)}
+              className="bg-[#4F46E5] hover:bg-[#4338CA] text-white text-xs font-semibold px-3.5 py-2.5 rounded-xl shadow-xs flex items-center space-x-2 transition-all cursor-pointer"
             >
               <Sparkles className="w-3.5 h-3.5" />
-              <span>Nouveau Quiz</span>
+              <span>Importer Quiz / Atelier</span>
             </button>
 
             <button
@@ -326,10 +410,10 @@ ${resources.map((r) => `<li><strong>${r.title}</strong> (${r.mime_type}) - ${r.s
           </div>
         </div>
 
-        {/* PRACTICAL PROGRESS TRACKER (Derived from Real Persisted Data) */}
-        <div className="mt-7 pt-6 border-t border-[#E4E8F0] grid grid-cols-1 md:grid-cols-4 gap-4">
+        {/* PRACTICAL PROGRESS TRACKER */}
+        <div className="mt-7 pt-6 border-t border-[#E4E8F0] grid grid-cols-2 md:grid-cols-4 gap-3.5">
           <div className="bg-[#FAFBFD] border border-[#E4E8F0] rounded-xl p-4 flex items-center space-x-3.5">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 text-[#2855D9] flex items-center justify-center font-bold font-mono text-sm shrink-0">
+            <div className="w-10 h-10 rounded-xl bg-blue-50 text-[#2855D9] flex items-center justify-center font-bold font-mono text-sm shrink-0 border border-blue-100">
               {progressPercentage}%
             </div>
             <div className="flex-1 min-w-0">
@@ -360,7 +444,7 @@ ${resources.map((r) => `<li><strong>${r.title}</strong> (${r.mime_type}) - ${r.s
           <div className="bg-[#FAFBFD] border border-[#E4E8F0] rounded-xl p-4 flex items-center justify-between">
             <div>
               <div className="text-[11px] font-semibold text-[#68748A] uppercase tracking-wider">
-                Quiz & QCM
+                Quiz & Ateliers
               </div>
               <div className="text-xl font-bold font-mono text-[#111A2E] mt-0.5">
                 {quizzes.length}
@@ -465,60 +549,455 @@ ${resources.map((r) => `<li><strong>${r.title}</strong> (${r.mime_type}) - ${r.s
 
       {/* --- TAB 1: COURS & RESSOURCES --- */}
       {activeTab === "resources" && (
-        <div className="space-y-5">
-          {/* Filter Bar */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+        <div className="space-y-6">
+          {/* CONTROL & FILTER BAR */}
+          <div className="bg-white border border-[#E4E8F0] rounded-2xl p-4 shadow-2xs space-y-3.5">
+            <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+              {/* Search Bar */}
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 text-[#68748A] absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={resourceSearch}
+                  onChange={(e) => setResourceSearch(e.target.value)}
+                  placeholder="Rechercher par titre, mot-clé, nom de fichier..."
+                  className="w-full bg-[#FAFAF7] focus:bg-white border border-[#E4E8F0] focus:border-[#2855D9] rounded-xl pl-9 pr-9 py-2 text-xs text-[#182235] transition-colors focus:outline-hidden"
+                />
+                {resourceSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setResourceSearch("")}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#68748A] hover:text-[#182235] p-0.5 cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {/* Status and Category Filter Dropdowns + View Switcher */}
+              <div className="flex flex-wrap items-center gap-2.5">
+                {/* Category Select Dropdown */}
+                <div className="flex items-center space-x-1.5 bg-[#FAFAF7] border border-[#E4E8F0] rounded-xl px-2.5 py-1 text-xs">
+                  <Filter className="w-3.5 h-3.5 text-[#68748A]" />
+                  <span className="text-[11px] text-[#68748A] font-medium hidden sm:inline">Catégorie :</span>
+                  <select
+                    value={activeCategoryFilter}
+                    onChange={(e) => setActiveCategoryFilter(e.target.value)}
+                    className="bg-transparent text-xs text-[#111A2E] font-semibold focus:outline-hidden cursor-pointer"
+                  >
+                    <option value="all">Toutes les sections ({resources.length})</option>
+                    {categories.map((c) => {
+                      const count = resources.filter(
+                        (r) => r.category?.slug === c.slug || r.category_id === c.id
+                      ).length;
+                      const visual = getCategoryVisual(c.slug, c.name);
+                      return (
+                        <option key={c.id} value={c.slug}>
+                          {visual.frenchLabel} ({count})
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+
+                {/* Revision Status Filter Dropdown */}
+                <div className="flex items-center space-x-1.5 bg-[#FAFAF7] border border-[#E4E8F0] rounded-xl px-2.5 py-1 text-xs">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-[#68748A]" />
+                  <span className="text-[11px] text-[#68748A] font-medium hidden sm:inline">Statut :</span>
+                  <select
+                    value={activeStatusFilter}
+                    onChange={(e) => setActiveStatusFilter(e.target.value)}
+                    className="bg-transparent text-xs text-[#111A2E] font-semibold focus:outline-hidden cursor-pointer"
+                  >
+                    <option value="all">Tous les statuts</option>
+                    <option value="not_started">À réviser</option>
+                    <option value="in_progress">En cours</option>
+                    <option value="revised">Révisé</option>
+                  </select>
+                </div>
+
+                {/* View Mode Toggle Switch */}
+                <div className="flex items-center bg-[#FAFAF7] border border-[#E4E8F0] rounded-xl p-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setViewMode("grouped_list")}
+                    className={cn(
+                      "px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition-all cursor-pointer",
+                      viewMode === "grouped_list"
+                        ? "bg-white text-[#2855D9] shadow-xs"
+                        : "text-[#68748A] hover:text-[#111A2E]"
+                    )}
+                    title="Vue Groupée par Listes"
+                  >
+                    <List className="w-3.5 h-3.5" />
+                    <span className="hidden md:inline">Par Listes</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setViewMode("cards")}
+                    className={cn(
+                      "px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition-all cursor-pointer",
+                      viewMode === "cards"
+                        ? "bg-white text-[#2855D9] shadow-xs"
+                        : "text-[#68748A] hover:text-[#111A2E]"
+                    )}
+                    title="Vue Grille / Cartes"
+                  >
+                    <LayoutGrid className="w-3.5 h-3.5" />
+                    <span className="hidden md:inline">Cartes</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Segmented Category Chips for Instant 1-Click Access */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 pt-1 border-t border-[#F4F6FA]">
               <button
                 type="button"
                 onClick={() => setActiveCategoryFilter("all")}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap border ${
+                className={cn(
+                  "px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap border flex items-center space-x-1.5",
                   activeCategoryFilter === "all"
-                    ? "bg-[#2855D9] text-white border-[#2855D9] shadow-xs"
-                    : "bg-white text-[#182235] border-[#E4E8F0] hover:bg-[#F4F6FA]"
-                }`}
+                    ? "bg-[#2855D9] text-white border-[#2855D9] shadow-2xs"
+                    : "bg-[#FAFAF7] text-[#68748A] border-[#E4E8F0] hover:text-[#111A2E] hover:bg-white"
+                )}
               >
-                Tous ({resources.length})
+                <Layers className="w-3.5 h-3.5" />
+                <span>Toutes les catégories</span>
+                <span className="text-[10px] font-mono opacity-80">({resources.length})</span>
               </button>
+
               {categories.map((cat) => {
                 const count = resources.filter(
                   (r) => r.category?.slug === cat.slug || r.category_id === cat.id
                 ).length;
+                const visual = getCategoryVisual(cat.slug, cat.name);
+                const CatIcon = visual.icon;
+                const isSelected = activeCategoryFilter === cat.slug;
+
                 return (
                   <button
                     key={cat.id}
                     type="button"
                     onClick={() => setActiveCategoryFilter(cat.slug)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap border ${
-                      activeCategoryFilter === cat.slug
-                        ? "bg-[#2855D9] text-white border-[#2855D9] shadow-xs"
-                        : "bg-white text-[#182235] border-[#E4E8F0] hover:bg-[#F4F6FA]"
-                    }`}
+                    className={cn(
+                      "px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap border flex items-center space-x-1.5",
+                      isSelected
+                        ? "bg-[#2855D9] text-white border-[#2855D9] shadow-2xs"
+                        : "bg-[#FAFAF7] text-[#68748A] border-[#E4E8F0] hover:text-[#111A2E] hover:bg-white"
+                    )}
                   >
-                    {cat.name} ({count})
+                    <CatIcon className={cn("w-3.5 h-3.5", isSelected ? "text-white" : visual.color)} />
+                    <span>{visual.frenchLabel}</span>
+                    <span
+                      className={cn(
+                        "text-[10px] font-mono px-1.5 py-0.2 rounded-full",
+                        isSelected ? "bg-white/20 text-white" : "bg-white text-[#68748A]"
+                      )}
+                    >
+                      {count}
+                    </span>
                   </button>
                 );
               })}
             </div>
-
-            <div className="relative w-full sm:w-64 shrink-0">
-              <Search className="w-3.5 h-3.5 text-[#68748A] absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={resourceSearch}
-                onChange={(e) => setResourceSearch(e.target.value)}
-                placeholder="Filtrer les ressources..."
-                className="w-full bg-white border border-[#E4E8F0] rounded-xl pl-8 pr-3 py-1.5 text-xs text-[#182235] focus:outline-none focus:border-[#2855D9]"
-              />
-            </div>
           </div>
 
-          {/* Resources List */}
-          {filteredResources.length > 0 ? (
+          {/* Resources View Rendering */}
+          {filteredResources.length === 0 ? (
+            <div className="bg-white border border-dashed border-[#CBD5E1] rounded-2xl p-10 text-center space-y-3">
+              <BookOpen className="w-9 h-9 text-[#68748A]/40 mx-auto" />
+              <div>
+                <h4 className="text-sm font-semibold text-[#182235]">
+                  Aucun document ne correspond à vos critères
+                </h4>
+                <p className="text-xs text-[#68748A] max-w-md mx-auto mt-1">
+                  Essayez de modifier votre recherche ou réinitialisez les filtres de catégorie et de statut.
+                </p>
+              </div>
+              <div className="pt-2 flex items-center justify-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setActiveCategoryFilter("all");
+                    setActiveStatusFilter("all");
+                    setResourceSearch("");
+                  }}
+                >
+                  <RotateCcw className="w-3.5 h-3.5 mr-1" />
+                  <span>Réinitialiser les filtres</span>
+                </Button>
+
+                <Button
+                  size="sm"
+                  variant="primary"
+                  onClick={() => {
+                    setPreselectedCategoryId(undefined);
+                    setIsAddResourceModalOpen(true);
+                  }}
+                  className="bg-[#2855D9] hover:bg-[#1E40AF]"
+                >
+                  <Plus className="w-3.5 h-3.5 mr-1" />
+                  <span>Ajouter une ressource</span>
+                </Button>
+              </div>
+            </div>
+          ) : viewMode === "grouped_list" ? (
+            /* GROUPED LIST VIEW (Grouped by Category Sections) */
+            <div className="space-y-6">
+              {groupedResourceSections.map(({ category, items }) => {
+                if (items.length === 0 && activeCategoryFilter === "all") return null;
+                const visual = getCategoryVisual(category.slug, category.name);
+                const CatIcon = visual.icon;
+
+                return (
+                  <div
+                    key={category.id}
+                    className="bg-white border border-[#E4E8F0] rounded-2xl overflow-hidden shadow-2xs"
+                  >
+                    {/* Category Group Header */}
+                    <div className="bg-[#FAFBFD] px-5 py-3.5 border-b border-[#E4E8F0] flex items-center justify-between gap-3">
+                      <div className="flex items-center space-x-2.5">
+                        <div className={cn("w-8 h-8 rounded-xl border flex items-center justify-center shrink-0", visual.bgColor, visual.borderColor)}>
+                          <CatIcon className={cn("w-4 h-4", visual.color)} />
+                        </div>
+                        <div>
+                          <h3 className="text-sm font-bold text-[#111A2E] leading-tight flex items-center space-x-2">
+                            <span>{visual.frenchLabel}</span>
+                            <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-white border border-[#E4E8F0] text-[#68748A] font-semibold">
+                              {items.length} {items.length <= 1 ? "document" : "documents"}
+                            </span>
+                          </h3>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPreselectedCategoryId(category.id);
+                          setIsAddResourceModalOpen(true);
+                        }}
+                        className="text-xs font-semibold text-[#2855D9] hover:text-[#1E40AF] hover:bg-[#EDF2FF] px-2.5 py-1 rounded-lg transition-colors flex items-center space-x-1 cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">Ajouter dans cette section</span>
+                      </button>
+                    </div>
+
+                    {/* Group Items List */}
+                    {items.length > 0 ? (
+                      <div className="divide-y divide-[#F1F4F9]">
+                        {items.map((res) => {
+                          const isPdf = res.mime_type === "application/pdf" || res.original_filename?.toLowerCase().endsWith(".pdf");
+                          const isHtml = res.mime_type === "text/html" || res.original_filename?.toLowerCase().endsWith(".html");
+                          const isExternalLink = res.mime_type === "application/x-url" || res.storage_path?.startsWith("http");
+
+                          return (
+                            <div
+                              key={res.id}
+                              className="p-4 hover:bg-[#FAFBFD] transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3 group"
+                            >
+                              <div className="flex items-start space-x-3.5 min-w-0 flex-1">
+                                {/* Format Badge */}
+                                <div className="shrink-0 mt-0.5">
+                                  {isPdf ? (
+                                    <div className="w-9 h-9 rounded-xl bg-rose-50 border border-rose-200 text-rose-600 flex flex-col items-center justify-center shadow-2xs">
+                                      <FileText className="w-4 h-4" />
+                                      <span className="text-[8px] font-mono font-bold leading-none mt-0.5">PDF</span>
+                                    </div>
+                                  ) : isHtml ? (
+                                    <div className="w-9 h-9 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-600 flex flex-col items-center justify-center shadow-2xs">
+                                      <FileCode className="w-4 h-4" />
+                                      <span className="text-[8px] font-mono font-bold leading-none mt-0.5">HTML</span>
+                                    </div>
+                                  ) : (
+                                    <div className="w-9 h-9 rounded-xl bg-sky-50 border border-sky-200 text-sky-600 flex flex-col items-center justify-center shadow-2xs">
+                                      <ExternalLink className="w-4 h-4" />
+                                      <span className="text-[8px] font-mono font-bold leading-none mt-0.5">LIEN</span>
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center space-x-2 flex-wrap gap-y-1">
+                                    <h4 className="text-sm font-semibold text-[#111A2E] leading-snug group-hover:text-[#2855D9] transition-colors">
+                                      {res.title}
+                                    </h4>
+                                    {res.exam_session && (
+                                      <span className="text-[10px] bg-[#FAF5FF] text-[#7C3AED] border border-[#DDD6FE] px-2 py-0.2 rounded font-medium">
+                                        {res.exam_session}
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  {res.description && (
+                                    <p className="text-xs text-[#68748A] mt-0.5 line-clamp-1">
+                                      {res.description}
+                                    </p>
+                                  )}
+
+                                  <div className="flex items-center space-x-3 text-[11px] text-[#68748A] mt-1 font-mono flex-wrap">
+                                    <span>{res.original_filename || "Document"}</span>
+                                    {res.file_size_bytes && (
+                                      <>
+                                        <span>•</span>
+                                        <span>{(res.file_size_bytes / (1024 * 1024)).toFixed(1)} Mo</span>
+                                      </>
+                                    )}
+                                    {res.instructor && (
+                                      <>
+                                        <span>•</span>
+                                        <span className="font-sans font-medium text-[#182235]">Prof. {res.instructor}</span>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Status Toggle & Action Controls */}
+                              <div className="flex items-center justify-between sm:justify-end space-x-2 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-[#F1F4F9]">
+                                {/* Revision Status Pill Button */}
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleRevision(res.id, res.revision_status)}
+                                  className={cn(
+                                    "px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all flex items-center space-x-1.5 cursor-pointer border shadow-2xs",
+                                    res.revision_status === "revised"
+                                      ? "bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100"
+                                      : res.revision_status === "in_progress"
+                                      ? "bg-amber-50 text-amber-700 border-amber-300 hover:bg-amber-100"
+                                      : "bg-[#F4F6FA] text-[#68748A] border-[#E4E8F0] hover:border-[#2855D9]/40 hover:text-[#111A2E]"
+                                  )}
+                                  title="Cliquer pour basculer le statut de révision"
+                                >
+                                  {res.revision_status === "revised" ? (
+                                    <>
+                                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                      <span>Révisé</span>
+                                    </>
+                                  ) : res.revision_status === "in_progress" ? (
+                                    <>
+                                      <Clock className="w-3.5 h-3.5 text-amber-600" />
+                                      <span>En cours</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <span className="w-1.5 h-1.5 rounded-full bg-[#68748A]" />
+                                      <span>À réviser</span>
+                                    </>
+                                  )}
+                                </button>
+
+                                {/* Action Buttons */}
+                                <div className="flex items-center space-x-1">
+                                  {isPdf && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setViewingResource(res)}
+                                      className="p-1.5 rounded-lg bg-[#EDF2FF] text-[#2855D9] hover:bg-[#2855D9] hover:text-white transition-colors cursor-pointer"
+                                      title="Consulter le document (Lecteur PDF)"
+                                    >
+                                      <Eye className="w-4 h-4" />
+                                    </button>
+                                  )}
+
+                                  {isExternalLink && (
+                                    <a
+                                      href={res.storage_path}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="p-1.5 rounded-lg bg-[#EDF2FF] text-[#2855D9] hover:bg-[#2855D9] hover:text-white transition-colors"
+                                      title="Ouvrir le lien externe"
+                                    >
+                                      <ExternalLink className="w-4 h-4" />
+                                    </a>
+                                  )}
+
+                                  <a
+                                    href={`/api/download/${res.id}`}
+                                    download
+                                    className="p-1.5 rounded-lg text-[#68748A] hover:text-[#182235] hover:bg-[#F4F6FA] transition-colors"
+                                    title="Télécharger"
+                                  >
+                                    <Download className="w-4 h-4" />
+                                  </a>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteResource(res.id, res.title)}
+                                    className="p-1.5 rounded-lg text-[#68748A] hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                                    title="Supprimer la ressource"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="p-6 text-center text-xs text-[#68748A] bg-[#FAFBFD]/50 border-t border-[#F1F4F9]">
+                        <span>Aucun document dans cette section pour le moment. </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPreselectedCategoryId(category.id);
+                            setIsAddResourceModalOpen(true);
+                          }}
+                          className="text-[#2855D9] hover:underline font-semibold ml-1 cursor-pointer"
+                        >
+                          Déposer un premier support
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+
+              {/* Empty categories quick-add bar when viewing all categories */}
+              {activeCategoryFilter === "all" && !resourceSearch && (() => {
+                const emptyCategories = categories.filter((c) =>
+                  !resources.some((r) => r.category?.slug === c.slug || r.category_id === c.id)
+                );
+                if (emptyCategories.length === 0) return null;
+                return (
+                  <div className="bg-[#FAFBFD] border border-dashed border-[#CBD5E1] rounded-2xl p-4 sm:p-5 text-center space-y-3">
+                    <p className="text-xs font-semibold text-[#68748A]">
+                      Sections sans document ({emptyCategories.length}) — Déposer directement un premier support :
+                    </p>
+                    <div className="flex flex-wrap items-center justify-center gap-2">
+                      {emptyCategories.map((c) => {
+                        const visual = getCategoryVisual(c.slug, c.name);
+                        const CatIcon = visual.icon;
+                        return (
+                          <button
+                            key={c.id}
+                            type="button"
+                            onClick={() => {
+                              setPreselectedCategoryId(c.id);
+                              setIsAddResourceModalOpen(true);
+                            }}
+                            className="bg-white hover:bg-[#EDF2FF] border border-[#E4E8F0] hover:border-[#2855D9] text-[#182235] hover:text-[#2855D9] px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition-all cursor-pointer shadow-2xs"
+                          >
+                            <CatIcon className={cn("w-3.5 h-3.5", visual.color)} />
+                            <span>+ {visual.frenchLabel}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          ) : (
+            /* CARDS VIEW */
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredResources.map((res) => {
-                const isPdf = res.mime_type === "application/pdf" || res.original_filename.endsWith(".pdf");
-                const isExternalLink = res.mime_type === "application/x-url" || res.storage_path.startsWith("http");
+                const isPdf = res.mime_type === "application/pdf" || res.original_filename?.toLowerCase().endsWith(".pdf");
+                const isExternalLink = res.mime_type === "application/x-url" || res.storage_path?.startsWith("http");
 
                 return (
                   <div
@@ -533,13 +1012,14 @@ ${resources.map((r) => `<li><strong>${r.title}</strong> (${r.mime_type}) - ${r.s
                         <button
                           type="button"
                           onClick={() => handleToggleRevision(res.id, res.revision_status)}
-                          className={`px-2 py-0.5 rounded-full text-[10px] font-semibold transition-colors flex items-center space-x-1 cursor-pointer border ${
+                          className={cn(
+                            "px-2 py-0.5 rounded-full text-[10px] font-semibold transition-colors flex items-center space-x-1 cursor-pointer border",
                             res.revision_status === "revised"
                               ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                               : res.revision_status === "in_progress"
                               ? "bg-amber-50 text-amber-700 border-amber-200"
                               : "bg-[#F4F6FA] text-[#68748A] border-[#E4E8F0] hover:border-[#2855D9]/30"
-                          }`}
+                          )}
                         >
                           {res.revision_status === "revised" ? (
                             <>
@@ -596,6 +1076,15 @@ ${resources.map((r) => `<li><strong>${r.title}</strong> (${r.mime_type}) - ${r.s
                           </a>
                         )}
 
+                        <a
+                          href={`/api/download/${res.id}`}
+                          download
+                          className="p-1.5 rounded-lg text-[#68748A] hover:text-[#182235] hover:bg-[#F4F6FA] transition-colors"
+                          title="Télécharger"
+                        >
+                          <Download className="w-4 h-4" />
+                        </a>
+
                         <button
                           type="button"
                           onClick={() => handleDeleteResource(res.id, res.title)}
@@ -609,26 +1098,6 @@ ${resources.map((r) => `<li><strong>${r.title}</strong> (${r.mime_type}) - ${r.s
                   </div>
                 );
               })}
-            </div>
-          ) : (
-            <div className="bg-white border border-dashed border-[#CBD5E1] rounded-2xl p-10 text-center space-y-3">
-              <BookOpen className="w-8 h-8 text-[#68748A]/40 mx-auto" />
-              <div>
-                <h4 className="text-sm font-semibold text-[#182235]">
-                  Aucun document ou ressource dans cette section
-                </h4>
-                <p className="text-xs text-[#68748A] max-w-md mx-auto mt-1">
-                  Déposez vos supports de cours, énoncés de TP, sujets de DS ou liens web pour constituer votre bibliothèque de révision.
-                </p>
-              </div>
-              <Button
-                size="sm"
-                variant="primary"
-                onClick={() => setIsAddResourceModalOpen(true)}
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Ajouter une première ressource</span>
-              </Button>
             </div>
           )}
         </div>
@@ -1168,8 +1637,10 @@ ${resources.map((r) => `<li><strong>${r.title}</strong> (${r.mime_type}) - ${r.s
                   Catégorie pédagogique *
                 </label>
                 <select
+                  key={preselectedCategoryId || "default"}
                   name="categoryId"
                   required
+                  defaultValue={preselectedCategoryId || (categories[0]?.id ?? "")}
                   className="w-full bg-[#FAFBFD] border border-[#E4E8F0] rounded-xl px-3 py-2 text-[#111A2E] focus:outline-none focus:border-[#2855D9]"
                 >
                   {categories.map((c) => (
