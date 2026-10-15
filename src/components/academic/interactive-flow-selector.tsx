@@ -70,52 +70,42 @@ export function InteractiveFlowSelector({
               type="button"
               onClick={() => setSelectedSemester("sem-1")}
               className={cn(
-                "relative flex flex-col sm:flex-row items-center justify-center space-y-1 sm:space-y-0 sm:space-x-2.5 py-3 px-4 rounded-xl text-xs font-semibold transition-all cursor-pointer border text-left",
+                "relative flex flex-col items-center justify-center py-3 px-4 rounded-xl transition-all cursor-pointer border text-center",
                 selectedSemester === "sem-1"
-                  ? "bg-[#2855D9] text-white border-[#2855D9] shadow-md scale-[1.01]"
-                  : "bg-[#F4F6FA] text-[#182235] border-[#E4E8F0] hover:bg-[#EDF2FF] hover:border-[#2855D9]/30"
+                  ? "bg-[#2855D9] text-white border-[#2855D9] shadow-sm shadow-blue-500/20 ring-1 ring-[#2855D9]"
+                  : "bg-white text-[#182235] border-[#E4E8F0] hover:bg-[#F8FAFC] hover:border-[#CBD5E1]"
               )}
             >
+              <span className="text-xs sm:text-sm font-bold tracking-tight">Semestre 1</span>
               <span
                 className={cn(
-                  "w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-mono font-bold shrink-0",
-                  selectedSemester === "sem-1" ? "bg-white text-[#2855D9]" : "bg-[#E4E8F0] text-[#182235]"
+                  "text-[11px] font-normal mt-0.5",
+                  selectedSemester === "sem-1" ? "text-blue-100" : "text-[#68748A]"
                 )}
               >
-                1
+                {s1Subjects.length} Matières
               </span>
-              <div className="flex flex-col items-center sm:items-start">
-                <span className="font-bold">Semestre 1</span>
-                <span className={cn("text-[10px] font-normal", selectedSemester === "sem-1" ? "text-blue-100" : "text-[#68748A]")}>
-                  {s1Subjects.length} Matières
-                </span>
-              </div>
             </button>
 
             <button
               type="button"
               onClick={() => setSelectedSemester("sem-2")}
               className={cn(
-                "relative flex flex-col sm:flex-row items-center justify-center space-y-1 sm:space-y-0 sm:space-x-2.5 py-3 px-4 rounded-xl text-xs font-semibold transition-all cursor-pointer border text-left",
+                "relative flex flex-col items-center justify-center py-3 px-4 rounded-xl transition-all cursor-pointer border text-center",
                 selectedSemester === "sem-2"
-                  ? "bg-[#2855D9] text-white border-[#2855D9] shadow-md scale-[1.01]"
-                  : "bg-[#F4F6FA] text-[#182235] border-[#E4E8F0] hover:bg-[#EDF2FF] hover:border-[#2855D9]/30"
+                  ? "bg-[#2855D9] text-white border-[#2855D9] shadow-sm shadow-blue-500/20 ring-1 ring-[#2855D9]"
+                  : "bg-white text-[#182235] border-[#E4E8F0] hover:bg-[#F8FAFC] hover:border-[#CBD5E1]"
               )}
             >
+              <span className="text-xs sm:text-sm font-bold tracking-tight">Semestre 2</span>
               <span
                 className={cn(
-                  "w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-mono font-bold shrink-0",
-                  selectedSemester === "sem-2" ? "bg-white text-[#2855D9]" : "bg-[#E4E8F0] text-[#182235]"
+                  "text-[11px] font-normal mt-0.5",
+                  selectedSemester === "sem-2" ? "text-blue-100" : "text-[#68748A]"
                 )}
               >
-                2
+                {s2Subjects.length} Matières
               </span>
-              <div className="flex flex-col items-center sm:items-start">
-                <span className="font-bold">Semestre 2</span>
-                <span className={cn("text-[10px] font-normal", selectedSemester === "sem-2" ? "text-blue-100" : "text-[#68748A]")}>
-                  {s2Subjects.length} Matières
-                </span>
-              </div>
             </button>
           </div>
         </div>
