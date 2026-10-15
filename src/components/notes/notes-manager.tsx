@@ -165,20 +165,20 @@ export function NotesManager({
       <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
         <div className="flex items-center gap-2 w-full sm:w-auto flex-1 max-w-md">
           <div className="relative flex-1">
-            <Search className="w-4 h-4 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search className="w-4 h-4 text-[#68748A] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search cheat sheets by keyword or #tag..."
-              className="w-full bg-[#f4f3ed] border border-[#dedad0] rounded-md pl-9 pr-3 py-1.5 text-xs text-stone-900 focus:outline-none focus:border-stone-400"
+              className="w-full bg-[#F4F6FA] border border-[#E4E8F0] rounded-md pl-9 pr-3 py-1.5 text-xs text-[#182235] focus:outline-none focus:border-[#2855D9] transition-all"
             />
           </div>
 
           <select
             value={selectedSubject}
             onChange={(e) => setSelectedSubject(e.target.value)}
-            className="bg-[#f4f3ed] border border-[#dedad0] rounded-md px-3 py-1.5 text-xs text-stone-700 focus:outline-none shrink-0"
+            className="bg-[#F4F6FA] border border-[#E4E8F0] rounded-md px-3 py-1.5 text-xs text-[#182235] focus:outline-none focus:border-[#2855D9] shrink-0 cursor-pointer"
           >
             <option value="">All Subjects</option>
             {subjects.map((sub) => (
@@ -198,11 +198,11 @@ export function NotesManager({
       {/* Editor Modal */}
       {isEditorOpen && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-2xs flex items-center justify-center p-4">
-          <div className="bg-white border border-[#e6e3da] rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 shadow-xl space-y-4">
-            <div className="flex items-center justify-between border-b border-stone-100 pb-3">
+          <div className="bg-white border border-[#E4E8F0] rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 shadow-xl space-y-4">
+            <div className="flex items-center justify-between border-b border-[#E4E8F0] pb-3">
               <div className="flex items-center space-x-2">
-                <FileEdit className="w-5 h-5 text-[#3730a3]" />
-                <h3 className="font-semibold text-sm text-stone-900">
+                <FileEdit className="w-5 h-5 text-[#2855D9]" />
+                <h3 className="font-semibold text-sm text-[#182235]">
                   {editingNote ? "Edit Cheat Sheet" : "Create New Cheat Sheet"}
                 </h3>
               </div>
@@ -218,14 +218,14 @@ export function NotesManager({
             <form onSubmit={handleSave} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-stone-700 mb-1">
+                  <label className="block text-xs font-medium text-[#182235] mb-1">
                     Subject Module *
                   </label>
                   <select
                     value={subjectId}
                     onChange={(e) => setSubjectId(e.target.value)}
                     required
-                    className="w-full bg-[#f4f3ed] border border-[#dedad0] rounded-md px-3 py-2 text-xs text-stone-900 focus:outline-none focus:border-stone-400"
+                    className="w-full bg-[#F4F6FA] border border-[#E4E8F0] rounded-md px-3 py-2 text-xs text-[#182235] focus:outline-none focus:border-[#2855D9] cursor-pointer"
                   >
                     {subjects.map((sub) => (
                       <option key={sub.id} value={sub.id}>
@@ -236,7 +236,7 @@ export function NotesManager({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-stone-700 mb-1">
+                  <label className="block text-xs font-medium text-[#182235] mb-1">
                     Note Title *
                   </label>
                   <input
@@ -245,7 +245,7 @@ export function NotesManager({
                     onChange={(e) => setTitle(e.target.value)}
                     placeholder="e.g. BLoC Architecture Summary"
                     required
-                    className="w-full bg-[#f4f3ed] border border-[#dedad0] rounded-md px-3 py-2 text-xs text-stone-900 focus:outline-none focus:border-stone-400"
+                    className="w-full bg-[#F4F6FA] border border-[#E4E8F0] rounded-md px-3 py-2 text-xs text-[#182235] focus:outline-none focus:border-[#2855D9]"
                   />
                 </div>
               </div>
@@ -253,17 +253,17 @@ export function NotesManager({
               {/* Write vs Preview Tabs */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-xs font-medium text-stone-700">
+                  <label className="block text-xs font-medium text-[#182235]">
                     Content (Markdown Supported) *
                   </label>
                   <div className="flex items-center space-x-1 text-xs">
                     <button
                       type="button"
                       onClick={() => setActiveTab("write")}
-                      className={`px-2 py-0.5 rounded transition-colors ${
+                      className={`px-2 py-0.5 rounded transition-colors cursor-pointer ${
                         activeTab === "write"
-                          ? "bg-stone-200 text-stone-900 font-medium"
-                          : "text-stone-500 hover:text-stone-900"
+                          ? "bg-[#2855D9] text-white font-medium"
+                          : "text-[#68748A] hover:text-[#182235]"
                       }`}
                     >
                       Write
@@ -271,10 +271,10 @@ export function NotesManager({
                     <button
                       type="button"
                       onClick={() => setActiveTab("preview")}
-                      className={`px-2 py-0.5 rounded transition-colors ${
+                      className={`px-2 py-0.5 rounded transition-colors cursor-pointer ${
                         activeTab === "preview"
-                          ? "bg-stone-200 text-stone-900 font-medium"
-                          : "text-stone-500 hover:text-stone-900"
+                          ? "bg-[#2855D9] text-white font-medium"
+                          : "text-[#68748A] hover:text-[#182235]"
                       }`}
                     >
                       Preview
@@ -289,31 +289,31 @@ export function NotesManager({
                     onChange={(e) => setContent(e.target.value)}
                     placeholder="## Key Concepts&#10;- Point 1: ...&#10;- Formula: `E = mc^2`&#10;&#10;```python&#10;# Example&#10;```"
                     required
-                    className="w-full font-mono bg-[#f4f3ed] border border-[#dedad0] rounded-md p-3 text-xs text-stone-900 focus:outline-none focus:border-stone-400"
+                    className="w-full font-mono bg-[#F4F6FA] border border-[#E4E8F0] rounded-md p-3 text-xs text-[#182235] focus:outline-none focus:border-[#2855D9]"
                   />
                 ) : (
-                  <div className="bg-[#fbfbfa] border border-[#dedad0] rounded-md p-4 text-xs font-mono leading-relaxed whitespace-pre-wrap min-h-[175px] max-h-64 overflow-y-auto text-stone-800">
-                    {content || <span className="text-stone-400 italic">No content to preview</span>}
+                  <div className="bg-[#FAFAF7] border border-[#E4E8F0] rounded-md p-4 text-xs font-mono leading-relaxed whitespace-pre-wrap min-h-[175px] max-h-64 overflow-y-auto text-[#182235]">
+                    {content || <span className="text-[#68748A] italic">No content to preview</span>}
                   </div>
                 )}
               </div>
 
               {/* Tags */}
               <div>
-                <label className="block text-xs font-medium text-stone-700 mb-1">
+                <label className="block text-xs font-medium text-[#182235] mb-1">
                   Tags (Press Enter or Comma to add)
                 </label>
-                <div className="flex flex-wrap gap-1.5 p-2 bg-[#f4f3ed] border border-[#dedad0] rounded-md min-h-[38px] items-center">
+                <div className="flex flex-wrap gap-1.5 p-2 bg-[#F4F6FA] border border-[#E4E8F0] rounded-md min-h-[38px] items-center">
                   {tags.map((tag) => (
                     <span
                       key={tag}
-                      className="bg-white text-stone-700 border border-stone-300 text-xs px-2 py-0.5 rounded flex items-center space-x-1"
+                      className="bg-white text-[#182235] border border-[#E4E8F0] text-xs px-2 py-0.5 rounded flex items-center space-x-1"
                     >
                       <span>#{tag}</span>
                       <button
                         type="button"
                         onClick={() => handleRemoveTag(tag)}
-                        className="text-stone-400 hover:text-rose-600"
+                        className="text-[#68748A] hover:text-rose-600 cursor-pointer"
                       >
                         <X className="w-3 h-3" />
                       </button>
@@ -324,13 +324,13 @@ export function NotesManager({
                     value={tagInput}
                     onChange={(e) => setTagInput(e.target.value)}
                     onKeyDown={handleAddTag}
-                    placeholder={tags.length === 0 ? "e.g. flutter, bloc..." : ""}
-                    className="bg-transparent text-xs text-stone-900 focus:outline-none flex-1 min-w-[120px]"
+                    placeholder={tags.length === 0 ? "e.g. flutter, bloc, exam..." : ""}
+                    className="bg-transparent text-xs text-[#182235] focus:outline-none flex-1 min-w-[120px]"
                   />
                 </div>
               </div>
 
-              <div className="flex items-center justify-between pt-2 border-t border-stone-100">
+              <div className="flex items-center justify-between pt-2 border-t border-[#E4E8F0]">
                 <span className="text-[11px] text-stone-400">
                   Private to your account.
                 </span>
@@ -364,14 +364,14 @@ export function NotesManager({
           {filteredNotes.map((note) => (
             <div
               key={note.id}
-              className="bg-white border border-[#e6e3da] hover:border-stone-400 rounded-lg p-5 transition-colors shadow-2xs flex flex-col justify-between"
+              className="bg-white border border-[#E4E8F0] hover:border-[#2855D9]/40 rounded-lg p-5 transition-all shadow-2xs flex flex-col justify-between"
             >
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-semibold text-[#3730a3] bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded">
+                  <span className="text-xs font-semibold text-[#2855D9] bg-[#EDF2FF] border border-[#2855D9]/20 px-2 py-0.5 rounded">
                     {note.subject?.name || "General"}
                   </span>
-                  <div className="flex items-center space-x-2 text-stone-400 text-xs">
+                  <div className="flex items-center space-x-2 text-[#68748A] text-xs">
                     <span className="text-[11px] font-mono flex items-center space-x-1">
                       <Calendar className="w-3 h-3" />
                       <span>{formatDate(note.created_at)}</span>
@@ -379,7 +379,7 @@ export function NotesManager({
                     <button
                       type="button"
                       onClick={() => openEditModal(note)}
-                      className="hover:text-stone-700 p-1"
+                      className="hover:text-[#182235] p-1 cursor-pointer"
                       title="Edit note"
                     >
                       <FileEdit className="w-3.5 h-3.5" />
@@ -387,7 +387,7 @@ export function NotesManager({
                     <button
                       type="button"
                       onClick={() => handleDelete(note.id)}
-                      className="hover:text-rose-600 p-1"
+                      className="hover:text-rose-600 p-1 cursor-pointer"
                       title="Delete note"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -395,28 +395,28 @@ export function NotesManager({
                   </div>
                 </div>
 
-                <h3 className="font-semibold text-sm text-stone-900 mb-2">
+                <h3 className="font-semibold text-sm text-[#182235] mb-2 leading-snug">
                   {note.title}
                 </h3>
 
-                <div className="text-xs text-stone-600 bg-[#fbfbfa] border border-[#dedad0] rounded p-3 font-mono leading-relaxed whitespace-pre-wrap mb-4 max-h-36 overflow-y-auto">
+                <div className="text-xs text-[#182235] bg-[#FAFAF7] border border-[#E4E8F0] rounded p-3 font-mono leading-relaxed whitespace-pre-wrap mb-4 max-h-36 overflow-y-auto">
                   {note.content}
                 </div>
               </div>
 
-              <div className="pt-3 border-t border-[#f0ede6] flex items-center justify-between">
+              <div className="pt-3 border-t border-[#E4E8F0] flex items-center justify-between">
                 <div className="flex flex-wrap gap-1">
                   {note.tags.map((tag) => (
                     <span
                       key={tag}
-                      className="text-[10px] font-mono text-stone-500 bg-stone-100 px-1.5 py-0.2 rounded"
+                      className="text-[10px] font-mono text-[#68748A] bg-[#F4F6FA] px-1.5 py-0.5 rounded border border-[#E4E8F0]"
                     >
                       #{tag}
                     </span>
                   ))}
                 </div>
 
-                <span className="text-[11px] font-mono text-stone-400 capitalize">
+                <span className="text-[11px] font-mono text-[#68748A] capitalize">
                   {note.visibility}
                 </span>
               </div>
@@ -424,12 +424,12 @@ export function NotesManager({
           ))}
         </div>
       ) : (
-        <div className="bg-white border border-[#e6e3da] rounded-xl p-12 text-center">
-          <FileEdit className="w-10 h-10 text-stone-400 mx-auto mb-3" />
-          <h3 className="text-sm font-semibold text-stone-900">
+        <div className="bg-white border border-[#E4E8F0] rounded-xl p-12 text-center">
+          <FileEdit className="w-10 h-10 text-[#68748A]/40 mx-auto mb-3" />
+          <h3 className="text-sm font-semibold text-[#182235]">
             No cheat sheets found
           </h3>
-          <p className="text-xs text-stone-500 mt-1 max-w-sm mx-auto">
+          <p className="text-xs text-[#68748A] mt-1 max-w-sm mx-auto">
             {search || selectedSubject
               ? "No revision notes match your active filter."
               : "Create high-yield formula sheets and revision summaries for your courses."}

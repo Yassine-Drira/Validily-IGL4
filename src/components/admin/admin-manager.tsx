@@ -167,17 +167,17 @@ export function AdminManager({
       )}
 
       {/* Summary Cards */}
-      <div className="bg-white border border-[#e6e3da] rounded-xl p-6 shadow-2xs">
+      <div className="bg-white border border-[#E4E8F0] rounded-xl p-6 shadow-xs">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-lg bg-indigo-50 border border-indigo-200 text-[#3730a3] flex items-center justify-center">
+            <div className="w-10 h-10 rounded-lg bg-[#EDF2FF] border border-[#2855D9]/20 text-[#2855D9] flex items-center justify-center">
               <Shield className="w-5 h-5" />
             </div>
             <div>
-              <h1 className="text-xl font-serif font-bold text-stone-900 tracking-tight">
+              <h1 className="text-xl font-serif font-bold text-[#182235] tracking-tight">
                 Academic Administration Console
               </h1>
-              <p className="text-xs text-stone-500 mt-0.5">
+              <p className="text-xs text-[#68748A] mt-0.5">
                 Manage semester terms, catalog course subjects, and configure categories.
               </p>
             </div>
@@ -203,28 +203,28 @@ export function AdminManager({
           </div>
         </div>
 
-        <div className="mt-6 pt-5 border-t border-[#f0ede6] grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <div className="bg-[#fbfbfa] border border-[#e6e3da] p-3 rounded-lg">
-            <div className="text-xs text-stone-500 font-medium">Semesters</div>
-            <div className="text-lg font-bold text-stone-900 mt-1 font-mono">
+        <div className="mt-6 pt-5 border-t border-[#E4E8F0] grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="bg-[#FAFAF7] border border-[#E4E8F0] p-3 rounded-lg">
+            <div className="text-xs text-[#68748A] font-medium">Semesters</div>
+            <div className="text-lg font-bold text-[#182235] mt-1 font-mono font-tabular">
               {semesters.length}
             </div>
           </div>
-          <div className="bg-[#fbfbfa] border border-[#e6e3da] p-3 rounded-lg">
-            <div className="text-xs text-stone-500 font-medium">Subjects Active</div>
-            <div className="text-lg font-bold text-[#3730a3] mt-1 font-mono">
+          <div className="bg-[#FAFAF7] border border-[#E4E8F0] p-3 rounded-lg">
+            <div className="text-xs text-[#68748A] font-medium">Subjects Active</div>
+            <div className="text-lg font-bold text-[#2855D9] mt-1 font-mono font-tabular">
               {subjects.filter((s) => s.is_active).length}
             </div>
           </div>
-          <div className="bg-[#fbfbfa] border border-[#e6e3da] p-3 rounded-lg">
-            <div className="text-xs text-stone-500 font-medium">Categories</div>
-            <div className="text-lg font-bold text-stone-900 mt-1 font-mono">
+          <div className="bg-[#FAFAF7] border border-[#E4E8F0] p-3 rounded-lg">
+            <div className="text-xs text-[#68748A] font-medium">Categories</div>
+            <div className="text-lg font-bold text-[#182235] mt-1 font-mono font-tabular">
               {categories.length}
             </div>
           </div>
-          <div className="bg-[#fbfbfa] border border-[#e6e3da] p-3 rounded-lg">
-            <div className="text-xs text-stone-500 font-medium">Indexed Docs</div>
-            <div className="text-lg font-bold text-stone-900 mt-1 font-mono">
+          <div className="bg-[#FAFAF7] border border-[#E4E8F0] p-3 rounded-lg">
+            <div className="text-xs text-[#68748A] font-medium">Indexed Docs</div>
+            <div className="text-lg font-bold text-[#182235] mt-1 font-mono font-tabular">
               {totalResources}
             </div>
           </div>
@@ -234,10 +234,10 @@ export function AdminManager({
       {/* Semesters & Categories Breakdown */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Semesters */}
-        <div className="bg-white border border-[#e6e3da] rounded-xl p-5 shadow-2xs space-y-4">
+        <div className="bg-white border border-[#E4E8F0] rounded-xl p-5 shadow-xs space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-stone-900 flex items-center space-x-2">
-              <Calendar className="w-4 h-4 text-[#3730a3]" />
+            <h2 className="text-sm font-semibold text-[#182235] flex items-center space-x-2">
+              <Calendar className="w-4 h-4 text-[#2855D9]" />
               <span>Academic Semesters ({semesters.length})</span>
             </h2>
             <Button
@@ -255,15 +255,15 @@ export function AdminManager({
             {semesters.map((s) => (
               <div
                 key={s.id}
-                className="flex items-center justify-between p-3 rounded-md border border-[#e6e3da] bg-[#fbfbfa] text-xs"
+                className="flex items-center justify-between p-3 rounded-md border border-[#E4E8F0] bg-[#FAFAF7] text-xs"
               >
                 <div>
-                  <div className="font-semibold text-stone-900">{s.name}</div>
-                  <div className="text-stone-400 font-mono text-[11px]">
+                  <div className="font-semibold text-[#182235]">{s.name}</div>
+                  <div className="text-[#68748A] font-mono text-[11px]">
                     AY {s.academic_year} • Order #{s.sort_order}
                   </div>
                 </div>
-                <span className="bg-stone-100 text-stone-600 px-2 py-0.5 rounded text-[11px] font-mono">
+                <span className="bg-[#F4F6FA] text-[#182235] px-2 py-0.5 rounded text-[11px] font-mono font-tabular border border-[#E4E8F0]">
                   {subjects.filter((sub) => sub.semester_id === s.id).length} subjects
                 </span>
               </div>
@@ -272,10 +272,10 @@ export function AdminManager({
         </div>
 
         {/* Categories */}
-        <div className="bg-white border border-[#e6e3da] rounded-xl p-5 shadow-2xs space-y-4">
+        <div className="bg-white border border-[#E4E8F0] rounded-xl p-5 shadow-xs space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-stone-900 flex items-center space-x-2">
-              <Layers className="w-4 h-4 text-[#3730a3]" />
+            <h2 className="text-sm font-semibold text-[#182235] flex items-center space-x-2">
+              <Layers className="w-4 h-4 text-[#2855D9]" />
               <span>Controlled Categories ({categories.length})</span>
             </h2>
           </div>
@@ -284,15 +284,15 @@ export function AdminManager({
             {categories.map((c) => (
               <div
                 key={c.id}
-                className="flex items-center justify-between p-2.5 rounded-md border border-[#e6e3da] bg-[#fbfbfa] text-xs"
+                className="flex items-center justify-between p-2.5 rounded-md border border-[#E4E8F0] bg-[#FAFAF7] text-xs"
               >
                 <div>
-                  <div className="font-semibold text-stone-900">{c.name}</div>
-                  <div className="text-stone-400 font-mono text-[11px]">
+                  <div className="font-semibold text-[#182235]">{c.name}</div>
+                  <div className="text-[#68748A] font-mono text-[11px]">
                     slug: {c.slug}
                   </div>
                 </div>
-                <span className="bg-stone-100 text-stone-600 px-2 py-0.5 rounded text-[11px] font-mono">
+                <span className="bg-[#F4F6FA] text-[#68748A] px-2 py-0.5 rounded text-[11px] font-mono border border-[#E4E8F0]">
                   Order #{c.sort_order}
                 </span>
               </div>
@@ -302,14 +302,14 @@ export function AdminManager({
       </div>
 
       {/* Subjects Catalog Table */}
-      <div className="bg-white border border-[#e6e3da] rounded-xl p-5 shadow-2xs space-y-4">
+      <div className="bg-white border border-[#E4E8F0] rounded-xl p-5 shadow-xs space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-sm font-semibold text-stone-900 flex items-center space-x-2">
-              <BookOpen className="w-4 h-4 text-[#3730a3]" />
+            <h2 className="text-sm font-semibold text-[#182235] flex items-center space-x-2">
+              <BookOpen className="w-4 h-4 text-[#2855D9]" />
               <span>Curriculum Subject Registry ({subjects.length} Modules)</span>
             </h2>
-            <p className="text-xs text-stone-500 mt-0.5">
+            <p className="text-xs text-[#68748A] mt-0.5">
               Administrators can add, edit, and archive subjects without editing application code.
             </p>
           </div>
@@ -326,7 +326,7 @@ export function AdminManager({
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead>
-              <tr className="border-b border-[#e6e3da] text-stone-400 font-mono uppercase text-[10px]">
+              <tr className="border-b border-[#E4E8F0] text-[#68748A] font-mono uppercase text-[10px]">
                 <th className="py-2 px-3 font-semibold">Order</th>
                 <th className="py-2 px-3 font-semibold">Subject Name</th>
                 <th className="py-2 px-3 font-semibold">Slug</th>
@@ -335,21 +335,21 @@ export function AdminManager({
                 <th className="py-2 px-3 font-semibold text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#f0ede6]">
+            <tbody className="divide-y divide-[#E4E8F0]">
               {subjects.map((sub) => {
                 const parentSem = semesters.find((s) => s.id === sub.semester_id);
                 return (
-                  <tr key={sub.id} className="hover:bg-stone-50/80 transition-colors">
-                    <td className="py-2.5 px-3 font-mono text-stone-400">
+                  <tr key={sub.id} className="hover:bg-[#F4F6FA] transition-colors">
+                    <td className="py-2.5 px-3 font-mono font-tabular text-[#68748A]">
                       #{sub.sort_order}
                     </td>
-                    <td className="py-2.5 px-3 font-medium text-stone-900">
+                    <td className="py-2.5 px-3 font-medium text-[#182235]">
                       {sub.name}
                     </td>
-                    <td className="py-2.5 px-3 font-mono text-stone-500">
+                    <td className="py-2.5 px-3 font-mono text-[#68748A]">
                       {sub.slug}
                     </td>
-                    <td className="py-2.5 px-3 font-mono text-stone-500">
+                    <td className="py-2.5 px-3 font-mono text-[#68748A]">
                       {parentSem?.name || "Semester 1"}
                     </td>
                     <td className="py-2.5 px-3">
@@ -357,7 +357,7 @@ export function AdminManager({
                         className={`px-2 py-0.5 rounded text-[10px] font-medium ${
                           sub.is_active
                             ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
-                            : "bg-stone-100 text-stone-500 border border-stone-200"
+                            : "bg-[#F4F6FA] text-[#68748A] border border-[#E4E8F0]"
                         }`}
                       >
                         {sub.is_active ? "Active" : "Archived"}
@@ -368,12 +368,12 @@ export function AdminManager({
                         <button
                           type="button"
                           onClick={() => handleArchive(sub.id, sub.name)}
-                          className="text-stone-400 hover:text-rose-600 transition-colors"
+                          className="text-[#68748A] hover:text-rose-600 transition-colors cursor-pointer"
                         >
                           Archive
                         </button>
                       ) : (
-                        <span className="text-stone-300 italic">Archived</span>
+                        <span className="text-[#68748A]/40 italic">Archived</span>
                       )}
                     </td>
                   </tr>
@@ -387,15 +387,15 @@ export function AdminManager({
       {/* Modal: Create Subject */}
       {isSubjectModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-2xs flex items-center justify-center p-4">
-          <div className="bg-white border border-[#e6e3da] rounded-xl max-w-md w-full p-6 shadow-xl space-y-4">
-            <div className="flex items-center justify-between border-b border-stone-100 pb-3">
-              <h3 className="font-semibold text-sm text-stone-900">
+          <div className="bg-white border border-[#E4E8F0] rounded-xl max-w-md w-full p-6 shadow-xl space-y-4">
+            <div className="flex items-center justify-between border-b border-[#E4E8F0] pb-3">
+              <h3 className="font-semibold text-sm text-[#182235]">
                 Register New Subject Module
               </h3>
               <button
                 type="button"
                 onClick={() => setIsSubjectModalOpen(false)}
-                className="text-stone-400 hover:text-stone-700"
+                className="text-[#68748A] hover:text-[#182235] cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -410,7 +410,7 @@ export function AdminManager({
                   value={subSemesterId}
                   onChange={(e) => setSubSemesterId(e.target.value)}
                   required
-                  className="w-full bg-[#f4f3ed] border border-[#dedad0] rounded-md px-3 py-2 text-xs text-stone-900 focus:outline-none focus:border-stone-400"
+                  className="w-full bg-[#F4F6FA] border border-[#E4E8F0] rounded-md px-3 py-2 text-xs text-[#182235] focus:outline-none focus:border-[#2855D9] cursor-pointer"
                 >
                   {semesters.map((s) => (
                     <option key={s.id} value={s.id}>
@@ -421,7 +421,7 @@ export function AdminManager({
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-stone-700 mb-1">
+                <label className="block text-xs font-medium text-[#182235] mb-1">
                   Subject Title *
                 </label>
                 <input
@@ -430,12 +430,12 @@ export function AdminManager({
                   onChange={(e) => handleSubNameChange(e.target.value)}
                   placeholder="e.g. Distributed Systems"
                   required
-                  className="w-full bg-[#f4f3ed] border border-[#dedad0] rounded-md px-3 py-2 text-xs text-stone-900 focus:outline-none focus:border-stone-400"
+                  className="w-full bg-[#F4F6FA] border border-[#E4E8F0] rounded-md px-3 py-2 text-xs text-[#182235] focus:outline-none focus:border-[#2855D9]"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-stone-700 mb-1">
+                <label className="block text-xs font-medium text-[#182235] mb-1">
                   URL Slug *
                 </label>
                 <input
@@ -444,12 +444,12 @@ export function AdminManager({
                   onChange={(e) => setSubSlug(e.target.value)}
                   placeholder="distributed-systems"
                   required
-                  className="w-full bg-[#f4f3ed] border border-[#dedad0] rounded-md px-3 py-2 text-xs text-stone-900 font-mono focus:outline-none focus:border-stone-400"
+                  className="w-full bg-[#F4F6FA] border border-[#E4E8F0] rounded-md px-3 py-2 text-xs text-[#182235] font-mono focus:outline-none focus:border-[#2855D9]"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-stone-700 mb-1">
+                <label className="block text-xs font-medium text-[#182235] mb-1">
                   Description
                 </label>
                 <textarea
@@ -457,11 +457,11 @@ export function AdminManager({
                   value={subDescription}
                   onChange={(e) => setSubDescription(e.target.value)}
                   placeholder="Module scope, topics, and syllabus overview..."
-                  className="w-full bg-[#f4f3ed] border border-[#dedad0] rounded-md p-2.5 text-xs text-stone-900 focus:outline-none focus:border-stone-400"
+                  className="w-full bg-[#F4F6FA] border border-[#E4E8F0] rounded-md p-2.5 text-xs text-[#182235] focus:outline-none focus:border-[#2855D9]"
                 />
               </div>
 
-              <div className="flex items-center justify-end space-x-2 pt-2 border-t border-stone-100">
+              <div className="flex items-center justify-end space-x-2 pt-2 border-t border-[#E4E8F0]">
                 <Button
                   type="button"
                   size="sm"
@@ -487,15 +487,15 @@ export function AdminManager({
       {/* Modal: Create Semester */}
       {isSemesterModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-2xs flex items-center justify-center p-4">
-          <div className="bg-white border border-[#e6e3da] rounded-xl max-w-md w-full p-6 shadow-xl space-y-4">
-            <div className="flex items-center justify-between border-b border-stone-100 pb-3">
-              <h3 className="font-semibold text-sm text-stone-900">
+          <div className="bg-white border border-[#E4E8F0] rounded-xl max-w-md w-full p-6 shadow-xl space-y-4">
+            <div className="flex items-center justify-between border-b border-[#E4E8F0] pb-3">
+              <h3 className="font-semibold text-sm text-[#182235]">
                 Add Academic Semester
               </h3>
               <button
                 type="button"
                 onClick={() => setIsSemesterModalOpen(false)}
-                className="text-stone-400 hover:text-stone-700"
+                className="text-[#68748A] hover:text-[#182235] cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -503,7 +503,7 @@ export function AdminManager({
 
             <form onSubmit={handleCreateSemester} className="space-y-4">
               <div>
-                <label className="block text-xs font-medium text-stone-700 mb-1">
+                <label className="block text-xs font-medium text-[#182235] mb-1">
                   Semester Name *
                 </label>
                 <input
@@ -512,12 +512,12 @@ export function AdminManager({
                   onChange={(e) => setSemName(e.target.value)}
                   placeholder="e.g. Semester 3 or Summer Session"
                   required
-                  className="w-full bg-[#f4f3ed] border border-[#dedad0] rounded-md px-3 py-2 text-xs text-stone-900 focus:outline-none focus:border-stone-400"
+                  className="w-full bg-[#F4F6FA] border border-[#E4E8F0] rounded-md px-3 py-2 text-xs text-[#182235] focus:outline-none focus:border-[#2855D9]"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-stone-700 mb-1">
+                <label className="block text-xs font-medium text-[#182235] mb-1">
                   Academic Year *
                 </label>
                 <input
@@ -526,11 +526,11 @@ export function AdminManager({
                   onChange={(e) => setSemYear(e.target.value)}
                   placeholder="2025-2026"
                   required
-                  className="w-full bg-[#f4f3ed] border border-[#dedad0] rounded-md px-3 py-2 text-xs text-stone-900 focus:outline-none focus:border-stone-400"
+                  className="w-full bg-[#F4F6FA] border border-[#E4E8F0] rounded-md px-3 py-2 text-xs text-[#182235] focus:outline-none focus:border-[#2855D9]"
                 />
               </div>
 
-              <div className="flex items-center justify-end space-x-2 pt-2 border-t border-stone-100">
+              <div className="flex items-center justify-end space-x-2 pt-2 border-t border-[#E4E8F0]">
                 <Button
                   type="button"
                   size="sm"

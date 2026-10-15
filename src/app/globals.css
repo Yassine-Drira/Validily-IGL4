@@ -1,26 +1,30 @@
 @import "tailwindcss";
 
 :root {
-  --background: #fbfbfa;
-  --surface: #ffffff;
-  --surface-subtle: #f5f4ef;
-  --surface-hover: #efeee8;
-  --border: #e6e3da;
-  --border-strong: #d3cfc2;
-  
-  --foreground: #141517;
-  --foreground-muted: #5e6068;
-  --foreground-faint: #898b94;
+  /* Brand Tokens - validily-IGL4 Master Design System */
+  --ink-navy: #111A2E;
+  --primary-cobalt: #2855D9;
+  --secondary-blue: #4776F2;
+  --warm-white: #FAFAF7;
+  --pure-white: #FFFFFF;
+  --cool-bg: #F4F6FA;
+  --primary-text: #182235;
+  --secondary-text: #68748A;
+  --border-color: #E4E8F0;
+  --muted-blue: #EDF2FF;
 
-  --primary: #3730a3; /* Restrained indigo accent */
-  --primary-hover: #312e81;
-  --primary-light: #eef2ff;
-  --primary-foreground: #ffffff;
+  /* Semantic Mapping */
+  --background: var(--cool-bg);
+  --surface: var(--pure-white);
+  --surface-warm: var(--warm-white);
+  --surface-accent: var(--muted-blue);
+  --foreground: var(--primary-text);
+  --foreground-muted: var(--secondary-text);
+  --border: var(--border-color);
 
-  --accent-amber: #b45309;
-  --accent-amber-light: #fef3c7;
-  --accent-emerald: #047857;
-  --accent-emerald-light: #d1fae5;
+  --accent-success: #059669;
+  --accent-warning: #D97706;
+  --accent-error: #DC2626;
 
   --radius-sm: 6px;
   --radius-md: 8px;
@@ -30,9 +34,14 @@
 body {
   background-color: var(--background);
   color: var(--foreground);
-  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11", "tnum";
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Tabular figures for metrics, counts, and academic numbers */
+.font-tabular {
+  font-variant-numeric: tabular-nums;
 }
 
 /* Custom scrollbar for library reading experience */
@@ -44,9 +53,9 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #d6d3c9;
+  background: #D8DFEB;
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #b8b4a7;
+  background: #BAC5D7;
 }

@@ -165,7 +165,7 @@ export function UploadDropzone({
   };
 
   return (
-    <div className="bg-white border border-[#e6e3da] rounded-xl p-6 shadow-sm">
+    <div className="bg-white border border-[#E4E8F0] rounded-xl p-6 shadow-xs">
       {errorMsg && (
         <div className="mb-5 p-3 rounded-md bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center space-x-2">
           <AlertCircle className="w-4 h-4 shrink-0" />
@@ -189,10 +189,10 @@ export function UploadDropzone({
           onClick={() => fileInputRef.current?.click()}
           className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-all ${
             isDragging
-              ? "border-[#3730a3] bg-indigo-50/50"
+              ? "border-[#2855D9] bg-[#EDF2FF]"
               : file
               ? "border-emerald-400 bg-emerald-50/20"
-              : "border-stone-300 hover:border-stone-400 bg-[#fbfbfa]"
+              : "border-[#E4E8F0] hover:border-[#2855D9]/40 bg-[#FAFAF7]"
           }`}
         >
           <input
@@ -225,12 +225,12 @@ export function UploadDropzone({
             </div>
           ) : (
             <div className="flex flex-col items-center">
-              <UploadCloud className="w-10 h-10 text-stone-400 mb-2" />
-              <div className="font-semibold text-xs text-stone-800">
+              <UploadCloud className="w-10 h-10 text-[#68748A] mb-2" />
+              <div className="font-semibold text-xs text-[#182235]">
                 Drag and drop your PDF course material here, or{" "}
-                <span className="text-[#3730a3] underline">browse</span>
+                <span className="text-[#2855D9] underline">browse</span>
               </div>
-              <div className="text-[11px] text-stone-400 font-mono mt-1">
+              <div className="text-[11px] text-[#68748A] font-mono mt-1">
                 Strictly validated for PDF format • Max 50 MB
               </div>
             </div>
@@ -240,14 +240,14 @@ export function UploadDropzone({
         {/* Academic Hierarchy Selection */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-medium text-stone-700 mb-1">
+            <label className="block text-xs font-medium text-[#182235] mb-1">
               Subject Module *
             </label>
             <select
               value={subjectId}
               onChange={(e) => setSubjectId(e.target.value)}
               required
-              className="w-full bg-[#f4f3ed] border border-[#dedad0] rounded-md px-3 py-2 text-xs text-stone-900 focus:outline-none focus:border-stone-400"
+              className="w-full bg-[#F4F6FA] border border-[#E4E8F0] rounded-md px-3 py-2 text-xs text-[#182235] focus:outline-none focus:border-[#2855D9] cursor-pointer"
             >
               <option value="" disabled>Select Module</option>
               {subjects.map((sub) => (
@@ -259,14 +259,14 @@ export function UploadDropzone({
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-stone-700 mb-1">
+            <label className="block text-xs font-medium text-[#182235] mb-1">
               Resource Category *
             </label>
             <select
               value={categoryId}
               onChange={(e) => setCategoryId(e.target.value)}
               required
-              className="w-full bg-[#f4f3ed] border border-[#dedad0] rounded-md px-3 py-2 text-xs text-stone-900 focus:outline-none focus:border-stone-400"
+              className="w-full bg-[#F4F6FA] border border-[#E4E8F0] rounded-md px-3 py-2 text-xs text-[#182235] focus:outline-none focus:border-[#2855D9] cursor-pointer"
             >
               <option value="" disabled>Select Category</option>
               {categories.map((cat) => (
@@ -281,7 +281,7 @@ export function UploadDropzone({
         {/* Document Metadata */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-medium text-stone-700 mb-1">
+            <label className="block text-xs font-medium text-[#182235] mb-1">
               Document Title *
             </label>
             <input
@@ -290,12 +290,12 @@ export function UploadDropzone({
               onChange={(e) => setTitle(e.target.value)}
               placeholder="e.g. Flutter Architecture & BLoC Pattern"
               required
-              className="w-full bg-[#f4f3ed] border border-[#dedad0] rounded-md px-3 py-2 text-xs text-stone-900 focus:outline-none focus:border-stone-400"
+              className="w-full bg-[#F4F6FA] border border-[#E4E8F0] rounded-md px-3 py-2 text-xs text-[#182235] focus:outline-none focus:border-[#2855D9]"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-stone-700 mb-1">
+            <label className="block text-xs font-medium text-[#182235] mb-1">
               Instructor / Professor (Optional)
             </label>
             <input
@@ -303,14 +303,14 @@ export function UploadDropzone({
               value={instructor}
               onChange={(e) => setInstructor(e.target.value)}
               placeholder="e.g. Dr. Ben Ammar"
-              className="w-full bg-[#f4f3ed] border border-[#dedad0] rounded-md px-3 py-2 text-xs text-stone-900 focus:outline-none focus:border-stone-400"
+              className="w-full bg-[#F4F6FA] border border-[#E4E8F0] rounded-md px-3 py-2 text-xs text-[#182235] focus:outline-none focus:border-[#2855D9]"
             />
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <label className="block text-xs font-medium text-stone-700 mb-1">
+            <label className="block text-xs font-medium text-[#182235] mb-1">
               Academic Year
             </label>
             <input
@@ -318,18 +318,18 @@ export function UploadDropzone({
               value={academicYear}
               onChange={(e) => setAcademicYear(e.target.value)}
               placeholder="2024-2025"
-              className="w-full bg-[#f4f3ed] border border-[#dedad0] rounded-md px-3 py-2 text-xs text-stone-900 focus:outline-none focus:border-stone-400"
+              className="w-full bg-[#F4F6FA] border border-[#E4E8F0] rounded-md px-3 py-2 text-xs text-[#182235] focus:outline-none focus:border-[#2855D9]"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-stone-700 mb-1">
+            <label className="block text-xs font-medium text-[#182235] mb-1">
               Exam Session (Optional)
             </label>
             <select
               value={examSession}
               onChange={(e) => setExamSession(e.target.value)}
-              className="w-full bg-[#f4f3ed] border border-[#dedad0] rounded-md px-3 py-2 text-xs text-stone-900 focus:outline-none focus:border-stone-400"
+              className="w-full bg-[#F4F6FA] border border-[#E4E8F0] rounded-md px-3 py-2 text-xs text-[#182235] focus:outline-none focus:border-[#2855D9] cursor-pointer"
             >
               <option value="">None / Not Applicable</option>
               <option value="Principal">Principal Session</option>
@@ -339,7 +339,7 @@ export function UploadDropzone({
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-stone-700 mb-1">
+            <label className="block text-xs font-medium text-[#182235] mb-1">
               Chapter / Topic (Optional)
             </label>
             <input
@@ -347,27 +347,27 @@ export function UploadDropzone({
               value={chapter}
               onChange={(e) => setChapter(e.target.value)}
               placeholder="e.g. Chapter 3: State"
-              className="w-full bg-[#f4f3ed] border border-[#dedad0] rounded-md px-3 py-2 text-xs text-stone-900 focus:outline-none focus:border-stone-400"
+              className="w-full bg-[#F4F6FA] border border-[#E4E8F0] rounded-md px-3 py-2 text-xs text-[#182235] focus:outline-none focus:border-[#2855D9]"
             />
           </div>
         </div>
 
         {/* Tag Input */}
         <div>
-          <label className="block text-xs font-medium text-stone-700 mb-1">
+          <label className="block text-xs font-medium text-[#182235] mb-1">
             Tags (Press Enter or Comma to add)
           </label>
-          <div className="flex flex-wrap gap-1.5 p-2 bg-[#f4f3ed] border border-[#dedad0] rounded-md min-h-[38px] items-center">
+          <div className="flex flex-wrap gap-1.5 p-2 bg-[#F4F6FA] border border-[#E4E8F0] rounded-md min-h-[38px] items-center">
             {tags.map((tag) => (
               <span
                 key={tag}
-                className="bg-white text-stone-700 border border-stone-300 text-xs px-2 py-0.5 rounded flex items-center space-x-1"
+                className="bg-white text-[#182235] border border-[#E4E8F0] text-xs px-2 py-0.5 rounded flex items-center space-x-1"
               >
                 <span>#{tag}</span>
                 <button
                   type="button"
                   onClick={() => handleRemoveTag(tag)}
-                  className="text-stone-400 hover:text-rose-600"
+                  className="text-[#68748A] hover:text-rose-600 cursor-pointer"
                 >
                   <X className="w-3 h-3" />
                 </button>
@@ -379,15 +379,15 @@ export function UploadDropzone({
               onChange={(e) => setTagInput(e.target.value)}
               onKeyDown={handleAddTag}
               placeholder={tags.length === 0 ? "e.g. flutter, bloc, exam..." : ""}
-              className="bg-transparent text-xs text-stone-900 focus:outline-none flex-1 min-w-[120px]"
+              className="bg-transparent text-xs text-[#182235] focus:outline-none flex-1 min-w-[120px]"
             />
           </div>
         </div>
 
         {/* Visibility / Sharing Policy */}
-        <div className="p-4 rounded-lg border border-[#e6e3da] bg-[#fbfbfa] flex items-center justify-between">
+        <div className="p-4 rounded-lg border border-[#E4E8F0] bg-[#FAFAF7] flex items-center justify-between">
           <div className="flex items-start space-x-3">
-            <div className="p-2 rounded bg-indigo-50 border border-indigo-200 text-[#3730a3] shrink-0 mt-0.5">
+            <div className="p-2 rounded bg-[#EDF2FF] border border-[#2855D9]/20 text-[#2855D9] shrink-0 mt-0.5">
               {submitShared ? (
                 <Globe className="w-4 h-4" />
               ) : (
@@ -395,12 +395,12 @@ export function UploadDropzone({
               )}
             </div>
             <div>
-              <div className="text-xs font-semibold text-stone-900">
+              <div className="text-xs font-semibold text-[#182235]">
                 {submitShared
                   ? "Submit for Class Library Review"
                   : "Keep as Personal Private Resource"}
               </div>
-              <div className="text-[11px] text-stone-500 mt-0.5 leading-relaxed">
+              <div className="text-[11px] text-[#68748A] mt-0.5 leading-relaxed">
                 {submitShared
                   ? "Resource will be queued for review before publishing to all classmates."
                   : "Private to your account only. It will not be visible to other students."}
@@ -415,7 +415,7 @@ export function UploadDropzone({
               onChange={(e) => setSubmitShared(e.target.checked)}
               className="sr-only peer"
             />
-            <div className="w-9 h-5 bg-stone-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-stone-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#3730a3]"></div>
+            <div className="w-9 h-5 bg-stone-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-stone-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#2855D9]"></div>
           </label>
         </div>
 

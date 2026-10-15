@@ -15,9 +15,9 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Validily — University Academic Library & Revision Platform",
+  title: "validily-IGL4 — University Academic Library & Revision Platform",
   description:
-    "Organized university revision materials by semester, subject, and resource category. Lecture notes, exams, labs, cheat sheets, and progress tracking.",
+    "Organized university revision materials by semester, subject, and resource category. Lecture notes, exams, labs, cheat sheets, and progress tracking for software engineering.",
 };
 
 export default function RootLayout({
@@ -27,7 +27,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable} h-full`}>
-      <body className="min-h-full flex flex-col font-sans bg-[#fbfbfa] text-[#141517]">
+      <body className="min-h-full flex flex-col font-sans bg-[#F4F6FA] text-[#182235] antialiased">
         {children}
       </body>
     </html>

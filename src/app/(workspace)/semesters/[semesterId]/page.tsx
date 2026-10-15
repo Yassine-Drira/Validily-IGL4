@@ -34,15 +34,15 @@ export default async function SemesterDetailPage({
       />
 
       {/* Header */}
-      <div className="bg-white border border-[#e6e3da] rounded-xl p-6 shadow-2xs">
-        <div className="flex items-center space-x-2 text-xs font-mono text-stone-500 mb-2">
-          <Calendar className="w-3.5 h-3.5 text-stone-400" />
+      <div className="bg-white border border-[#E4E8F0] rounded-xl p-6 shadow-xs">
+        <div className="flex items-center space-x-2 text-xs font-mono text-[#68748A] mb-2">
+          <Calendar className="w-3.5 h-3.5 text-[#68748A]" />
           <span>AY {semester.academic_year}</span>
         </div>
-        <h1 className="text-2xl font-serif font-bold text-stone-900 tracking-tight">
+        <h1 className="text-2xl font-serif font-bold text-[#182235] tracking-tight">
           {semester.name}
         </h1>
-        <p className="text-xs text-stone-500 mt-1 max-w-xl">
+        <p className="text-xs text-[#68748A] mt-1 max-w-xl">
           Browse all subjects and course documents registered for {semester.name}.
         </p>
       </div>
@@ -50,8 +50,8 @@ export default async function SemesterDetailPage({
       {/* Subjects Grid */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold text-stone-900 flex items-center space-x-2">
-            <Layers className="w-4 h-4 text-[#3730a3]" />
+          <h2 className="text-base font-semibold text-[#182235] flex items-center space-x-2">
+            <Layers className="w-4 h-4 text-[#2855D9]" />
             <span>Curriculum Subjects ({subjects.length})</span>
           </h2>
         </div>
@@ -63,12 +63,12 @@ export default async function SemesterDetailPage({
             ))}
           </div>
         ) : (
-          <div className="bg-white border border-[#e6e3da] rounded-xl p-12 text-center">
-            <Layers className="w-8 h-8 text-stone-400 mx-auto mb-3" />
-            <h3 className="text-sm font-semibold text-stone-900">
+          <div className="bg-white border border-[#E4E8F0] rounded-xl p-12 text-center">
+            <Layers className="w-8 h-8 text-[#68748A]/40 mx-auto mb-3" />
+            <h3 className="text-sm font-semibold text-[#182235]">
               No subjects registered yet
             </h3>
-            <p className="text-xs text-stone-500 mt-1 max-w-md mx-auto">
+            <p className="text-xs text-[#68748A] mt-1 max-w-md mx-auto">
               Subjects for this semester have not been configured yet. Administrators can add subjects in the admin console.
             </p>
           </div>

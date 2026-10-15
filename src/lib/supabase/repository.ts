@@ -6,21 +6,11 @@ import {
   AcademicResource,
   Note,
   Quiz,
+  QuizQuestion,
+  Bookmark,
 } from "@/types/database";
-import {
-  INITIAL_SEMESTERS,
-  INITIAL_SUBJECTS,
-  INITIAL_CATEGORIES,
-  INITIAL_RESOURCES,
-  INITIAL_NOTES,
-  INITIAL_QUIZZES,
-} from "../mock-data";
 
 export async function getSemesters(): Promise<Semester[]> {
-  if (!isSupabaseConfigured()) {
-    return INITIAL_SEMESTERS;
-  }
-
   try {
     const supabase = await createClient();
     const { data, error } = await supabase
@@ -28,8 +18,9 @@ export async function getSemesters(): Promise<Semester[]> {
       .select("*, subjects:subjects(count)")
       .order("sort_order", { ascending: true });
 
-    if (error || !data || data.length === 0) {
-      return INITIAL_SEMESTERS;
+    if (error || !data) {
+      console.error("Database query error [getSemesters]:", error);
+      return [];
     }
 
     return data.map((item) => ({
@@ -37,35 +28,40 @@ export async function getSemesters(): Promise<Semester[]> {
       subject_count: item.subjects?.[0]?.count ?? 0,
     }));
   } catch (err) {
-    console.error("Error fetching semesters, using fallback data:", err);
-    return INITIAL_SEMESTERS;
+    console.error("Failed to query semesters from database:", err);
+    return [];
   }
 }
 
 export async function getSemesterById(idOrSlug: string): Promise<Semester | null> {
-  const all = await getSemesters();
-  return (
-    all.find(
-      (s) =>
-        s.id === idOrSlug ||
-        s.name.toLowerCase().replace(/\s+/g, "-") === idOrSlug.toLowerCase()
-    ) || null
-  );
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("semesters")
+      .select("*, subjects:subjects(count)")
+      .or(`id.eq.${idOrSlug},name.ilike.%${idOrSlug}%`)
+      .maybeSingle();
+
+    if (error || !data) {
+      return null;
+    }
+
+    return {
+      ...data,
+      subject_count: data.subjects?.[0]?.count ?? 0,
+    };
+  } catch {
+    return null;
+  }
 }
 
 export async function getSubjects(semesterId?: string): Promise<Subject[]> {
-  if (!isSupabaseConfigured()) {
-    if (semesterId) {
-      return INITIAL_SUBJECTS.filter((s) => s.semester_id === semesterId);
-    }
-    return INITIAL_SUBJECTS;
-  }
-
   try {
     const supabase = await createClient();
     let query = supabase
       .from("subjects")
       .select("*, semester:semesters(*), resources:resources(count)")
+      .eq("is_active", true)
       .order("sort_order", { ascending: true });
 
     if (semesterId) {
@@ -73,11 +69,9 @@ export async function getSubjects(semesterId?: string): Promise<Subject[]> {
     }
 
     const { data, error } = await query;
-    if (error || !data || data.length === 0) {
-      if (semesterId) {
-        return INITIAL_SUBJECTS.filter((s) => s.semester_id === semesterId);
-      }
-      return INITIAL_SUBJECTS;
+    if (error || !data) {
+      console.error("Database query error [getSubjects]:", error);
+      return [];
     }
 
     return data.map((item) => ({
@@ -85,33 +79,45 @@ export async function getSubjects(semesterId?: string): Promise<Subject[]> {
       resource_count: item.resources?.[0]?.count ?? 0,
     }));
   } catch (err) {
-    console.error("Error fetching subjects, using fallback data:", err);
-    if (semesterId) {
-      return INITIAL_SUBJECTS.filter((s) => s.semester_id === semesterId);
-    }
-    return INITIAL_SUBJECTS;
+    console.error("Failed to query subjects from database:", err);
+    return [];
   }
 }
 
 export async function getSubjectBySlugOrId(idOrSlug: string): Promise<Subject | null> {
-  const subjects = await getSubjects();
-  return subjects.find((s) => s.id === idOrSlug || s.slug === idOrSlug) || null;
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("subjects")
+      .select("*, semester:semesters(*), resources:resources(count)")
+      .or(`id.eq.${idOrSlug},slug.eq.${idOrSlug}`)
+      .maybeSingle();
+
+    if (error || !data) {
+      return null;
+    }
+
+    return {
+      ...data,
+      resource_count: data.resources?.[0]?.count ?? 0,
+    };
+  } catch {
+    return null;
+  }
 }
 
 export async function getCategories(): Promise<ResourceCategory[]> {
-  if (!isSupabaseConfigured()) {
-    return INITIAL_CATEGORIES;
-  }
-
   try {
     const supabase = await createClient();
     const { data, error } = await supabase
       .from("resource_categories")
       .select("*, resources:resources(count)")
+      .eq("is_active", true)
       .order("sort_order", { ascending: true });
 
-    if (error || !data || data.length === 0) {
-      return INITIAL_CATEGORIES;
+    if (error || !data) {
+      console.error("Database query error [getCategories]:", error);
+      return [];
     }
 
     return data.map((item) => ({
@@ -119,8 +125,8 @@ export async function getCategories(): Promise<ResourceCategory[]> {
       resource_count: item.resources?.[0]?.count ?? 0,
     }));
   } catch (err) {
-    console.error("Error fetching categories, using fallback data:", err);
-    return INITIAL_CATEGORIES;
+    console.error("Failed to query categories from database:", err);
+    return [];
   }
 }
 
@@ -130,36 +136,12 @@ export async function getResources(options?: {
   search?: string;
   limit?: number;
 }): Promise<AcademicResource[]> {
-  if (!isSupabaseConfigured()) {
-    let list = [...INITIAL_RESOURCES];
-    if (options?.subjectId) {
-      list = list.filter((r) => r.subject_id === options.subjectId);
-    }
-    if (options?.categoryId) {
-      list = list.filter((r) => r.category_id === options.categoryId);
-    }
-    if (options?.search) {
-      const q = options.search.toLowerCase();
-      list = list.filter(
-        (r) =>
-          r.title.toLowerCase().includes(q) ||
-          r.description?.toLowerCase().includes(q) ||
-          r.tags?.some((t) => t.toLowerCase().includes(q))
-      );
-    }
-    // enrich with subject and category
-    return list.map((r) => ({
-      ...r,
-      subject: INITIAL_SUBJECTS.find((s) => s.id === r.subject_id),
-      category: INITIAL_CATEGORIES.find((c) => c.id === r.category_id),
-    }));
-  }
-
   try {
     const supabase = await createClient();
     let query = supabase
       .from("resources")
       .select("*, subject:subjects(*), category:resource_categories(*)")
+      .eq("publication_status", "published")
       .order("created_at", { ascending: false });
 
     if (options?.subjectId) {
@@ -169,47 +151,179 @@ export async function getResources(options?: {
       query = query.eq("category_id", options.categoryId);
     }
     if (options?.search) {
-      query = query.ilike("title", `%${options.search}%`);
+      query = query.or(
+        `title.ilike.%${options.search}%,description.ilike.%${options.search}%`
+      );
     }
     if (options?.limit) {
       query = query.limit(options.limit);
     }
 
     const { data, error } = await query;
-    if (error || !data || data.length === 0) {
-      return INITIAL_RESOURCES.map((r) => ({
-        ...r,
-        subject: INITIAL_SUBJECTS.find((s) => s.id === r.subject_id),
-        category: INITIAL_CATEGORIES.find((c) => c.id === r.category_id),
-      }));
+    if (error || !data) {
+      console.error("Database query error [getResources]:", error);
+      return [];
     }
 
     return data;
   } catch (err) {
-    console.error("Error fetching resources, using fallback data:", err);
-    return INITIAL_RESOURCES;
+    console.error("Failed to query resources from database:", err);
+    return [];
   }
 }
 
 export async function getResourceById(id: string): Promise<AcademicResource | null> {
-  const resources = await getResources();
-  return resources.find((r) => r.id === id) || null;
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("resources")
+      .select("*, subject:subjects(*), category:resource_categories(*)")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (error || !data) {
+      return null;
+    }
+
+    return data;
+  } catch {
+    return null;
+  }
 }
 
 export async function getNotes(userId?: string): Promise<Note[]> {
-  return INITIAL_NOTES.map((n) => ({
-    ...n,
-    subject: INITIAL_SUBJECTS.find((s) => s.id === n.subject_id),
-  }));
+  try {
+    const supabase = await createClient();
+    let query = supabase
+      .from("notes")
+      .select("*, subject:subjects(*)")
+      .order("created_at", { ascending: false });
+
+    if (userId) {
+      query = query.eq("user_id", userId);
+    }
+
+    const { data, error } = await query;
+    if (error || !data) {
+      return [];
+    }
+
+    return data;
+  } catch (err) {
+    console.error("Failed to query notes from database:", err);
+    return [];
+  }
 }
 
 export async function getQuizzes(subjectId?: string): Promise<Quiz[]> {
-  let list = [...INITIAL_QUIZZES];
-  if (subjectId) {
-    list = list.filter((q) => q.subject_id === subjectId);
+  try {
+    const supabase = await createClient();
+    let query = supabase
+      .from("quizzes")
+      .select("*, subject:subjects(*), questions:quiz_questions(count)")
+      .eq("publication_status", "published")
+      .order("created_at", { ascending: false });
+
+    if (subjectId) {
+      query = query.eq("subject_id", subjectId);
+    }
+
+    const { data, error } = await query;
+    if (error || !data) {
+      return [];
+    }
+
+    return data.map((item) => ({
+      ...item,
+      question_count: item.questions?.[0]?.count ?? 0,
+    }));
+  } catch (err) {
+    console.error("Failed to query quizzes from database:", err);
+    return [];
   }
-  return list.map((q) => ({
-    ...q,
-    subject: INITIAL_SUBJECTS.find((s) => s.id === q.subject_id),
-  }));
+}
+
+export async function getQuizWithQuestions(quizId: string) {
+  try {
+    const supabase = await createClient();
+    const { data: quiz, error: quizErr } = await supabase
+      .from("quizzes")
+      .select("*, subject:subjects(*)")
+      .eq("id", quizId)
+      .maybeSingle();
+
+    if (quizErr || !quiz) {
+      return null;
+    }
+
+    const { data: questions, error: qErr } = await supabase
+      .from("quiz_questions")
+      .select("*, options:quiz_options(*)")
+      .eq("quiz_id", quizId)
+      .order("sort_order", { ascending: true });
+
+    if (qErr || !questions) {
+      return { quiz, questions: [] };
+    }
+
+    return { quiz, questions };
+  } catch (err) {
+    console.error("Failed to query quiz with questions:", err);
+    return null;
+  }
+}
+
+export async function getBookmarks(userId?: string): Promise<Bookmark[]> {
+  try {
+    const supabase = await createClient();
+    let query = supabase
+      .from("bookmarks")
+      .select("*, resource:resources(*, subject:subjects(*), category:resource_categories(*))")
+      .order("created_at", { ascending: false });
+
+    if (userId) {
+      query = query.eq("user_id", userId);
+    }
+
+    const { data, error } = await query;
+    if (error || !data) {
+      return [];
+    }
+
+    return data;
+  } catch {
+    return [];
+  }
+}
+
+export async function getDashboardMetrics() {
+  try {
+    const supabase = await createClient();
+    const [
+      { count: totalSemesters },
+      { count: totalSubjects },
+      { count: totalResources },
+      { count: totalCategories },
+    ] = await Promise.all([
+      supabase.from("semesters").select("*", { count: "exact", head: true }),
+      supabase.from("subjects").select("*", { count: "exact", head: true }).eq("is_active", true),
+      supabase.from("resources").select("*", { count: "exact", head: true }).eq("publication_status", "published"),
+      supabase.from("resource_categories").select("*", { count: "exact", head: true }),
+    ]);
+
+    return {
+      totalSemesters: totalSemesters ?? 0,
+      totalSubjects: totalSubjects ?? 0,
+      totalResources: totalResources ?? 0,
+      totalCategories: totalCategories ?? 0,
+    };
+  } catch (err) {
+    console.error("Failed to calculate dashboard metrics from database:", err);
+    return {
+      totalSemesters: 0,
+      totalSubjects: 0,
+      totalResources: 0,
+      totalCategories: 0,
+    };
+  }
 }

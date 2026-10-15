@@ -9,6 +9,7 @@ import {
   Search,
   Filter,
   CheckCircle2,
+  X,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -18,30 +19,38 @@ interface LibraryPageProps {
   searchParams: Promise<{
     action?: string;
     subjectId?: string;
+    categoryId?: string;
+    q?: string;
     uploaded?: string;
   }>;
 }
 
 export default async function LibraryPage({ searchParams }: LibraryPageProps) {
-  const { action, subjectId, uploaded } = await searchParams;
+  const { action, subjectId, categoryId, q, uploaded } = await searchParams;
   const subjects = await getSubjects("sem-1");
   const categories = await getCategories();
-  const resources = await getResources();
+  
+  // Dynamic PostgreSQL query with search and filters
+  const resources = await getResources({
+    subjectId: subjectId || undefined,
+    categoryId: categoryId || undefined,
+    search: q?.trim() || undefined,
+  });
 
   const isUploadModalOpen = action === "upload";
 
   return (
     <div className="space-y-6">
-      <Breadcrumbs items={[{ label: "Personal Library" }]} />
+      <Breadcrumbs items={[{ label: "Resource Library" }]} />
 
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[#e6e3da] pb-5">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[#E4E8F0] pb-5">
         <div>
-          <h1 className="text-2xl font-serif font-bold text-stone-900 tracking-tight">
-            Personal Library & Uploads
+          <h1 className="text-2xl font-serif font-bold text-[#182235] tracking-tight">
+            Academic Resource Library
           </h1>
-          <p className="text-xs text-stone-500 mt-1">
-            Manage your personal revision documents, uploaded lecture notes, and submissions.
+          <p className="text-xs text-[#68748A] mt-1">
+            Search, filter, and study course materials, exam archives, practical guides, and cheat sheets.
           </p>
         </div>
 
@@ -49,7 +58,7 @@ export default async function LibraryPage({ searchParams }: LibraryPageProps) {
           <Link href="/library?action=upload">
             <Button size="md" variant="primary">
               <UploadCloud className="w-4 h-4" />
-              <span>Upload New Document</span>
+              <span>Upload Document</span>
             </Button>
           </Link>
         )}
@@ -59,22 +68,22 @@ export default async function LibraryPage({ searchParams }: LibraryPageProps) {
         <div className="p-3.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center space-x-2">
           <CheckCircle2 className="w-4 h-4 shrink-0" />
           <span>
-            Document uploaded successfully and registered in your library!
+            Document uploaded successfully and registered in the academic library!
           </span>
         </div>
       )}
 
-      {/* Drag & Drop Upload Panel */}
+      {/* Upload Zone */}
       {isUploadModalOpen && (
-        <div className="space-y-3">
+        <div className="space-y-3 bg-[#FAFAF7] border border-[#E4E8F0] p-6 rounded-xl">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-stone-900 flex items-center space-x-2">
-              <UploadCloud className="w-4 h-4 text-[#3730a3]" />
-              <span>Upload Revision Document (PDF)</span>
+            <h2 className="text-sm font-semibold text-[#182235] flex items-center space-x-2">
+              <UploadCloud className="w-4 h-4 text-[#2855D9]" />
+              <span>Upload Academic Resource (PDF)</span>
             </h2>
             <Link
               href="/library"
-              className="text-xs text-stone-400 hover:text-stone-700"
+              className="text-xs text-[#68748A] hover:text-[#182235]"
             >
               Cancel
             </Link>
@@ -88,18 +97,81 @@ export default async function LibraryPage({ searchParams }: LibraryPageProps) {
         </div>
       )}
 
-      {/* Resource Listing */}
-      <div className="space-y-4">
-        <h2 className="text-sm font-semibold text-stone-900 flex items-center space-x-2">
-          <FolderArchive className="w-4 h-4 text-[#3730a3]" />
-          <span>Your Uploaded Materials ({resources.length})</span>
-        </h2>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {resources.map((res) => (
-            <ResourceCard key={res.id} resource={res} />
+      {/* Search & Filter Bar */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-[#FAFAF7] p-3 rounded-lg border border-[#E4E8F0]">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Category Filter Pills */}
+          <Link
+            href="/library"
+            className={`px-3 py-1 text-xs rounded-md transition-colors ${
+              !categoryId && !subjectId && !q
+                ? "bg-[#2855D9] text-white font-medium"
+                : "bg-white border border-[#E4E8F0] text-[#68748A] hover:text-[#182235]"
+            }`}
+          >
+            All Resources
+          </Link>
+          {categories.slice(0, 5).map((cat) => (
+            <Link
+              key={cat.id}
+              href={`/library?categoryId=${cat.id}${q ? `&q=${encodeURIComponent(q)}` : ""}`}
+              className={`px-3 py-1 text-xs rounded-md transition-colors ${
+                categoryId === cat.id
+                  ? "bg-[#2855D9] text-white font-medium"
+                  : "bg-white border border-[#E4E8F0] text-[#68748A] hover:text-[#182235]"
+              }`}
+            >
+              {cat.name}
+            </Link>
           ))}
         </div>
+
+        {/* Active Query Tag */}
+        {q && (
+          <div className="flex items-center space-x-2 text-xs text-[#182235] bg-[#EDF2FF] px-2.5 py-1 rounded border border-[#2855D9]/20 self-start sm:self-auto">
+            <span>Query: &ldquo;{q}&rdquo;</span>
+            <Link href="/library" className="text-[#2855D9] hover:text-[#111A2E]">
+              <X className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+        )}
+      </div>
+
+      {/* Resource Grid */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-[#182235] flex items-center space-x-2">
+            <FolderArchive className="w-4 h-4 text-[#2855D9]" />
+            <span>Documents ({resources.length})</span>
+          </h2>
+        </div>
+
+        {resources.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {resources.map((res) => (
+              <ResourceCard key={res.id} resource={res} />
+            ))}
+          </div>
+        ) : (
+          <div className="bg-white border border-[#E4E8F0] rounded-xl p-12 text-center">
+            <FolderArchive className="w-10 h-10 text-[#68748A]/40 mx-auto mb-3" />
+            <h3 className="text-sm font-semibold text-[#182235]">
+              No documents found
+            </h3>
+            <p className="text-xs text-[#68748A] mt-1 max-w-sm mx-auto">
+              {q
+                ? `No academic resources matching "${q}". Try a different keyword or reset filters.`
+                : "No materials registered under this filter yet. Be the first to upload lecture notes or exams!"}
+            </p>
+            <div className="mt-4">
+              <Link href="/library">
+                <Button size="sm" variant="outline">
+                  Reset Filters
+                </Button>
+              </Link>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

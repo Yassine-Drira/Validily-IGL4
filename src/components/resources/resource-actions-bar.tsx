@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Bookmark, CheckCircle2, Clock, Download, ChevronDown } from "lucide-react";
+import { Bookmark, Download, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toggleBookmark, updateRevisionStatus } from "@/lib/actions/resource-actions";
 import { RevisionStatus } from "@/types/database";
@@ -70,10 +70,10 @@ export function ResourceActionsBar({
         type="button"
         onClick={handleBookmarkToggle}
         disabled={loadingBookmark}
-        className={`p-2 border rounded-md transition-colors flex items-center space-x-1.5 text-xs font-medium ${
+        className={`p-2 border rounded-md transition-colors flex items-center space-x-1.5 text-xs font-medium cursor-pointer ${
           isBookmarked
             ? "bg-amber-50 border-amber-300 text-amber-800"
-            : "bg-white border-stone-200 text-stone-600 hover:bg-stone-50 hover:text-stone-900"
+            : "bg-white border-[#E4E8F0] text-[#68748A] hover:bg-[#F4F6FA] hover:text-[#182235]"
         }`}
         title={isBookmarked ? "Remove Bookmark" : "Save to Revision Bookmarks"}
       >
@@ -95,15 +95,15 @@ export function ResourceActionsBar({
             status === "revised"
               ? "bg-emerald-50 border-emerald-300 text-emerald-800"
               : status === "in_progress"
-              ? "bg-indigo-50 border-indigo-200 text-[#3730a3]"
-              : "bg-white border-stone-200 text-stone-700 hover:bg-stone-50"
+              ? "bg-[#EDF2FF] border-[#2855D9]/20 text-[#2855D9]"
+              : "bg-white border-[#E4E8F0] text-[#182235] hover:bg-[#F4F6FA]"
           }`}
         >
           <option value="not_started">⚪ Not Started</option>
           <option value="in_progress">🟡 In Progress</option>
           <option value="revised">🟢 Revised</option>
         </select>
-        <ChevronDown className="w-3.5 h-3.5 absolute right-2 pointer-events-none text-stone-400" />
+        <ChevronDown className="w-3.5 h-3.5 absolute right-2 pointer-events-none text-[#68748A]" />
       </div>
 
       {/* Download Action */}
