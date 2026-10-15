@@ -10,6 +10,20 @@ const nextConfig: NextConfig = {
       },
     },
   },
+  async redirects() {
+    return [
+      {
+        source: "/admin/semesters",
+        destination: "/admin",
+        permanent: false,
+      },
+      {
+        source: "/admin/subjects",
+        destination: "/admin",
+        permanent: false,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

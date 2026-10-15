@@ -106,7 +106,21 @@ export async function POST(req: NextRequest) {
       ? `/subjects/${resource.subject.slug}`
       : `/library?uploaded=true`;
 
-    return NextResponse.redirect(new URL(redirectPath, req.url));
+    const acceptHeader = req.headers.get("accept") || "";
+    const isFetch =
+      acceptHeader.includes("application/json") ||
+      req.headers.get("sec-fetch-dest") === "empty";
+
+    if (isFetch) {
+      return NextResponse.json({
+        success: true,
+        resource,
+        redirectUrl: redirectPath,
+      });
+    }
+
+    // HTTP 303 (See Other) forces the browser to navigate using GET instead of re-POSTing
+    return NextResponse.redirect(new URL(redirectPath, req.url), 303);
   } catch (err: any) {
     console.error("Upload route uncaught exception:", err);
     return NextResponse.json(

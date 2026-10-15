@@ -29,12 +29,8 @@ export function getServiceSupabase(): any {
 }
 
 export const FALLBACK_SYSTEM_USER_ID = "8d18a271-32e9-4d4d-9809-94c3cc5ca540";
+let cachedSystemUserId: string | null = null;
 
-/**
- * Returns current authenticated user ID if exists, otherwise returns the fallback system user ID.
- * This guarantees foreign-key constraints on auth.users(id) succeed seamlessly in both authenticated
- * and local workspace modes.
- */
 export async function getEffectiveUserId(): Promise<string> {
   try {
     const supabase = await createServerClient();
@@ -47,6 +43,34 @@ export async function getEffectiveUserId(): Promise<string> {
     }
   } catch {
     // In guest/local mode
+  }
+
+  if (cachedSystemUserId) {
+    return cachedSystemUserId;
+  }
+
+  try {
+    const admin = getServiceSupabase();
+    // 1. Check existing profiles
+    const { data: profile } = await admin
+      .from("profiles")
+      .select("id")
+      .limit(1)
+      .maybeSingle();
+
+    if (profile?.id) {
+      cachedSystemUserId = profile.id;
+      return profile.id;
+    }
+
+    // 2. Check auth.users
+    const { data: userData } = await admin.auth.admin.listUsers({ page: 1, perPage: 1 });
+    if (userData?.users?.[0]?.id) {
+      cachedSystemUserId = userData.users[0].id;
+      return userData.users[0].id;
+    }
+  } catch {
+    // Fallback if admin query fails
   }
 
   return FALLBACK_SYSTEM_USER_ID;

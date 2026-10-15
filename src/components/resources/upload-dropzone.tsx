@@ -143,20 +143,25 @@ export function UploadDropzone({
 
       const response = await fetch("/api/upload", {
         method: "POST",
+        headers: {
+          Accept: "application/json",
+        },
         body: formData,
       });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || "Failed to upload resource.");
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok || data.error) {
+        throw new Error(data.error || "Failed to upload resource.");
       }
 
       setUploadSuccess(true);
       setTimeout(() => {
-        router.push("/library");
+        const destination = data.redirectUrl || "/library";
+        router.push(destination);
         router.refresh();
         if (onSuccess) onSuccess();
-      }, 1200);
+      }, 1000);
     } catch (err: any) {
       setErrorMsg(err?.message || "An unexpected error occurred during upload.");
     } finally {
