@@ -287,44 +287,62 @@ export async function updateRevisionStatus(
   }
 }
 
-export async function deleteResource(resourceId: string) {
+export async function deleteResource(resourceId: string): Promise<{ success?: boolean; error?: string }> {
   try {
     if (!isSupabaseConfigured()) {
-      return { success: true, isDemo: true };
+      return { success: true };
     }
 
     const serviceSupabase = getServiceSupabase();
 
     const { data: resource, error: fetchError } = await serviceSupabase
       .from("resources")
-      .select("id, storage_path, subject_id")
+      .select("id, storage_path, subject_id, subject:subjects(slug)")
       .eq("id", resourceId)
-      .single();
+      .maybeSingle();
 
     if (fetchError || !resource) {
-      return { error: "Resource not found." };
+      return { error: "Ressource introuvable ou déjà supprimée." };
     }
 
+    // 1. Delete dependent foreign-key records first (bookmarks, revision_progress)
+    await serviceSupabase.from("bookmarks").delete().eq("resource_id", resourceId);
+    await serviceSupabase.from("revision_progress").delete().eq("resource_id", resourceId);
+
+    // 2. Remove file from storage if stored locally (not external HTTP link)
     if (resource.storage_path && !resource.storage_path.startsWith("http")) {
       await serviceSupabase.storage
         .from("academic-resources")
         .remove([resource.storage_path]);
     }
 
+    // 3. Delete the resource record
     const { error: deleteError } = await serviceSupabase
       .from("resources")
       .delete()
       .eq("id", resourceId);
 
     if (deleteError) {
+      console.error("Delete resource DB error:", deleteError);
       return { error: deleteError.message };
     }
 
+    // 4. Revalidate all dependent routes
     safeRevalidate("/library");
     safeRevalidate("/subjects");
-    safeRevalidate("/");
+    safeRevalidate("/bookmarks");
+    safeRevalidate(`/resources/${resourceId}`);
+    if (resource.subject_id) {
+      safeRevalidate(`/subjects/${resource.subject_id}`);
+    }
+    const slug = (resource as any).subject?.slug;
+    if (slug) {
+      safeRevalidate(`/subjects/${slug}`);
+    }
+
     return { success: true };
   } catch (err: any) {
-    return { error: err.message };
+    console.error("deleteResource uncaught exception:", err);
+    return { error: err.message || "Échec de la suppression de la ressource." };
   }
 }

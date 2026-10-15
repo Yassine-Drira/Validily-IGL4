@@ -18,6 +18,8 @@ import { Button } from "@/components/ui/button";
 import { PdfViewer } from "@/components/pdf/pdf-viewer";
 import { TextResourceViewer } from "@/components/workspace/text-resource-viewer";
 import { SubjectFileLibrary } from "@/components/workspace/subject-file-library";
+import { FolderTreePicker } from "@/components/workspace/folder-tree-picker";
+import { DeleteConfirmModal } from "@/components/ui/delete-confirm-modal";
 import { QuizRunner } from "@/components/quizzes/quiz-runner";
 import { QuizImportModal } from "@/components/quizzes/quiz-import-modal";
 import { InteractiveHtmlRunner } from "@/components/quizzes/interactive-html-runner";
@@ -103,6 +105,8 @@ export function SubjectLearningWorkspace({
   const [isImportQuizModalOpen, setIsImportQuizModalOpen] = useState(false);
   const [isAddNoteModalOpen, setIsAddNoteModalOpen] = useState(false);
   const [isAddCheatModalOpen, setIsAddCheatModalOpen] = useState(false);
+  const [quizToDelete, setQuizToDelete] = useState<any | null>(null);
+  const [noteToDelete, setNoteToDelete] = useState<Note | null>(null);
 
   // Status & Feedback
   const [isPending, startTransition] = useTransition();
@@ -135,31 +139,25 @@ export function SubjectLearningWorkspace({
 
 
   // --- HANDLERS: QUIZZES ---
-  const handleDeleteQuiz = async (quizId: string, title: string) => {
-    if (!confirm(`Supprimer le quiz "${title}" ?`)) return;
-    setQuizzes((prev) => prev.filter((q) => q.id !== quizId));
-    startTransition(async () => {
-      const res = await deleteQuiz(quizId);
-      if (res.error) {
-        alert(res.error);
-      } else {
-        showFeedback(`Quiz supprimé.`);
-      }
-    });
+  const executeDeleteQuiz = async () => {
+    if (!quizToDelete) return;
+    const qId = quizToDelete.id;
+    const res = await deleteQuiz(qId);
+    if (res.error) throw new Error(res.error);
+    setQuizzes((prev) => prev.filter((q) => q.id !== qId));
+    showFeedback("Quiz supprimé avec succès.");
+    setQuizToDelete(null);
   };
 
   // --- HANDLERS: NOTES & CHEAT SHEETS ---
-  const handleDeleteNote = async (noteId: string, title: string) => {
-    if (!confirm(`Supprimer "${title}" ?`)) return;
-    setNotes((prev) => prev.filter((n) => n.id !== noteId));
-    startTransition(async () => {
-      const res = await deleteNote(noteId);
-      if (res.error) {
-        alert(res.error);
-      } else {
-        showFeedback(`Élément supprimé.`);
-      }
-    });
+  const executeDeleteNote = async () => {
+    if (!noteToDelete) return;
+    const nId = noteToDelete.id;
+    const res = await deleteNote(nId);
+    if (res.error) throw new Error(res.error);
+    setNotes((prev) => prev.filter((n) => n.id !== nId));
+    showFeedback("Élément supprimé avec succès.");
+    setNoteToDelete(null);
   };
 
   const handleCopy = (text: string, id: string) => {
@@ -595,7 +593,7 @@ ${resources.map((r) => `<li><strong>${r.title}</strong> (${r.mime_type}) - ${r.s
 
                       <button
                         type="button"
-                        onClick={() => handleDeleteQuiz(quiz.id, quiz.title)}
+                        onClick={() => setQuizToDelete(quiz)}
                         className="p-1.5 rounded-lg text-[#68748A] hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
                         title="Supprimer le quiz"
                       >
@@ -704,7 +702,7 @@ ${resources.map((r) => `<li><strong>${r.title}</strong> (${r.mime_type}) - ${r.s
                     <span>{new Date(item.created_at).toLocaleDateString()}</span>
                     <button
                       type="button"
-                      onClick={() => handleDeleteNote(item.id, item.title)}
+                      onClick={() => setNoteToDelete(item)}
                       className="text-slate-500 hover:text-rose-400 transition-colors cursor-pointer"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -781,7 +779,7 @@ ${resources.map((r) => `<li><strong>${r.title}</strong> (${r.mime_type}) - ${r.s
                     </span>
                     <button
                       type="button"
-                      onClick={() => handleDeleteNote(note.id, note.title)}
+                      onClick={() => setNoteToDelete(note)}
                       className="p-1.5 rounded-lg text-[#68748A] hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
                       title="Supprimer la note"
                     >
@@ -1030,23 +1028,12 @@ ${resources.map((r) => `<li><strong>${r.title}</strong> (${r.mime_type}) - ${r.s
               <input type="hidden" name="subjectId" value={subject.id} />
               <input type="hidden" name="folderId" value={targetUploadFolderId || ""} />
 
-              <div>
-                <label className="block font-medium text-[#111A2E] mb-1">
-                  Dossier de destination (Optionnel)
-                </label>
-                <select
-                  value={targetUploadFolderId || ""}
-                  onChange={(e) => setTargetUploadFolderId(e.target.value || undefined)}
-                  className="w-full bg-[#FAFBFD] border border-[#E4E8F0] rounded-xl px-3 py-2 text-[#111A2E] focus:outline-hidden focus:border-[#2855D9]"
-                >
-                  <option value="">📁 Racine du cours (aucun sous-dossier)</option>
-                  {folders.map((f) => (
-                    <option key={f.id} value={f.id}>
-                      📁 {f.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <FolderTreePicker
+                folders={folders}
+                selectedFolderId={targetUploadFolderId || null}
+                onSelect={(id) => setTargetUploadFolderId(id || undefined)}
+                label="Dossier de destination (Optionnel)"
+              />
 
               <div>
                 <label className="block font-medium text-[#111A2E] mb-1">
@@ -1161,6 +1148,30 @@ ${resources.map((r) => `<li><strong>${r.title}</strong> (${r.mime_type}) - ${r.s
             setIsAddCheatModalOpen(false);
             showFeedback("Fiche mémo enregistrée avec succès!");
           }}
+        />
+      )}
+
+      {/* Delete Quiz Confirmation Pop-up */}
+      {quizToDelete && (
+        <DeleteConfirmModal
+          isOpen={Boolean(quizToDelete)}
+          onClose={() => setQuizToDelete(null)}
+          onConfirm={executeDeleteQuiz}
+          itemName={quizToDelete.title}
+          itemType="quiz"
+          itemFormat="Série QCM"
+        />
+      )}
+
+      {/* Delete Note Confirmation Pop-up */}
+      {noteToDelete && (
+        <DeleteConfirmModal
+          isOpen={Boolean(noteToDelete)}
+          onClose={() => setNoteToDelete(null)}
+          onConfirm={executeDeleteNote}
+          itemName={noteToDelete.title}
+          itemType="note"
+          itemFormat={noteToDelete.tags?.includes("cheat-sheet") ? "Fiche Mémo" : "Note Personnelle"}
         />
       )}
     </div>

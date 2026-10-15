@@ -5,6 +5,7 @@ import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { CategoryBadge } from "@/components/academic/category-badge";
 import { formatBytes, formatDate } from "@/lib/utils";
 import { PdfViewer } from "@/components/pdf/pdf-viewer";
+import { ExternalLinkViewer } from "@/components/resources/external-link-viewer";
 import { ResourceActionsBar } from "@/components/resources/resource-actions-bar";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import {
@@ -122,27 +123,58 @@ export default async function ResourceDetailPage({
             </div>
           </div>
 
-          {/* Interactive Bookmark, Revision Status & Download */}
-          <ResourceActionsBar
-            resourceId={resource.id}
-            initialBookmarked={resource.is_bookmarked}
-            initialStatus={resource.revision_status}
-            downloadUrl={downloadEndpoint}
-            filename={resource.original_filename}
-          />
+          {/* Interactive Bookmark, Revision Status & Download / Redirect */}
+          {(() => {
+            const isExternal =
+              resource.mime_type?.includes("url") ||
+              resource.mime_type?.includes("google-apps") ||
+              resource.tags?.includes("external_link") ||
+              resource.tags?.includes("gdrive") ||
+              resource.storage_path?.startsWith("http");
+
+            const isGoogleDrive =
+              resource.mime_type === "application/vnd.google-apps" ||
+              resource.tags?.includes("gdrive") ||
+              resource.storage_path?.includes("drive.google.com");
+
+            const externalUrl = resource.external_url || resource.storage_path;
+
+            return (
+              <ResourceActionsBar
+                resourceId={resource.id}
+                title={resource.title}
+                initialBookmarked={resource.is_bookmarked}
+                initialStatus={resource.revision_status}
+                downloadUrl={downloadEndpoint}
+                filename={resource.original_filename}
+                isExternal={isExternal}
+                isGoogleDrive={isGoogleDrive}
+                externalUrl={externalUrl}
+                subjectSlug={resource.subject?.slug}
+              />
+            );
+          })()}
         </div>
       </div>
 
       {/* In-App Reader Interface */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* PDF Reader Frame */}
+        {/* Main Viewer Frame: External Link Portal vs PDF Reader */}
         <div className="lg:col-span-3">
-          <PdfViewer
-            url={viewUrl}
-            filename={resource.original_filename}
-            title={resource.title}
-            downloadUrl={downloadEndpoint}
-          />
+          {resource.mime_type?.includes("url") ||
+          resource.mime_type?.includes("google-apps") ||
+          resource.tags?.includes("external_link") ||
+          resource.tags?.includes("gdrive") ||
+          resource.storage_path?.startsWith("http") ? (
+            <ExternalLinkViewer resource={resource} />
+          ) : (
+            <PdfViewer
+              url={viewUrl}
+              filename={resource.original_filename}
+              title={resource.title}
+              downloadUrl={downloadEndpoint}
+            />
+          )}
         </div>
 
         {/* Sidebar: Metadata & Related Documents */}

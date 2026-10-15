@@ -113,10 +113,27 @@ export async function createQuiz(input: CreateQuizInput): Promise<{
 export async function deleteQuiz(quizId: string): Promise<{ success?: boolean; error?: string }> {
   try {
     if (!isSupabaseConfigured()) {
-      return { error: "Database not configured." };
+      return { success: true };
     }
 
     const serviceSupabase = getServiceSupabase();
+
+    // 1. Delete dependent quiz attempts
+    await serviceSupabase.from("quiz_attempts").delete().eq("quiz_id", quizId);
+
+    // 2. Delete options for all questions in this quiz
+    const { data: questions } = await serviceSupabase
+      .from("quiz_questions")
+      .select("id")
+      .eq("quiz_id", quizId);
+
+    if (questions && questions.length > 0) {
+      const questionIds = questions.map((q: any) => q.id);
+      await serviceSupabase.from("quiz_options").delete().in("question_id", questionIds);
+      await serviceSupabase.from("quiz_questions").delete().eq("quiz_id", quizId);
+    }
+
+    // 3. Delete the quiz record
     const { error } = await serviceSupabase.from("quizzes").delete().eq("id", quizId);
 
     if (error) {

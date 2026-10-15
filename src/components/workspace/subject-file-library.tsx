@@ -52,6 +52,11 @@ import {
   Layers,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { FolderTree } from "lucide-react";
+import { FolderTreePicker } from "@/components/workspace/folder-tree-picker";
+import { getDescendantFolderIds } from "@/lib/utils/folder-tree";
+import { SubjectTreeView } from "@/components/workspace/subject-tree-view";
+import { DeleteConfirmModal } from "@/components/ui/delete-confirm-modal";
 import { cn } from "@/lib/utils";
 
 interface SubjectFileLibraryProps {
@@ -82,7 +87,7 @@ export function SubjectFileLibrary({
   // Navigation State
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const [viewMode, setViewMode] = useState<"grid" | "list">("list");
+  const [viewMode, setViewMode] = useState<"grid" | "list" | "tree">("list");
   const [isPending, startTransition] = useTransition();
 
   // Modals
@@ -92,6 +97,8 @@ export function SubjectFileLibrary({
   const [folderToMove, setFolderToMove] = useState<SubjectFolder | null>(null);
   const [resourceToRename, setResourceToRename] = useState<AcademicResource | null>(null);
   const [resourceToMove, setResourceToMove] = useState<AcademicResource | null>(null);
+  const [resourceToDelete, setResourceToDelete] = useState<AcademicResource | null>(null);
+  const [folderToDelete, setFolderToDelete] = useState<SubjectFolder | null>(null);
 
   // Active folder object
   const currentFolder = useMemo(() => {
@@ -162,53 +169,45 @@ export function SubjectFileLibrary({
     });
   };
 
-  // Delete Resource handler
-  const handleDeleteResource = async (res: AcademicResource) => {
-    if (!confirm(`Supprimer définitivement "${res.title}" ?`)) return;
-
-    onResourcesChange((prev) => prev.filter((r) => r.id !== res.id));
-    startTransition(async () => {
-      const result = await deleteResource(res.id);
-      if (result.error) {
-        alert(result.error);
-      } else {
-        showFeedback("Ressource supprimée avec succès.");
-      }
-    });
+  // Delete Resource execution from modal
+  const executeDeleteResource = async () => {
+    if (!resourceToDelete) return;
+    const resId = resourceToDelete.id;
+    const res = await deleteResource(resId);
+    if (res.error) {
+      throw new Error(res.error);
+    }
+    onResourcesChange((prev) => prev.filter((r) => r.id !== resId));
+    showFeedback("Ressource supprimée avec succès.");
+    setResourceToDelete(null);
   };
 
-  // Delete Folder handler
-  const handleDeleteFolder = async (folder: SubjectFolder) => {
-    const hasItems =
-      resources.some((r) => r.chapter === folder.id) ||
-      folders.some((f) => f.parent_id === folder.id);
+  // Delete Folder execution from modal
+  const executeDeleteFolder = async (options?: { deleteContents?: boolean }) => {
+    if (!folderToDelete) return;
+    const fId = folderToDelete.id;
+    const deleteContents = Boolean(options?.deleteContents);
 
-    const message = hasItems
-      ? `Le dossier "${folder.name}" contient des fichiers ou des sous-dossiers. Supprimer le dossier et déplacer son contenu vers le niveau supérieur ?`
-      : `Supprimer le dossier "${folder.name}" ?`;
-
-    if (!confirm(message)) return;
-
-    onFoldersChange((prev) => prev.filter((f) => f.id !== folder.id));
-    // Move contained resources to current parent
-    onResourcesChange((prev) =>
-      prev.map((r) =>
-        r.chapter === folder.id ? { ...r, chapter: folder.parent_id || null } : r
-      )
-    );
-
-    startTransition(async () => {
-      const result = await deleteFolderAction({
-        subject_id: subject.id,
-        folder_id: folder.id,
-        deleteContents: false,
-      });
-      if (result.error) {
-        alert(result.error);
-      } else {
-        showFeedback("Dossier supprimé.");
-      }
+    const res = await deleteFolderAction({
+      subject_id: subject.id,
+      folder_id: fId,
+      deleteContents,
     });
+
+    if (!res.success) {
+      throw new Error(res.error || "Échec de la suppression du dossier.");
+    }
+
+    onFoldersChange((prev) => prev.filter((f) => f.id !== fId));
+    if (deleteContents) {
+      onResourcesChange((prev) => prev.filter((r) => r.chapter !== fId));
+    } else {
+      onResourcesChange((prev) =>
+        prev.map((r) => (r.chapter === fId ? { ...r, chapter: folderToDelete.parent_id || null } : r))
+      );
+    }
+    showFeedback("Dossier supprimé avec succès.");
+    setFolderToDelete(null);
   };
 
   // Open resource according to type
@@ -425,13 +424,53 @@ export function SubjectFileLibrary({
               >
                 <LayoutGrid className="w-3.5 h-3.5" />
               </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("tree")}
+                className={cn(
+                  "px-2 py-1.5 rounded-lg transition-all cursor-pointer flex items-center space-x-1.5 text-xs font-semibold",
+                  viewMode === "tree" ? "bg-white text-[#2855D9] shadow-xs" : "text-[#68748A] hover:text-[#111A2E]"
+                )}
+                title="Vue Arborescence (Arbre complet)"
+              >
+                <FolderTree className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Arborescence</span>
+              </button>
             </div>
           </div>
         </div>
       </div>
 
       {/* CONTENT LISTING (FOLDERS & FILES) */}
-      {currentSubfolders.length === 0 && currentResources.length === 0 ? (
+      {viewMode === "tree" ? (
+        <SubjectTreeView
+          subject={subject}
+          folders={folders}
+          resources={resources}
+          onOpenFolder={(fId) => {
+            setCurrentFolderId(fId);
+            setViewMode("list");
+          }}
+          onViewPdf={onViewPdf}
+          onViewText={onViewText}
+          onOpenUploadModal={onOpenUploadModal}
+          onOpenLinkModal={(fId) => {
+            setCurrentFolderId(fId || null);
+            setIsAddLinkModalOpen(true);
+          }}
+          onOpenCreateFolderModal={(pId) => {
+            setCurrentFolderId(pId || null);
+            setIsCreateFolderModalOpen(true);
+          }}
+          onRenameFolder={(f) => setFolderToRename(f)}
+          onMoveFolder={(f) => setFolderToMove(f)}
+          onDeleteFolder={(f) => setFolderToDelete(f)}
+          onRenameResource={(r) => setResourceToRename(r)}
+          onMoveResource={(r) => setResourceToMove(r)}
+          onDeleteResource={(r) => setResourceToDelete(r)}
+          onToggleRevision={(resId, cur) => handleToggleRevision(resId, cur)}
+        />
+      ) : currentSubfolders.length === 0 && currentResources.length === 0 ? (
         /* Empty Folder State */
         <div className="bg-white border border-dashed border-[#CBD5E1] rounded-2xl p-12 text-center space-y-4">
           <div className="w-12 h-12 rounded-2xl bg-blue-50 text-[#2855D9] flex items-center justify-center mx-auto border border-blue-100 shadow-2xs">
@@ -545,7 +584,7 @@ export function SubjectFileLibrary({
                             </button>
                             <button
                               type="button"
-                              onClick={() => handleDeleteFolder(folder)}
+                              onClick={() => setFolderToDelete(folder)}
                               className="p-1 rounded-md text-[#68748A] hover:text-rose-600 hover:bg-rose-50 cursor-pointer"
                               title="Supprimer le dossier"
                             >
@@ -599,7 +638,7 @@ export function SubjectFileLibrary({
                         </button>
                         <button
                           type="button"
-                          onClick={() => handleDeleteFolder(folder)}
+                          onClick={() => setFolderToDelete(folder)}
                           className="p-1.5 rounded-lg text-[#68748A] hover:text-rose-600 hover:bg-rose-50 cursor-pointer"
                           title="Supprimer"
                         >
@@ -726,7 +765,7 @@ export function SubjectFileLibrary({
                             </button>
                             <button
                               type="button"
-                              onClick={() => handleDeleteResource(res)}
+                              onClick={() => setResourceToDelete(res)}
                               className="p-1 text-[#68748A] hover:text-rose-600 rounded-md hover:bg-rose-50 cursor-pointer"
                               title="Supprimer"
                             >
@@ -870,7 +909,7 @@ export function SubjectFileLibrary({
 
                           <button
                             type="button"
-                            onClick={() => handleDeleteResource(res)}
+                            onClick={() => setResourceToDelete(res)}
                             className="p-1.5 rounded-lg text-[#68748A] hover:text-rose-600 hover:bg-rose-50 cursor-pointer"
                             title="Supprimer"
                           >
@@ -1319,8 +1358,10 @@ function MoveFolderModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
 
-  // Filter out folder itself and its descendants to prevent cycles
-  const eligibleFolders = allFolders.filter((f) => f.id !== folder.id);
+  // Gather folder itself and all its recursive descendants to prevent circular loops
+  const disabledFolderIds = useMemo(() => {
+    return getDescendantFolderIds(folder.id, allFolders);
+  }, [folder.id, allFolders]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1341,33 +1382,47 @@ function MoveFolderModal({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-[#E4E8F0] space-y-4">
-        <h3 className="font-bold text-sm text-[#111A2E]">Déplacer "{folder.name}"</h3>
-        {error && <div className="text-xs text-rose-600">{error}</div>}
-        <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+      <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl border border-[#E4E8F0] space-y-4">
+        <div className="flex items-center justify-between pb-2 border-b border-[#E4E8F0]">
           <div>
-            <label className="block font-semibold text-[#111A2E] mb-1">
-              Choisir l'emplacement cible
-            </label>
-            <select
-              value={targetParentId || "root"}
-              onChange={(e) => setTargetParentId(e.target.value === "root" ? null : e.target.value)}
-              className="w-full bg-[#FAFAF7] border border-[#E4E8F0] rounded-xl px-3 py-2 text-[#111A2E]"
-            >
-              <option value="root">📁 Racine de la bibliothèque</option>
-              {eligibleFolders.map((f) => (
-                <option key={f.id} value={f.id}>
-                  📁 {f.name}
-                </option>
-              ))}
-            </select>
+            <h3 className="font-bold text-sm text-[#111A2E]">
+              Déplacer le dossier "{folder.name}"
+            </h3>
+            <p className="text-[11px] text-[#68748A]">
+              Sélectionnez son nouvel emplacement dans l'arborescence.
+            </p>
           </div>
-          <div className="flex justify-end space-x-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-[#68748A] hover:text-[#111A2E] p-1 rounded-lg"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {error && (
+          <div className="bg-rose-50 border border-rose-200 text-rose-700 text-xs p-3 rounded-xl flex items-center space-x-2">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+          <FolderTreePicker
+            folders={allFolders}
+            selectedFolderId={targetParentId}
+            onSelect={setTargetParentId}
+            disabledFolderIds={disabledFolderIds}
+            label="Choisir le dossier parent cible :"
+          />
+
+          <div className="flex items-center justify-end space-x-2 pt-3 border-t border-[#E4E8F0]">
             <Button type="button" size="sm" variant="ghost" onClick={onClose}>
               Annuler
             </Button>
             <Button type="submit" size="sm" variant="primary" disabled={isSubmitting}>
-              {isSubmitting ? "Déplacement..." : "Déplacer"}
+              {isSubmitting ? "Déplacement..." : "Déplacer ici"}
             </Button>
           </div>
         </form>
@@ -1462,33 +1517,46 @@ function MoveResourceModal({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-[#E4E8F0] space-y-4">
-        <h3 className="font-bold text-sm text-[#111A2E]">Déplacer "{resource.title}"</h3>
-        {error && <div className="text-xs text-rose-600">{error}</div>}
-        <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+      <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl border border-[#E4E8F0] space-y-4">
+        <div className="flex items-center justify-between pb-2 border-b border-[#E4E8F0]">
           <div>
-            <label className="block font-semibold text-[#111A2E] mb-1">
-              Sélectionner le dossier de destination
-            </label>
-            <select
-              value={targetFolderId || "root"}
-              onChange={(e) => setTargetFolderId(e.target.value === "root" ? null : e.target.value)}
-              className="w-full bg-[#FAFAF7] border border-[#E4E8F0] rounded-xl px-3 py-2 text-[#111A2E]"
-            >
-              <option value="root">📁 Racine de la bibliothèque</option>
-              {allFolders.map((f) => (
-                <option key={f.id} value={f.id}>
-                  📁 {f.name}
-                </option>
-              ))}
-            </select>
+            <h3 className="font-bold text-sm text-[#111A2E]">
+              Déplacer la ressource "{resource.title}"
+            </h3>
+            <p className="text-[11px] text-[#68748A]">
+              Sélectionnez son dossier de destination dans l'arborescence.
+            </p>
           </div>
-          <div className="flex justify-end space-x-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-[#68748A] hover:text-[#111A2E] p-1 rounded-lg"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {error && (
+          <div className="bg-rose-50 border border-rose-200 text-rose-700 text-xs p-3 rounded-xl flex items-center space-x-2">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+          <FolderTreePicker
+            folders={allFolders}
+            selectedFolderId={targetFolderId}
+            onSelect={setTargetFolderId}
+            label="Sélectionner le dossier de destination :"
+          />
+
+          <div className="flex items-center justify-end space-x-2 pt-3 border-t border-[#E4E8F0]">
             <Button type="button" size="sm" variant="ghost" onClick={onClose}>
               Annuler
             </Button>
             <Button type="submit" size="sm" variant="primary" disabled={isSubmitting}>
-              {isSubmitting ? "Déplacement..." : "Déplacer"}
+              {isSubmitting ? "Déplacement..." : "Déplacer ici"}
             </Button>
           </div>
         </form>

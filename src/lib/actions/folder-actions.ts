@@ -320,7 +320,11 @@ export async function deleteFolderAction(data: {
         }
 
         const ids = resourcesToDelete.map((r: any) => r.id);
-        await serviceSupabase.from("resources").delete().in("id", ids);
+        if (ids.length > 0) {
+          await serviceSupabase.from("bookmarks").delete().in("resource_id", ids);
+          await serviceSupabase.from("revision_progress").delete().in("resource_id", ids);
+          await serviceSupabase.from("resources").delete().in("id", ids);
+        }
       }
     } else {
       // Move contained resources to the parent of the deleted folder (or root)
@@ -340,6 +344,8 @@ export async function deleteFolderAction(data: {
     }
 
     safeRevalidate("/subjects");
+    safeRevalidate("/library");
+    safeRevalidate(`/subjects/${data.subject_id}`);
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message || "Échec de la suppression du dossier." };

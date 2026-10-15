@@ -70,6 +70,7 @@ export interface AcademicResource {
   title: string;
   description: string | null;
   storage_path: string;
+  external_url?: string;
   original_filename: string;
   mime_type: string;
   file_size_bytes: number;
