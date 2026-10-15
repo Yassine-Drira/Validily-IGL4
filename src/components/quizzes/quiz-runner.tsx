@@ -10,8 +10,13 @@ import {
   BookOpen,
   HelpCircle,
   Award,
+  Loader2,
+  Info,
+  AlertCircle,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { submitQuizAttempt } from "@/lib/actions/quiz-actions";
 
 export interface QuestionData {
   id: string;
@@ -25,18 +30,22 @@ export interface QuestionData {
   }[];
 }
 
-interface QuizRunnerProps {
+export interface QuizRunnerProps {
+  quizId: string;
   quizTitle: string;
   subjectName: string;
   difficulty: string;
   questions: QuestionData[];
+  onClose?: () => void;
 }
 
 export function QuizRunner({
+  quizId,
   quizTitle,
   subjectName,
   difficulty,
   questions,
+  onClose,
 }: QuizRunnerProps) {
   const [currentIndex, setCurrentIndex] = useState<number>(0);
   const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null);
@@ -45,6 +54,14 @@ export function QuizRunner({
     { questionId: string; selectedId: string; isCorrect: boolean }[]
   >([]);
   const [isCompleted, setIsCompleted] = useState<boolean>(false);
+  const [isPersisting, setIsPersisting] = useState<boolean>(false);
+  const [hasPersisted, setHasPersisted] = useState<boolean>(false);
+  const [persistenceStatus, setPersistenceStatus] = useState<{
+    success?: boolean;
+    isGuest?: boolean;
+    error?: string;
+    message?: string;
+  } | null>(null);
 
   if (!questions || questions.length === 0) {
     return (
@@ -54,11 +71,17 @@ export function QuizRunner({
         <p className="text-xs text-[#68748A]">
           This quiz currently does not have published questions. Check back soon or browse other module drills.
         </p>
-        <Link href="/quizzes">
-          <Button size="sm" variant="outline">
-            Back to Quizzes
+        {onClose ? (
+          <Button size="sm" variant="outline" onClick={onClose}>
+            Fermer
           </Button>
-        </Link>
+        ) : (
+          <Link href="/quizzes">
+            <Button size="sm" variant="outline">
+              Back to Quizzes
+            </Button>
+          </Link>
+        )}
       </div>
     );
   }
@@ -77,8 +100,8 @@ export function QuizRunner({
     const chosen = currentQ.options.find((o) => o.id === selectedOptionId);
     const isCorrect = Boolean(chosen?.is_correct);
 
-    setAnswers([
-      ...answers,
+    setAnswers((prev) => [
+      ...prev,
       {
         questionId: currentQ.id,
         selectedId: selectedOptionId,
@@ -91,6 +114,39 @@ export function QuizRunner({
   const handleNext = () => {
     if (isLastQuestion) {
       setIsCompleted(true);
+      // Persist attempt when completing the final question
+      if (!isPersisting && !hasPersisted && quizId) {
+        setIsPersisting(true);
+        const finalScore = answers.filter((a) => a.isCorrect).length;
+
+        submitQuizAttempt({
+          quiz_id: quizId,
+          score: finalScore,
+          total_questions: questions.length,
+          answers: answers.map((a) => ({
+            question_id: a.questionId,
+            selected_option_id: a.selectedId,
+            is_correct: a.isCorrect,
+          })),
+        })
+          .then((res) => {
+            setHasPersisted(true);
+            if (res?.error) {
+              setPersistenceStatus({ error: res.error });
+            } else if (res?.isGuest) {
+              setPersistenceStatus({ isGuest: true, message: res.message });
+            } else {
+              setPersistenceStatus({ success: true });
+            }
+          })
+          .catch((err) => {
+            setHasPersisted(true);
+            setPersistenceStatus({ error: err?.message || "Erreur de connexion lors de l'enregistrement." });
+          })
+          .finally(() => {
+            setIsPersisting(false);
+          });
+      }
     } else {
       setCurrentIndex((prev) => prev + 1);
       setSelectedOptionId(null);
@@ -104,6 +160,9 @@ export function QuizRunner({
     setIsAnswerSubmitted(false);
     setAnswers([]);
     setIsCompleted(false);
+    setHasPersisted(false);
+    setPersistenceStatus(null);
+    setIsPersisting(false);
   };
 
   const score = answers.filter((a) => a.isCorrect).length;
@@ -143,6 +202,35 @@ export function QuizRunner({
               : "Review the lecture notes and try this drill again to solidify understanding."}
           </p>
         </div>
+
+        {/* Persistence Feedback Status */}
+        {isPersisting && (
+          <div className="flex items-center justify-center space-x-2 text-xs text-[#2855D9] bg-[#EDF2FF] border border-[#2855D9]/20 p-3 rounded-lg max-w-sm mx-auto">
+            <Loader2 className="w-4 h-4 animate-spin text-[#2855D9]" />
+            <span>Enregistrement de votre tentative...</span>
+          </div>
+        )}
+
+        {!isPersisting && persistenceStatus?.success && !persistenceStatus.isGuest && (
+          <div className="flex items-center justify-center space-x-2 text-xs text-emerald-800 bg-emerald-50 border border-emerald-200 p-3 rounded-lg max-w-sm mx-auto font-medium">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>Tentative enregistrée avec succès dans votre espace étudiant.</span>
+          </div>
+        )}
+
+        {!isPersisting && persistenceStatus?.isGuest && (
+          <div className="flex items-center justify-center space-x-2 text-xs text-[#68748A] bg-[#F4F6FA] border border-[#E4E8F0] p-3 rounded-lg max-w-sm mx-auto text-left">
+            <Info className="w-4 h-4 text-[#2855D9] shrink-0" />
+            <span>{persistenceStatus.message || "Mode Invité : résultat calculé localement. Connectez-vous pour conserver l'historique."}</span>
+          </div>
+        )}
+
+        {!isPersisting && persistenceStatus?.error && (
+          <div className="flex items-center justify-center space-x-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 p-3 rounded-lg max-w-sm mx-auto">
+            <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+            <span>Score calculé localement (Sauvegarde différée : {persistenceStatus.error})</span>
+          </div>
+        )}
 
         {/* Question Review Breakdown */}
         <div className="text-left space-y-3 pt-4 border-t border-[#E4E8F0]">
@@ -191,12 +279,20 @@ export function QuizRunner({
             <RotateCcw className="w-4 h-4 mr-1.5" />
             <span>Retake Drill</span>
           </Button>
-          <Link href="/quizzes">
-            <Button size="md" variant="primary">
-              <BookOpen className="w-4 h-4 mr-1.5" />
-              <span>Back to Quizzes</span>
+
+          {onClose ? (
+            <Button size="md" variant="primary" onClick={onClose}>
+              <X className="w-4 h-4 mr-1.5" />
+              <span>Fermer l&apos;évaluation</span>
             </Button>
-          </Link>
+          ) : (
+            <Link href="/quizzes">
+              <Button size="md" variant="primary">
+                <BookOpen className="w-4 h-4 mr-1.5" />
+                <span>Back to Quizzes</span>
+              </Button>
+            </Link>
+          )}
         </div>
       </div>
     );
@@ -290,9 +386,19 @@ export function QuizRunner({
 
       {/* Action Footer */}
       <div className="flex items-center justify-between pt-4 border-t border-[#E4E8F0]">
-        <Link href="/quizzes" className="text-xs text-[#68748A] hover:text-[#182235]">
-          Exit Drill
-        </Link>
+        {onClose ? (
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-xs text-[#68748A] hover:text-[#182235] cursor-pointer"
+          >
+            Quitter l&apos;évaluation
+          </button>
+        ) : (
+          <Link href="/quizzes" className="text-xs text-[#68748A] hover:text-[#182235]">
+            Exit Drill
+          </Link>
+        )}
 
         <div>
           {!isAnswerSubmitted ? (

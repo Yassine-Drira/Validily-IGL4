@@ -42,6 +42,7 @@ export default async function QuizPage({ params }: QuizPageProps) {
       />
 
       <QuizRunner
+        quizId={quiz.id}
         quizTitle={quiz.title}
         subjectName={quiz.subject?.name || "Academic Module"}
         difficulty={quiz.difficulty}

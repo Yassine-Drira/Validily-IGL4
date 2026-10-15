@@ -14,6 +14,7 @@ import { CategoryBadge } from "@/components/academic/category-badge";
 import { SubjectIcon } from "@/components/academic/subject-icon";
 import { Button } from "@/components/ui/button";
 import { PdfViewer } from "@/components/pdf/pdf-viewer";
+import { QuizRunner } from "@/components/quizzes/quiz-runner";
 import {
   createResource,
   updateRevisionStatus,
@@ -1006,76 +1007,26 @@ ${resources.map((r) => `<li><strong>${r.title}</strong> (${r.mime_type}) - ${r.s
 
       {/* --- MODAL: IN-APP INTERACTIVE QUIZ RUNNER --- */}
       {activeQuizToRun && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6">
-          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-[#E4E8F0] p-6">
-            <div className="flex items-center justify-between pb-4 border-b border-[#E4E8F0]">
-              <div>
-                <span className="text-[10px] font-bold text-[#7C3AED] bg-[#F5F0FF] px-2 py-0.5 rounded-full uppercase">
-                  Quiz Interactif
-                </span>
-                <h3 className="text-lg font-bold text-[#111A2E] mt-1">
-                  {activeQuizToRun.title}
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setActiveQuizToRun(null)}
-                className="p-1.5 rounded-lg text-[#68748A] hover:text-[#111A2E] cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="py-6 space-y-6">
-              {activeQuizToRun.questions && activeQuizToRun.questions.length > 0 ? (
-                activeQuizToRun.questions.map((q: any, qIdx: number) => (
-                  <div key={q.id || qIdx} className="bg-[#FAFBFD] border border-[#E4E8F0] rounded-xl p-5 space-y-3">
-                    <div className="font-semibold text-xs text-[#111A2E] flex items-start space-x-2">
-                      <span className="w-5 h-5 rounded-full bg-[#111A2E] text-white flex items-center justify-center text-[10px] font-mono shrink-0">
-                        {qIdx + 1}
-                      </span>
-                      <span>{q.question_text}</span>
-                    </div>
-
-                    <div className="space-y-2 pt-1">
-                      {q.options?.map((opt: any) => (
-                        <div
-                          key={opt.id}
-                          className={`p-3 rounded-lg text-xs font-medium border flex items-center justify-between ${
-                            opt.is_correct
-                              ? "bg-emerald-50 text-emerald-800 border-emerald-200"
-                              : "bg-white text-[#182235] border-[#E4E8F0]"
-                          }`}
-                        >
-                          <span>{opt.option_text}</span>
-                          {opt.is_correct && (
-                            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded">
-                              Bonne réponse
-                            </span>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-
-                    {q.explanation && (
-                      <div className="text-[11px] text-[#68748A] bg-white p-2.5 rounded-lg border border-[#E4E8F0] leading-relaxed">
-                        <strong>Explication :</strong> {q.explanation}
-                      </div>
-                    )}
-                  </div>
-                ))
-              ) : (
-                <p className="text-xs text-[#68748A] text-center">
-                  Aucune question enregistrée pour ce quiz.
-                </p>
-              )}
-            </div>
-
-            <div className="pt-4 border-t border-[#E4E8F0] flex justify-end">
-              <Button size="sm" variant="primary" onClick={() => setActiveQuizToRun(null)}>
-                Fermer l&apos;évaluation
-              </Button>
-            </div>
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+          <div className="w-full max-w-2xl my-auto">
+            <QuizRunner
+              quizId={activeQuizToRun.id}
+              quizTitle={activeQuizToRun.title}
+              subjectName={subject.name}
+              difficulty={activeQuizToRun.difficulty || "intermediate"}
+              questions={(activeQuizToRun.questions || []).map((q: any) => ({
+                id: q.id,
+                question_text: q.question_text,
+                explanation: q.explanation || "Explication officielle fournie pour cette question.",
+                options: (q.options || []).map((opt: any) => ({
+                  id: opt.id,
+                  text: opt.option_text || opt.text,
+                  option_text: opt.option_text || opt.text,
+                  is_correct: Boolean(opt.is_correct),
+                })),
+              }))}
+              onClose={() => setActiveQuizToRun(null)}
+            />
           </div>
         </div>
       )}

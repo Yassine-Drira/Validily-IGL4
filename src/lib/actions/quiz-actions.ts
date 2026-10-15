@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { isSupabaseConfigured } from "@/lib/supabase/server";
+import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { getServiceSupabase, getEffectiveUserId } from "@/lib/supabase/admin";
 import { Quiz } from "@/types/database";
 
@@ -140,20 +140,41 @@ export async function submitQuizAttempt(data: {
     selected_option_id: string;
     is_correct: boolean;
   }>;
-}) {
+}): Promise<{
+  success?: boolean;
+  attemptId?: string;
+  isGuest?: boolean;
+  isDemo?: boolean;
+  error?: string;
+  message?: string;
+}> {
   try {
     if (!isSupabaseConfigured()) {
       return { success: true, isDemo: true };
     }
 
-    const userId = await getEffectiveUserId();
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    // Check if the student is authenticated
+    if (!user?.id) {
+      // Guest mode: do not pollute other accounts with unauthenticated attempts
+      return {
+        success: true,
+        isGuest: true,
+        message: "Résultats calculés localement. Connectez-vous pour conserver l'historique dans votre espace.",
+      };
+    }
+
     const serviceSupabase = getServiceSupabase();
 
     const { data: attempt, error: attemptError } = await serviceSupabase
       .from("quiz_attempts")
       .insert({
         quiz_id: data.quiz_id,
-        user_id: userId,
+        user_id: user.id,
         score: data.score,
         total_questions: data.total_questions,
         completed_at: new Date().toISOString(),
@@ -163,7 +184,7 @@ export async function submitQuizAttempt(data: {
 
     if (attemptError || !attempt) {
       console.error("Error recording quiz attempt:", attemptError);
-      return { error: attemptError?.message };
+      return { error: attemptError?.message || "Erreur lors de l'enregistrement de la tentative." };
     }
 
     if (data.answers && data.answers.length > 0) {
@@ -174,12 +195,21 @@ export async function submitQuizAttempt(data: {
         is_correct: ans.is_correct,
       }));
 
-      await serviceSupabase.from("quiz_attempt_answers").insert(answersToInsert);
+      const { error: ansError } = await serviceSupabase
+        .from("quiz_attempt_answers")
+        .insert(answersToInsert);
+
+      if (ansError) {
+        console.error("Error recording attempt answers:", ansError);
+      }
     }
 
     safeRevalidate("/quizzes");
+    safeRevalidate(`/quizzes/${data.quiz_id}`);
+    safeRevalidate("/subjects");
     return { success: true, attemptId: attempt.id };
   } catch (err: any) {
-    return { error: err.message };
+    console.error("submitQuizAttempt error:", err);
+    return { error: err.message || "Erreur lors de la soumission de la tentative." };
   }
 }
