@@ -71,10 +71,11 @@ export async function getRequesterUser(): Promise<AuthenticatedActor | null> {
     const cachedRole = roleMemoryCache.get(user.id);
     let role: AuthenticatedActor["role"] = "student";
 
+    const serviceSupabase = await getAdminClient();
+
     if (cachedRole && Date.now() < cachedRole.expiry) {
       role = cachedRole.role;
     } else {
-      const serviceSupabase = await getAdminClient();
       if (!serviceSupabase) {
         return { id: user.id, email: user.email, role: "student" };
       }
@@ -90,7 +91,7 @@ export async function getRequesterUser(): Promise<AuthenticatedActor | null> {
     }
 
     // Verify if an assigned admin role is temporary and has expired
-    if (role === "admin") {
+    if (role === "admin" && serviceSupabase) {
       const expiresAt = user.user_metadata?.temporary_admin_expires_at;
       if (expiresAt && new Date(expiresAt).getTime() < Date.now()) {
         role = "student";
