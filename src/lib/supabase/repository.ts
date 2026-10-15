@@ -315,6 +315,8 @@ export async function getNotes(userId?: string): Promise<Note[]> {
 
     if (userId) {
       query = query.eq("user_id", userId);
+    } else {
+      query = query.eq("visibility", "public");
     }
 
     const { data, error } = await query;
@@ -405,7 +407,17 @@ export async function getQuizWithQuestions(quizId: string) {
       return { quiz, questions: [] };
     }
 
-    return { quiz, questions };
+    const htmlQuestion = questions.find((qu: any) => qu.question_type === "interactive_html");
+    const isHtmlDrill = Boolean(htmlQuestion);
+
+    return {
+      quiz: {
+        ...quiz,
+        isHtmlDrill,
+        htmlContent: htmlQuestion ? (htmlQuestion.explanation || htmlQuestion.question_text) : undefined,
+      },
+      questions,
+    };
   } catch (err) {
     console.error("Failed to query quiz with questions:", err);
     return null;
@@ -425,10 +437,16 @@ export async function getSubjectQuizzesWithQuestions(subjectId: string) {
       return [];
     }
 
-    return quizzes.map((q: any) => ({
-      ...q,
-      question_count: q.questions?.length ?? 0,
-    }));
+    return quizzes.map((q: any) => {
+      const htmlQuestion = q.questions?.find((qu: any) => qu.question_type === "interactive_html");
+      const isHtml = Boolean(htmlQuestion);
+      return {
+        ...q,
+        isHtmlDrill: isHtml,
+        htmlContent: htmlQuestion ? (htmlQuestion.explanation || htmlQuestion.question_text) : undefined,
+        question_count: isHtml ? "Atelier" : (q.questions?.length ?? 0),
+      };
+    });
   } catch (err) {
     console.error("Failed to query subject quizzes:", err);
     return [];

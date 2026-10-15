@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { getServiceSupabase, getEffectiveUserId } from "@/lib/supabase/admin";
 import { Quiz } from "@/types/database";
+import { getRequesterUser, assertOwnershipOrAdmin } from "@/lib/auth/authorization";
 
 function safeRevalidate(path: string) {
   try {
@@ -13,16 +14,20 @@ function safeRevalidate(path: string) {
   }
 }
 
+import { invalidateRepositoryCache } from "@/lib/supabase/repository";
+
 export interface CreateQuizInput {
   subject_id: string;
   title: string;
   description?: string;
   difficulty?: "beginner" | "intermediate" | "advanced";
-  questions: Array<{
+  isHtmlDrill?: boolean;
+  htmlContent?: string;
+  questions?: Array<{
     question_text: string;
     explanation?: string;
-    question_type?: "single_choice" | "multiple_choice";
-    options: Array<{
+    question_type?: "single_choice" | "multiple_choice" | "interactive_html";
+    options?: Array<{
       option_text: string;
       is_correct: boolean;
     }>;
@@ -40,14 +45,24 @@ export async function createQuiz(input: CreateQuizInput): Promise<{
     }
 
     if (!input.title?.trim() || !input.subject_id) {
-      return { error: "Title and subject ID are required." };
+      return { error: "Le titre et la matière sont obligatoires." };
     }
 
-    if (!input.questions || input.questions.length === 0) {
-      return { error: "At least one quiz question is required." };
+    const isHtmlDrill = Boolean(input.isHtmlDrill || input.htmlContent);
+
+    if (!isHtmlDrill && (!input.questions || input.questions.length === 0)) {
+      return { error: "Au moins une question QCM est requise." };
     }
 
-    const userId = await getEffectiveUserId();
+    const requester = await getRequesterUser();
+    let userId = requester?.id;
+    if (!userId) {
+      userId = await getEffectiveUserId();
+    }
+    if (!userId) {
+      return { error: "Authentification requise pour créer un quiz." };
+    }
+
     const serviceSupabase = getServiceSupabase();
 
     // 1. Insert Quiz
@@ -57,7 +72,7 @@ export async function createQuiz(input: CreateQuizInput): Promise<{
         owner_id: userId,
         subject_id: input.subject_id,
         title: input.title.trim(),
-        description: input.description?.trim() || null,
+        description: input.description?.trim() || (isHtmlDrill ? "Atelier interactif complet" : null),
         difficulty: input.difficulty || "intermediate",
         publication_status: "published",
       })
@@ -66,43 +81,65 @@ export async function createQuiz(input: CreateQuizInput): Promise<{
 
     if (quizError || !quiz) {
       console.error("Error creating quiz:", quizError);
-      return { error: quizError?.message || "Failed to create quiz." };
+      return { error: quizError?.message || "Échec de l'enregistrement du quiz." };
     }
 
-    // 2. Insert Questions & Options
-    for (let i = 0; i < input.questions.length; i++) {
-      const q = input.questions[i];
-      const { data: question, error: qError } = await serviceSupabase
-        .from("quiz_questions")
-        .insert({
-          quiz_id: quiz.id,
-          question_text: q.question_text.trim(),
-          explanation: q.explanation?.trim() || null,
-          question_type: q.question_type || "single_choice",
-          sort_order: i + 1,
-        })
-        .select()
-        .single();
+    // 2. Insert Interactive HTML Drill Question OR Standard QCM Questions
+    if (isHtmlDrill && input.htmlContent) {
+      await serviceSupabase.from("quiz_questions").insert({
+        quiz_id: quiz.id,
+        question_text: input.title.trim(),
+        explanation: input.htmlContent,
+        question_type: "interactive_html",
+        sort_order: 1,
+      });
+    } else if (input.questions && input.questions.length > 0) {
+      for (let i = 0; i < input.questions.length; i++) {
+        const q = input.questions[i];
+        const { data: question, error: qError } = await serviceSupabase
+          .from("quiz_questions")
+          .insert({
+            quiz_id: quiz.id,
+            question_text: q.question_text.trim(),
+            explanation: q.explanation?.trim() || null,
+            question_type: q.question_type || "single_choice",
+            sort_order: i + 1,
+          })
+          .select()
+          .single();
 
-      if (qError || !question) {
-        console.error("Error creating question:", qError);
-        continue;
-      }
+        if (qError || !question) {
+          console.error("Error creating question:", qError);
+          continue;
+        }
 
-      if (q.options && q.options.length > 0) {
-        const optionInserts = q.options.map((opt, optIdx) => ({
-          question_id: question.id,
-          option_text: opt.option_text.trim(),
-          is_correct: Boolean(opt.is_correct),
-          sort_order: optIdx + 1,
-        }));
+        if (q.options && q.options.length > 0) {
+          const optionInserts = q.options.map((opt, optIdx) => ({
+            question_id: question.id,
+            option_text: opt.option_text.trim(),
+            is_correct: Boolean(opt.is_correct),
+            sort_order: optIdx + 1,
+          }));
 
-        await serviceSupabase.from("quiz_options").insert(optionInserts);
+          await serviceSupabase.from("quiz_options").insert(optionInserts);
+        }
       }
     }
 
+    invalidateRepositoryCache();
     safeRevalidate("/quizzes");
     safeRevalidate("/subjects");
+    safeRevalidate(`/subjects/${input.subject_id}`);
+
+    const { data: subData } = await serviceSupabase
+      .from("subjects")
+      .select("slug")
+      .eq("id", input.subject_id)
+      .maybeSingle();
+    if (subData?.slug) {
+      safeRevalidate(`/subjects/${subData.slug}`);
+    }
+
     return { success: true, quiz };
   } catch (err: any) {
     console.error("createQuiz error:", err);
@@ -116,9 +153,39 @@ export async function deleteQuiz(quizId: string): Promise<{ success?: boolean; e
       return { success: true };
     }
 
+    const requester = await getRequesterUser();
+    if (!requester) {
+      return { error: "Authentification requise pour supprimer un quiz." };
+    }
+
     const serviceSupabase = getServiceSupabase();
 
-    // 1. Delete dependent quiz attempts
+    // Fetch quiz and verify ownership BEFORE any cascade deletion
+    const { data: quiz, error: fetchErr } = await serviceSupabase
+      .from("quizzes")
+      .select("id, owner_id, title")
+      .eq("id", quizId)
+      .maybeSingle();
+
+    if (fetchErr || !quiz) {
+      return { error: "Quiz introuvable ou déjà supprimé." };
+    }
+
+    const authCheck = await assertOwnershipOrAdmin(quiz.owner_id, "ce quiz");
+    if (!authCheck.authorized) {
+      return { error: authCheck.error };
+    }
+
+    // 1. Delete dependent quiz attempts and answers
+    const { data: attempts } = await serviceSupabase
+      .from("quiz_attempts")
+      .select("id")
+      .eq("quiz_id", quizId);
+
+    if (attempts && attempts.length > 0) {
+      const attemptIds = attempts.map((a: any) => a.id);
+      await serviceSupabase.from("quiz_attempt_answers").delete().in("attempt_id", attemptIds);
+    }
     await serviceSupabase.from("quiz_attempts").delete().eq("quiz_id", quizId);
 
     // 2. Delete options for all questions in this quiz
@@ -140,8 +207,12 @@ export async function deleteQuiz(quizId: string): Promise<{ success?: boolean; e
       return { error: error.message };
     }
 
+    invalidateRepositoryCache();
     safeRevalidate("/quizzes");
     safeRevalidate("/subjects");
+    if (quiz.subject_id) {
+      safeRevalidate(`/subjects/${quiz.subject_id}`);
+    }
     return { success: true };
   } catch (err: any) {
     return { error: err.message || "Failed to delete quiz." };

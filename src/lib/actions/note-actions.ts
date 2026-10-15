@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { getServiceSupabase, getEffectiveUserId } from "@/lib/supabase/admin";
 import { Note } from "@/types/database";
+import { getRequesterUser, assertOwnershipOrAdmin } from "@/lib/auth/authorization";
 
 function safeRevalidate(path: string) {
   try {
@@ -29,12 +30,11 @@ export async function createNote(data: {
       return { error: "Note title is required." };
     }
 
-    const supabase = await createClient();
-    const {
-      data: { user: authUser },
-    } = await supabase.auth.getUser();
-    const fallbackId = await getEffectiveUserId();
-    const user = { id: authUser?.id || fallbackId };
+    const requester = await getRequesterUser();
+    if (!requester) {
+      return { error: "Authentification requise pour créer une note." };
+    }
+    const user = { id: requester.id };
     const serviceSupabase = getServiceSupabase();
 
     const { data: newNote, error } = await serviceSupabase
@@ -77,7 +77,28 @@ export async function updateNote(
       return { error: "Database not configured." };
     }
 
+    const requester = await getRequesterUser();
+    if (!requester) {
+      return { error: "Authentification requise pour modifier cette note." };
+    }
+
     const serviceSupabase = getServiceSupabase();
+
+    const { data: note, error: fetchErr } = await serviceSupabase
+      .from("notes")
+      .select("id, user_id, title")
+      .eq("id", noteId)
+      .maybeSingle();
+
+    if (fetchErr || !note) {
+      return { error: "Note introuvable." };
+    }
+
+    const authCheck = await assertOwnershipOrAdmin(note.user_id, "cette note");
+    if (!authCheck.authorized) {
+      return { error: authCheck.error };
+    }
+
     const updatePayload: Record<string, any> = {
       updated_at: new Date().toISOString(),
     };
@@ -112,7 +133,28 @@ export async function deleteNote(noteId: string): Promise<{ success?: boolean; e
       return { error: "Database not configured." };
     }
 
+    const requester = await getRequesterUser();
+    if (!requester) {
+      return { error: "Authentification requise pour supprimer cette note." };
+    }
+
     const serviceSupabase = getServiceSupabase();
+
+    const { data: note, error: fetchErr } = await serviceSupabase
+      .from("notes")
+      .select("id, user_id, title")
+      .eq("id", noteId)
+      .maybeSingle();
+
+    if (fetchErr || !note) {
+      return { error: "Note introuvable ou déjà supprimée." };
+    }
+
+    const authCheck = await assertOwnershipOrAdmin(note.user_id, "cette note");
+    if (!authCheck.authorized) {
+      return { error: authCheck.error };
+    }
+
     const { error } = await serviceSupabase
       .from("notes")
       .delete()

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { getServiceSupabase, getEffectiveUserId } from "@/lib/supabase/admin";
 import { SubjectFolder } from "@/types/database";
+import { getRequesterUser, assertOwnershipOrAdmin } from "@/lib/auth/authorization";
 
 const FOLDER_REGISTRY_TAG = "system_folder_registry";
 
@@ -114,6 +115,11 @@ export async function createFolderAction(data: {
       return { success: false, error: "Le nom du dossier et la matière sont requis." };
     }
 
+    const requester = await getRequesterUser();
+    if (!requester) {
+      return { success: false, error: "Authentification requise pour créer un dossier." };
+    }
+
     const currentFolders = await getSubjectFolders(data.subject_id);
 
     // Check for duplicate folder name under same parent
@@ -138,6 +144,7 @@ export async function createFolderAction(data: {
       parent_id: targetParentId,
       color: data.color || "blue",
       sort_order: currentFolders.filter((f) => f.parent_id === targetParentId).length + 1,
+      owner_id: requester.id,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
@@ -169,6 +176,11 @@ export async function renameFolderAction(data: {
       return { success: false, error: "Nom et identifiant de dossier requis." };
     }
 
+    const requester = await getRequesterUser();
+    if (!requester) {
+      return { success: false, error: "Authentification requise pour renommer un dossier." };
+    }
+
     const currentFolders = await getSubjectFolders(data.subject_id);
     const targetIndex = currentFolders.findIndex((f) => f.id === data.folder_id);
 
@@ -176,7 +188,13 @@ export async function renameFolderAction(data: {
       return { success: false, error: "Dossier introuvable." };
     }
 
-    const targetParentId = currentFolders[targetIndex].parent_id;
+    const targetFolder = currentFolders[targetIndex];
+    const authCheck = await assertOwnershipOrAdmin(targetFolder.owner_id, "ce dossier");
+    if (!authCheck.authorized) {
+      return { success: false, error: authCheck.error };
+    }
+
+    const targetParentId = targetFolder.parent_id;
     const duplicate = currentFolders.some(
       (f) =>
         f.id !== data.folder_id &&
@@ -223,10 +241,20 @@ export async function moveFolderAction(data: {
       return { success: false, error: "Un dossier ne peut pas être déplacé dans lui-même." };
     }
 
+    const requester = await getRequesterUser();
+    if (!requester) {
+      return { success: false, error: "Authentification requise pour déplacer un dossier." };
+    }
+
     const currentFolders = await getSubjectFolders(data.subject_id);
     const targetFolder = currentFolders.find((f) => f.id === data.folder_id);
     if (!targetFolder) {
       return { success: false, error: "Dossier cible introuvable." };
+    }
+
+    const authCheck = await assertOwnershipOrAdmin(targetFolder.owner_id, "ce dossier");
+    if (!authCheck.authorized) {
+      return { success: false, error: authCheck.error };
     }
 
     // Check circular reference: new_parent cannot be any descendant of folder_id
@@ -280,10 +308,20 @@ export async function deleteFolderAction(data: {
   deleteContents?: boolean;
 }): Promise<{ success: boolean; error?: string }> {
   try {
+    const requester = await getRequesterUser();
+    if (!requester) {
+      return { success: false, error: "Authentification requise pour supprimer un dossier." };
+    }
+
     const currentFolders = await getSubjectFolders(data.subject_id);
     const targetFolder = currentFolders.find((f) => f.id === data.folder_id);
     if (!targetFolder) {
       return { success: false, error: "Dossier introuvable." };
+    }
+
+    const authCheck = await assertOwnershipOrAdmin(targetFolder.owner_id, "ce dossier");
+    if (!authCheck.authorized) {
+      return { success: false, error: authCheck.error };
     }
 
     // Gather all descendant folder IDs recursively
@@ -304,10 +342,23 @@ export async function deleteFolderAction(data: {
       // Find all resources inside these folders
       const { data: resourcesToDelete } = await serviceSupabase
         .from("resources")
-        .select("id, storage_path")
+        .select("id, owner_id, storage_path")
         .in("chapter", foldersToDelete);
 
       if (resourcesToDelete && resourcesToDelete.length > 0) {
+        // Enforce ownership check on ALL affected descendant resources
+        const isAdmin = authCheck.isAdmin;
+        const unauthorizedResource = resourcesToDelete.find(
+          (r: any) => r.owner_id && r.owner_id !== requester.id && !isAdmin
+        );
+
+        if (unauthorizedResource) {
+          return {
+            success: false,
+            error: "Accès refusé. Certains éléments contenus dans ce dossier appartiennent à un autre utilisateur.",
+          };
+        }
+
         // Delete files from storage
         const storagePaths = resourcesToDelete
           .map((r: any) => r.storage_path)

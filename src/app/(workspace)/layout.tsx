@@ -2,6 +2,7 @@ import { AppSidebar } from "@/components/layout/app-sidebar";
 import { AppHeader } from "@/components/layout/app-header";
 import { WorkspaceShell } from "@/components/layout/workspace-shell";
 import { getSubjects } from "@/lib/supabase/repository";
+import { getRequesterUser, isUserAdmin } from "@/lib/auth/authorization";
 
 export const dynamic = "force-dynamic";
 
@@ -11,10 +12,12 @@ export default async function WorkspaceLayout({
   children: React.ReactNode;
 }) {
   const subjects = await getSubjects();
+  const user = await getRequesterUser();
+  const isAdmin = user ? user.role === "admin" || (await isUserAdmin(user.id)) : false;
 
   return (
     <WorkspaceShell
-      sidebar={<AppSidebar subjects={subjects} />}
+      sidebar={<AppSidebar subjects={subjects} isAdmin={isAdmin} />}
       header={<AppHeader />}
     >
       {children}

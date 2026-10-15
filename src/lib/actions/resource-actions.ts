@@ -5,6 +5,7 @@ import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { getServiceSupabase, getEffectiveUserId } from "@/lib/supabase/admin";
 import { RevisionStatus, AcademicResource } from "@/types/database";
 import { logAuditEvent } from "@/lib/audit/audit-logger";
+import { getRequesterUser, assertOwnershipOrAdmin } from "@/lib/auth/authorization";
 
 function safeRevalidate(path: string) {
   try {
@@ -40,9 +41,10 @@ export async function createResource(data: {
 
     const supabase = await createClient();
     const {
-      data: { user },
+      data: { user: authUser },
     } = await supabase.auth.getUser();
-    const userId = user?.id || (await getEffectiveUserId());
+    const requester = await getRequesterUser();
+    const userId = requester?.id || authUser?.id || (await getEffectiveUserId());
     const serviceSupabase = getServiceSupabase();
 
     const storagePath = data.storage_path || data.external_url || `links/${Date.now()}`;
@@ -159,7 +161,28 @@ export async function moveResourceAction(
       return { success: true };
     }
 
+    const requester = await getRequesterUser();
+    if (!requester) {
+      return { success: false, error: "Authentification requise pour déplacer une ressource." };
+    }
+
     const serviceSupabase = getServiceSupabase();
+    const { data: resource, error: fetchErr } = await serviceSupabase
+      .from("resources")
+      .select("id, owner_id, visibility, title")
+      .eq("id", resourceId)
+      .maybeSingle();
+
+    if (fetchErr || !resource) {
+      return { success: false, error: "Ressource introuvable ou déjà supprimée." };
+    }
+
+    const authCheck = await assertOwnershipOrAdmin(resource.owner_id, "cette ressource");
+    if (!authCheck.authorized) {
+      return { success: false, error: authCheck.error };
+    }
+
+    // Explicit publication decision rule: moving a resource into a folder MUST NOT alter its visibility
     const { error } = await serviceSupabase
       .from("resources")
       .update({
@@ -172,7 +195,16 @@ export async function moveResourceAction(
       return { success: false, error: error.message };
     }
 
+    await logAuditEvent({
+      actor_id: requester.id,
+      action: "RESOURCE_MOVE",
+      target_id: resourceId,
+      target_type: "resource",
+      metadata: { target_folder_id: targetFolderId, preserved_visibility: resource.visibility },
+    });
+
     safeRevalidate("/subjects");
+    safeRevalidate("/library");
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message || "Échec du déplacement de la ressource." };
@@ -195,7 +227,27 @@ export async function renameResourceAction(
       return { success: true };
     }
 
+    const requester = await getRequesterUser();
+    if (!requester) {
+      return { success: false, error: "Authentification requise pour renommer une ressource." };
+    }
+
     const serviceSupabase = getServiceSupabase();
+    const { data: resource, error: fetchErr } = await serviceSupabase
+      .from("resources")
+      .select("id, owner_id, title")
+      .eq("id", resourceId)
+      .maybeSingle();
+
+    if (fetchErr || !resource) {
+      return { success: false, error: "Ressource introuvable ou déjà supprimée." };
+    }
+
+    const authCheck = await assertOwnershipOrAdmin(resource.owner_id, "cette ressource");
+    if (!authCheck.authorized) {
+      return { success: false, error: authCheck.error };
+    }
+
     const { error } = await serviceSupabase
       .from("resources")
       .update({
@@ -208,7 +260,16 @@ export async function renameResourceAction(
       return { success: false, error: error.message };
     }
 
+    await logAuditEvent({
+      actor_id: requester.id,
+      action: "RESOURCE_RENAME",
+      target_id: resourceId,
+      target_type: "resource",
+      metadata: { old_title: resource.title, new_title: newTitle.trim() },
+    });
+
     safeRevalidate("/subjects");
+    safeRevalidate("/library");
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message || "Échec du renommage de la ressource." };
@@ -294,16 +355,27 @@ export async function deleteResource(resourceId: string): Promise<{ success?: bo
       return { success: true };
     }
 
+    const requester = await getRequesterUser();
+    if (!requester) {
+      return { error: "Authentification requise pour supprimer une ressource." };
+    }
+
     const serviceSupabase = getServiceSupabase();
 
     const { data: resource, error: fetchError } = await serviceSupabase
       .from("resources")
-      .select("id, storage_path, subject_id, subject:subjects(slug)")
+      .select("id, owner_id, storage_path, subject_id, title, subject:subjects(slug)")
       .eq("id", resourceId)
       .maybeSingle();
 
     if (fetchError || !resource) {
       return { error: "Ressource introuvable ou déjà supprimée." };
+    }
+
+    // Server-side authorization check BEFORE any deletion or mutation
+    const authCheck = await assertOwnershipOrAdmin(resource.owner_id, "cette ressource");
+    if (!authCheck.authorized) {
+      return { error: authCheck.error };
     }
 
     // 1. Delete dependent foreign-key records first (bookmarks, revision_progress)
@@ -312,15 +384,18 @@ export async function deleteResource(resourceId: string): Promise<{ success?: bo
 
     // 2. Remove file from storage if stored locally (not external HTTP link)
     if (resource.storage_path && !resource.storage_path.startsWith("http")) {
-      await serviceSupabase.storage
-        .from("academic-resources")
-        .remove([resource.storage_path]);
+      try {
+        await serviceSupabase.storage
+          .from("academic-resources")
+          .remove([resource.storage_path]);
+      } catch (storageErr) {
+        console.error("Storage removal error during deleteResource:", storageErr);
+      }
     }
 
     // 3. Delete the resource record
     const { error: deleteError } = await serviceSupabase
-      .from("resources")
-      .delete()
+      .from("resources").delete()
       .eq("id", resourceId);
 
     if (deleteError) {
@@ -330,11 +405,11 @@ export async function deleteResource(resourceId: string): Promise<{ success?: bo
 
     // Record audit event
     await logAuditEvent({
-      actor_id: "authenticated_user",
+      actor_id: requester.id,
       action: "RESOURCE_DELETE",
       target_id: resourceId,
       target_type: "resource",
-      metadata: { storage_path: resource.storage_path },
+      metadata: { storage_path: resource.storage_path, title: resource.title },
     });
 
     // 4. Revalidate all dependent routes
@@ -369,15 +444,15 @@ export async function updateResourceVisibility(
       return { success: true };
     }
 
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const requester = await getRequesterUser();
+    if (!requester) {
+      return { error: "Authentification requise pour modifier la visibilité." };
+    }
 
     const serviceSupabase = getServiceSupabase();
     const { data: resource, error: fetchErr } = await serviceSupabase
       .from("resources")
-      .select("id, owner_id, title")
+      .select("id, owner_id, title, visibility")
       .eq("id", resourceId)
       .single();
 
@@ -385,8 +460,9 @@ export async function updateResourceVisibility(
       return { error: "Ressource introuvable." };
     }
 
-    // Permission: Only owner can modify visibility
-    if (user && resource.owner_id && user.id !== resource.owner_id) {
+    // Permission: Only owner or admin can modify visibility
+    const authCheck = await assertOwnershipOrAdmin(resource.owner_id, "ce document");
+    if (!authCheck.authorized) {
       return { error: "Seul le propriétaire de ce document peut modifier sa visibilité." };
     }
 
@@ -400,11 +476,11 @@ export async function updateResourceVisibility(
     }
 
     await logAuditEvent({
-      actor_id: user?.id || "guest",
+      actor_id: requester.id,
       action: visibility === "shared" ? "RESOURCE_SHARED" : "RESOURCE_VISIBILITY_CHANGE",
       target_id: resourceId,
       target_type: "resource",
-      metadata: { new_visibility: visibility, title: resource.title },
+      metadata: { old_visibility: resource.visibility, new_visibility: visibility, title: resource.title },
     });
 
     safeRevalidate(`/resources/${resourceId}`);

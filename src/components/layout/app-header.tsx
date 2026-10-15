@@ -81,22 +81,6 @@ export function AppHeader() {
 
       {/* Right controls */}
       <div className="flex items-center space-x-3">
-        {/* Semester quick selector */}
-        <div className="hidden sm:flex items-center space-x-1 bg-[#F4F6FA] p-0.5 rounded-lg border border-[#E4E8F0] text-xs">
-          <Link
-            href="/semesters/sem-1"
-            className="px-2.5 py-1 rounded font-medium text-[#2855D9] bg-white shadow-2xs border border-[#E4E8F0]"
-          >
-            S1
-          </Link>
-          <Link
-            href="/semesters/sem-2"
-            className="px-2.5 py-1 rounded text-[#68748A] hover:text-[#182235] transition-colors"
-          >
-            S2
-          </Link>
-        </div>
-
         {/* Upload Resource Button */}
         <Link href="/library?action=upload">
           <Button size="sm" variant="outline" className="text-xs">

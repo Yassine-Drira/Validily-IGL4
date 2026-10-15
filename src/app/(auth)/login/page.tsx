@@ -1,15 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Lock, Mail, AlertCircle } from "lucide-react";
+import { Lock, Mail, AlertCircle, ShieldCheck, ArrowRight } from "lucide-react";
 import { ValidilySymbol } from "@/components/brand/validily-logo";
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const nextUrl = searchParams.get("next") || "/";
+  const isAdminNext = nextUrl.includes("admin");
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
@@ -30,11 +34,10 @@ export default function LoginPage() {
       if (error) {
         setErrorMsg(error.message);
       } else {
-        router.push("/");
-        router.refresh();
+        window.location.href = nextUrl;
       }
     } catch (err: any) {
-      setErrorMsg(err?.message || "Failed to sign in. Please verify your connection.");
+      setErrorMsg(err?.message || "Échec de connexion. Vérifiez vos identifiants.");
     } finally {
       setLoading(false);
     }
@@ -45,12 +48,26 @@ export default function LoginPage() {
       <div className="text-center mb-6">
         <ValidilySymbol size="lg" className="mx-auto mb-3" />
         <h1 className="text-xl font-serif font-bold text-[#182235] tracking-tight">
-          Sign In to validily-IGL4
+          Connexion à validily-IGL4
         </h1>
         <p className="text-xs text-[#68748A] mt-1">
-          Access your private uploads, bookmarks, and revision progress
+          {isAdminNext
+            ? "Authentification requise pour accéder aux Paramètres et à la Console d'Administration"
+            : "Accédez à vos documents, favoris, et suivi de révision"}
         </p>
       </div>
+
+      {isAdminNext && (
+        <div className="mb-5 p-3 rounded-lg bg-blue-50/80 border border-blue-200 text-[#182235] text-xs flex items-start space-x-2.5">
+          <ShieldCheck className="w-4 h-4 text-[#2855D9] shrink-0 mt-0.5" />
+          <div>
+            <span className="font-semibold text-[#2855D9]">Accès Paramètres :</span>
+            <p className="text-[11px] text-[#4A5568] mt-0.5">
+              Connectez-vous avec votre compte administrateur pour configurer les matières et semestres.
+            </p>
+          </div>
+        </div>
+      )}
 
       {errorMsg && (
         <div className="mb-4 p-3 rounded-md bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center space-x-2">
@@ -62,7 +79,7 @@ export default function LoginPage() {
       <form onSubmit={handleLogin} className="space-y-4">
         <div>
           <label className="block text-xs font-medium text-[#182235] mb-1">
-            Student Email
+            Email
           </label>
           <div className="relative">
             <Mail className="w-4 h-4 text-[#68748A] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -70,7 +87,7 @@ export default function LoginPage() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="student@university.tn"
+              placeholder="votre.email@university.tn"
               required
               className="w-full bg-[#F4F6FA] border border-[#E4E8F0] rounded-md pl-9 pr-3 py-2 text-xs text-[#182235] focus:outline-none focus:border-[#2855D9] transition-all"
             />
@@ -80,13 +97,13 @@ export default function LoginPage() {
         <div>
           <div className="flex justify-between items-center mb-1">
             <label className="block text-xs font-medium text-[#182235]">
-              Password
+              Mot de passe
             </label>
             <Link
               href="/reset-password"
               className="text-[11px] text-[#2855D9] hover:underline"
             >
-              Forgot password?
+              Mot de passe oublié ?
             </Link>
           </div>
           <div className="relative">
@@ -109,16 +126,24 @@ export default function LoginPage() {
           disabled={loading}
           className="w-full text-xs"
         >
-          {loading ? "Authenticating..." : "Sign In to Workspace"}
+          {loading ? "Authentification en cours..." : "Se connecter"}
         </Button>
       </form>
 
       <div className="mt-6 pt-5 border-t border-[#E4E8F0] text-center text-xs text-[#68748A]">
-        Don&apos;t have an account?{" "}
+        Pas encore de compte ?{" "}
         <Link href="/register" className="font-semibold text-[#2855D9] hover:underline">
-          Create student account
+          Créer un compte étudiant
         </Link>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-xs text-[#68748A]">Chargement...</div>}>
+      <LoginForm />
+    </Suspense>
   );
 }

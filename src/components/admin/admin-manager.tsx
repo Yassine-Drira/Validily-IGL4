@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
 import {
   Shield,
   Layers,
@@ -12,6 +13,13 @@ import {
   AlertCircle,
   Archive,
   Trash2,
+  ShieldAlert,
+  ArrowRight,
+  Lock,
+  UserCheck,
+  UserX,
+  Users,
+  Clock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Semester, Subject, ResourceCategory } from "@/types/database";
@@ -20,14 +28,21 @@ import {
   updateSubject,
   deleteSubject,
   createSemester,
+  grantTemporaryAdminRole,
+  revokeAdminRole,
+  ManagedUser,
 } from "@/lib/actions/admin-actions";
 import { DeleteConfirmModal } from "@/components/ui/delete-confirm-modal";
+import { AuthenticatedActor } from "@/lib/auth/authorization";
 
 interface AdminManagerProps {
   initialSemesters: Semester[];
   initialSubjects: Subject[];
   initialCategories: ResourceCategory[];
   totalResources: number;
+  currentUser?: AuthenticatedActor | null;
+  isAdmin?: boolean;
+  initialUsers?: ManagedUser[];
 }
 
 export function AdminManager({
@@ -35,11 +50,22 @@ export function AdminManager({
   initialSubjects,
   initialCategories,
   totalResources,
+  currentUser = null,
+  isAdmin = false,
+  initialUsers = [],
 }: AdminManagerProps) {
   const [semesters, setSemesters] = useState<Semester[]>(initialSemesters);
   const [subjects, setSubjects] = useState<Subject[]>(initialSubjects);
   const [categories, setCategories] = useState<ResourceCategory[]>(initialCategories);
   const [subjectToDelete, setSubjectToDelete] = useState<Subject | null>(null);
+
+  // Role delegation state
+  const [users, setUsers] = useState<ManagedUser[]>(initialUsers);
+  const [userToDelegate, setUserToDelegate] = useState<ManagedUser | null>(null);
+  const [delegationDuration, setDelegationDuration] = useState<number>(30); // 30 days by default
+  const [customExpiresDate, setCustomExpiresDate] = useState<string>("");
+  const [isDelegating, setIsDelegating] = useState<boolean>(false);
+  const [isRevokingId, setIsRevokingId] = useState<string | null>(null);
 
   // Subject Modal State
   const [isSubjectModalOpen, setIsSubjectModalOpen] = useState(false);
@@ -156,6 +182,91 @@ export function AdminManager({
     }
   };
 
+  const handleGrantRole = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!userToDelegate) return;
+
+    setIsDelegating(true);
+    setErrorMsg("");
+    try {
+      const res = await grantTemporaryAdminRole({
+        userId: userToDelegate.id,
+        durationDays: customExpiresDate ? undefined : delegationDuration,
+        customExpiresAt: customExpiresDate ? new Date(customExpiresDate).toISOString() : undefined,
+      });
+
+      if (res.error) {
+        setErrorMsg(res.error);
+        return;
+      }
+
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.id === userToDelegate.id
+            ? {
+                ...u,
+                role: "admin",
+                isTemporaryAdmin: true,
+                isPermanentAdmin: false,
+                expiresAt: res.expiresAt || null,
+                isExpired: false,
+              }
+            : u
+        )
+      );
+
+      const formattedDate = res.expiresAt ? new Date(res.expiresAt).toLocaleDateString("fr-FR") : "";
+      setFeedbackMsg(`Privilèges Administrateur temporaires accordés à ${userToDelegate.displayName} jusqu'au ${formattedDate}.`);
+      setUserToDelegate(null);
+      setCustomExpiresDate("");
+      setDelegationDuration(30);
+      setTimeout(() => setFeedbackMsg(""), 5000);
+    } catch (err: any) {
+      setErrorMsg(err?.message || "Échec de l'octroi du rôle administrateur.");
+    } finally {
+      setIsDelegating(false);
+    }
+  };
+
+  const handleRevokeRole = async (user: ManagedUser) => {
+    if (user.email === "yassinedrira3@gmail.com") {
+      setErrorMsg("Impossible de révoquer l'administrateur principal.");
+      return;
+    }
+
+    setIsRevokingId(user.id);
+    setErrorMsg("");
+    try {
+      const res = await revokeAdminRole(user.id);
+      if (res.error) {
+        setErrorMsg(res.error);
+        return;
+      }
+
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.id === user.id
+            ? {
+                ...u,
+                role: "student",
+                isTemporaryAdmin: false,
+                isPermanentAdmin: false,
+                expiresAt: null,
+                isExpired: false,
+              }
+            : u
+        )
+      );
+
+      setFeedbackMsg(`Privilèges Administrateur révoqués pour ${user.displayName}.`);
+      setTimeout(() => setFeedbackMsg(""), 5000);
+    } catch (err: any) {
+      setErrorMsg(err?.message || "Échec de la révocation.");
+    } finally {
+      setIsRevokingId(null);
+    }
+  };
+
   return (
     <div className="space-y-8">
       {/* Feedback Alert */}
@@ -166,6 +277,36 @@ export function AdminManager({
         </div>
       )}
 
+      {errorMsg && (
+        <div className="p-3.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center space-x-2 animate-in fade-in duration-200">
+          <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+          <span>{errorMsg}</span>
+        </div>
+      )}
+
+      {/* Active Admin Session Chip */}
+      <div className="p-3.5 rounded-xl bg-emerald-50/80 border border-emerald-200 text-emerald-900 text-xs flex items-center justify-between shadow-xs">
+        <div className="flex items-center space-x-2.5">
+          <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
+            ✓
+          </div>
+          <div>
+            <span className="font-semibold text-emerald-800">
+              Session Administrateur Active :
+            </span>{" "}
+            <span className="font-mono text-emerald-950 font-medium">
+              {currentUser?.email || "yassinedrira3@gmail.com"}
+            </span>{" "}
+            <span className="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded font-mono ml-1">
+              Admin Principal
+            </span>
+          </div>
+        </div>
+        <span className="text-[11px] text-emerald-700 font-medium hidden sm:inline">
+          Gestion du curriculum et délégation des rôles activées
+        </span>
+      </div>
+
       {/* Summary Cards */}
       <div className="bg-white border border-[#E4E8F0] rounded-xl p-6 shadow-xs">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -175,10 +316,10 @@ export function AdminManager({
             </div>
             <div>
               <h1 className="text-xl font-serif font-bold text-[#182235] tracking-tight">
-                Academic Administration Console
+                Paramètres & Console d&apos;Administration
               </h1>
               <p className="text-xs text-[#68748A] mt-0.5">
-                Manage semester terms, catalog course subjects, and configure categories.
+                Configuration des semestres, des matières d&apos;IGL4 et gestion des catégories.
               </p>
             </div>
           </div>
@@ -187,7 +328,13 @@ export function AdminManager({
             <Button
               size="sm"
               variant="outline"
-              onClick={() => setIsSemesterModalOpen(true)}
+              onClick={() => {
+                if (!isAdmin) {
+                  setErrorMsg("Privilèges Administrateur requis. Cliquez sur 'Activer Mode Admin (1 clic)' ci-dessus.");
+                  return;
+                }
+                setIsSemesterModalOpen(true);
+              }}
             >
               <Plus className="w-3.5 h-3.5 mr-1" />
               <span>Add Semester</span>
@@ -195,7 +342,13 @@ export function AdminManager({
             <Button
               size="sm"
               variant="primary"
-              onClick={() => setIsSubjectModalOpen(true)}
+              onClick={() => {
+                if (!isAdmin) {
+                  setErrorMsg("Privilèges Administrateur requis. Cliquez sur 'Activer Mode Admin (1 clic)' ci-dessus.");
+                  return;
+                }
+                setIsSubjectModalOpen(true);
+              }}
             >
               <Plus className="w-3.5 h-3.5 mr-1" />
               <span>Create Subject</span>
@@ -316,7 +469,13 @@ export function AdminManager({
           <Button
             size="sm"
             variant="primary"
-            onClick={() => setIsSubjectModalOpen(true)}
+            onClick={() => {
+              if (!isAdmin) {
+                setErrorMsg("Privilèges Administrateur requis pour créer des matières. Activez le mode Administrateur ci-dessus.");
+                return;
+              }
+              setIsSubjectModalOpen(true);
+            }}
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Create Subject</span>
@@ -366,7 +525,13 @@ export function AdminManager({
                     <td className="py-2.5 px-3 text-right space-x-2">
                       <button
                         type="button"
-                        onClick={() => setSubjectToDelete(sub)}
+                        onClick={() => {
+                          if (!isAdmin) {
+                            setErrorMsg("Privilèges Administrateur requis pour supprimer des matières. Activez le mode Administrateur ci-dessus.");
+                            return;
+                          }
+                          setSubjectToDelete(sub);
+                        }}
                         className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-semibold text-rose-600 hover:text-white hover:bg-rose-600 border border-rose-200 hover:border-rose-600 transition-colors cursor-pointer shadow-2xs"
                         title={`Supprimer ${sub.name}`}
                       >
@@ -381,6 +546,211 @@ export function AdminManager({
           </table>
         </div>
       </div>
+
+      {/* SECTION: USER ROLES & TEMPORARY ADMIN DELEGATION */}
+      <div className="bg-white border border-[#E4E8F0] rounded-xl p-5 shadow-xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <h2 className="text-sm font-semibold text-[#182235] flex items-center space-x-2">
+              <Users className="w-4 h-4 text-[#2855D9]" />
+              <span>Délégation des Rôles & Accès Administrateur Temporaires</span>
+            </h2>
+            <p className="text-xs text-[#68748A] mt-0.5">
+              En tant qu&apos;administrateur principal, vous pouvez accorder un accès administrateur temporaire à un étudiant (ex: pour 1 mois), révocable à tout moment.
+            </p>
+          </div>
+          <span className="text-[11px] font-mono text-[#68748A] bg-[#F4F6FA] px-2.5 py-1 rounded-md border border-[#E4E8F0] self-start sm:self-auto">
+            {users.length} compte{users.length > 1 ? "s" : ""} enregistré{users.length > 1 ? "s" : ""}
+          </span>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead>
+              <tr className="border-b border-[#E4E8F0] text-[#68748A] font-mono uppercase text-[10px]">
+                <th className="py-2.5 px-3 font-semibold">Utilisateur</th>
+                <th className="py-2.5 px-3 font-semibold">Email</th>
+                <th className="py-2.5 px-3 font-semibold">Rôle & Privilèges</th>
+                <th className="py-2.5 px-3 font-semibold">Validité de l&apos;accès</th>
+                <th className="py-2.5 px-3 font-semibold text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#E4E8F0]">
+              {users.map((u) => {
+                const isMaster = u.email === "yassinedrira3@gmail.com";
+                const isTemp = u.isTemporaryAdmin && u.expiresAt;
+                const expiresDate = u.expiresAt ? new Date(u.expiresAt) : null;
+                const daysLeft = expiresDate ? Math.ceil((expiresDate.getTime() - Date.now()) / (1000 * 3600 * 24)) : null;
+
+                return (
+                  <tr key={u.id} className="hover:bg-[#F4F6FA] transition-colors">
+                    <td className="py-2.5 px-3 font-medium text-[#182235]">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-6 h-6 rounded-full bg-[#EDF2FF] text-[#2855D9] flex items-center justify-center font-bold text-[10px]">
+                          {u.displayName.charAt(0).toUpperCase()}
+                        </div>
+                        <span>{u.displayName}</span>
+                      </div>
+                    </td>
+                    <td className="py-2.5 px-3 font-mono text-[#68748A]">
+                      {u.email}
+                    </td>
+                    <td className="py-2.5 px-3">
+                      {isMaster ? (
+                        <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded text-[10px] font-semibold">
+                          <Shield className="w-3 h-3 text-emerald-600" />
+                          <span>Admin Principal (Propriétaire)</span>
+                        </span>
+                      ) : isTemp ? (
+                        <span className="inline-flex items-center gap-1 bg-indigo-50 text-indigo-800 border border-indigo-200 px-2 py-0.5 rounded text-[10px] font-semibold">
+                          <Clock className="w-3 h-3 text-indigo-600" />
+                          <span>Admin Temporaire</span>
+                        </span>
+                      ) : (
+                        <span className="bg-[#F4F6FA] text-[#68748A] border border-[#E4E8F0] px-2 py-0.5 rounded text-[10px] font-medium">
+                          Étudiant
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-2.5 px-3 font-mono text-[11px] text-[#68748A]">
+                      {isMaster ? (
+                        <span className="text-emerald-700 font-sans font-medium">Permanent</span>
+                      ) : isTemp && expiresDate ? (
+                        <span className="text-indigo-700 font-sans font-medium">
+                          Expire le {expiresDate.toLocaleDateString("fr-FR")} ({daysLeft} jour{daysLeft && daysLeft > 1 ? "s" : ""} restant{daysLeft && daysLeft > 1 ? "s" : ""})
+                        </span>
+                      ) : (
+                        <span className="text-[#A0AEC0]">Accès étudiant standard</span>
+                      )}
+                    </td>
+                    <td className="py-2.5 px-3 text-right">
+                      {isMaster ? (
+                        <span className="text-[10px] font-mono text-[#A0AEC0] italic">
+                          Protégé
+                        </span>
+                      ) : isTemp ? (
+                        <button
+                          type="button"
+                          onClick={() => handleRevokeRole(u)}
+                          disabled={isRevokingId === u.id}
+                          className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-md text-xs font-semibold text-rose-600 hover:text-white hover:bg-rose-600 border border-rose-200 hover:border-rose-600 transition-colors cursor-pointer"
+                          title="Révoquer les droits administrateur"
+                        >
+                          <UserX className="w-3.5 h-3.5" />
+                          <span>{isRevokingId === u.id ? "Révocation..." : "Révoquer Accès"}</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setUserToDelegate(u)}
+                          className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-md text-xs font-semibold text-[#2855D9] hover:text-white hover:bg-[#2855D9] border border-[#2855D9]/30 hover:border-[#2855D9] transition-colors cursor-pointer"
+                          title="Accorder un accès administrateur temporaire"
+                        >
+                          <UserCheck className="w-3.5 h-3.5" />
+                          <span>Accorder Accès Admin</span>
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Modal: Grant Temporary Admin Role */}
+      {userToDelegate && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-2xs flex items-center justify-center p-4">
+          <div className="bg-white border border-[#E4E8F0] rounded-xl max-w-md w-full p-6 shadow-xl space-y-4">
+            <div className="flex items-center justify-between border-b border-[#E4E8F0] pb-3">
+              <div className="flex items-center space-x-2">
+                <Clock className="w-4 h-4 text-[#2855D9]" />
+                <h3 className="font-semibold text-sm text-[#182235]">
+                  Déléguer l&apos;accès Administrateur
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setUserToDelegate(null)}
+                className="text-[#68748A] hover:text-[#182235] cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-[#68748A]">
+              Vous allez accorder un accès administrateur temporaire à{" "}
+              <strong className="text-[#182235]">{userToDelegate.displayName}</strong> ({userToDelegate.email}).
+              Cet utilisateur pourra gérer les matières, semestres et fichiers jusqu&apos;à expiration.
+            </p>
+
+            <form onSubmit={handleGrantRole} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-[#182235] mb-2">
+                  Durée de validité de l&apos;accès :
+                </label>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  {[
+                    { label: "24 heures (1 jour)", days: 1 },
+                    { label: "7 jours (1 semaine)", days: 7 },
+                    { label: "30 jours (1 mois)", days: 30 },
+                    { label: "90 jours (3 mois)", days: 90 },
+                  ].map((option) => (
+                    <button
+                      key={option.days}
+                      type="button"
+                      onClick={() => {
+                        setDelegationDuration(option.days);
+                        setCustomExpiresDate("");
+                      }}
+                      className={`p-2.5 rounded-lg border text-left font-medium transition-all cursor-pointer ${
+                        delegationDuration === option.days && !customExpiresDate
+                          ? "border-[#2855D9] bg-[#EDF2FF] text-[#2855D9] font-semibold"
+                          : "border-[#E4E8F0] bg-[#FAFAF7] text-[#182235] hover:bg-[#F4F6FA]"
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-[#182235] mb-1">
+                  Ou choisir une date personnalisée d&apos;expiration :
+                </label>
+                <input
+                  type="date"
+                  value={customExpiresDate}
+                  min={new Date(Date.now() + 86400000).toISOString().split("T")[0]}
+                  onChange={(e) => setCustomExpiresDate(e.target.value)}
+                  className="w-full bg-[#F4F6FA] border border-[#E4E8F0] rounded-md px-3 py-2 text-xs text-[#182235] focus:outline-none focus:border-[#2855D9]"
+                />
+              </div>
+
+              <div className="flex items-center justify-end space-x-2 pt-3 border-t border-[#E4E8F0]">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setUserToDelegate(null)}
+                >
+                  Annuler
+                </Button>
+                <Button
+                  type="submit"
+                  size="sm"
+                  variant="primary"
+                  disabled={isDelegating}
+                >
+                  {isDelegating ? "En cours..." : "Confirmer l'accès Administrateur"}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Modal: Create Subject */}
       {isSubjectModalOpen && (

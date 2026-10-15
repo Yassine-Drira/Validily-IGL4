@@ -88,20 +88,42 @@ export function QuizImportModal({
   const handleFinalImport = () => {
     if (!parsedPackage) return;
 
-    // 1. If HTML format: launch drill or notify parent
-    if (parsedPackage.format === "html") {
-      if (onLaunchHtmlDrill && parsedPackage.htmlContent) {
-        onLaunchHtmlDrill({
+    startTransition(async () => {
+      // 1. If HTML format: persist as interactive HTML drill
+      if (parsedPackage.format === "html") {
+        const res = await createQuiz({
+          subject_id: subjectId,
           title: titleOverride || parsedPackage.title,
+          description: parsedPackage.description || "Atelier interactif complet (flashcards, QCM avec minuteur, guides).",
+          difficulty,
+          isHtmlDrill: true,
           htmlContent: parsedPackage.htmlContent,
         });
-        onClose();
-      }
-      return;
-    }
 
-    // 2. If JSON / Markdown QCM questions: persist to Supabase via createQuiz
-    startTransition(async () => {
+        if (res.error) {
+          setParseError(`Erreur lors de la sauvegarde : ${res.error}`);
+        } else {
+          if (onQuizCreated && res.quiz) {
+            onQuizCreated({
+              ...res.quiz,
+              isHtmlDrill: true,
+              htmlContent: parsedPackage.htmlContent,
+              question_count: "Atelier",
+            });
+          }
+          if (onLaunchHtmlDrill && parsedPackage.htmlContent) {
+            onLaunchHtmlDrill({
+              quizId: res.quiz?.id,
+              title: titleOverride || parsedPackage.title,
+              htmlContent: parsedPackage.htmlContent,
+            });
+          }
+          onClose();
+        }
+        return;
+      }
+
+      // 2. If JSON / Markdown QCM questions: persist to Supabase via createQuiz
       const res = await createQuiz({
         subject_id: subjectId,
         title: titleOverride || parsedPackage.title,

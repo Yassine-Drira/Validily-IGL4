@@ -40,9 +40,10 @@ const navItems = [
 
 interface AppSidebarProps {
   subjects?: Subject[];
+  isAdmin?: boolean;
 }
 
-export function AppSidebar({ subjects = [] }: AppSidebarProps) {
+export function AppSidebar({ subjects = [], isAdmin = false }: AppSidebarProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { isMobileOpen, closeMobile } = useSidebar();
@@ -72,7 +73,14 @@ export function AppSidebar({ subjects = [] }: AppSidebarProps) {
           <div className="px-3 pb-2 text-[10px] font-semibold text-[#68748A] uppercase tracking-wider font-mono">
             Navigation
           </div>
-          {navItems.map((item) => {
+          {navItems
+            .filter((item) => {
+              if (item.href === "/admin" && !isAdmin) {
+                return false;
+              }
+              return true;
+            })
+            .map((item) => {
             const Icon = item.icon;
             const isExamItem = item.label === "Examens";
             const isLibraryItem = item.label === "Bibliothèque" || item.label === "Fichiers";

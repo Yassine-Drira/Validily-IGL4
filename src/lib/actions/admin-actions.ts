@@ -5,6 +5,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/server";
 import { getServiceSupabase } from "@/lib/supabase/admin";
 import { Subject, Semester } from "@/types/database";
 import { invalidateRepositoryCache } from "@/lib/supabase/repository";
+import { assertAdmin } from "@/lib/auth/authorization";
 
 function safeRevalidate(path: string) {
   try {
@@ -52,6 +53,11 @@ export async function createSubject(data: {
   sort_order?: number;
 }): Promise<{ success?: boolean; error?: string; subject?: Subject }> {
   try {
+    const adminCheck = await assertAdmin();
+    if (!adminCheck.authorized) {
+      return { error: adminCheck.error || "Accès refusé. Privilèges administrateur requis." };
+    }
+
     const cleanName = data.name?.trim() || "";
     if (!cleanName) {
       return { error: "Subject name is required." };
@@ -143,6 +149,11 @@ export async function updateSubject(
   }
 ): Promise<{ success?: boolean; error?: string; subject?: Subject }> {
   try {
+    const adminCheck = await assertAdmin();
+    if (!adminCheck.authorized) {
+      return { error: adminCheck.error || "Accès refusé. Privilèges administrateur requis." };
+    }
+
     if (!isSupabaseConfigured()) {
       return { error: "Database is not configured." };
     }
@@ -180,6 +191,11 @@ export async function updateSubject(
 
 export async function deleteSubject(subjectId: string): Promise<{ success?: boolean; error?: string }> {
   try {
+    const adminCheck = await assertAdmin();
+    if (!adminCheck.authorized) {
+      return { error: adminCheck.error || "Accès refusé. Privilèges administrateur requis." };
+    }
+
     if (!isSupabaseConfigured()) {
       return { success: true };
     }
@@ -293,6 +309,11 @@ export async function createSemester(data: {
   sort_order?: number;
 }): Promise<{ success?: boolean; error?: string; semester?: Semester }> {
   try {
+    const adminCheck = await assertAdmin();
+    if (!adminCheck.authorized) {
+      return { error: adminCheck.error || "Accès refusé. Privilèges administrateur requis." };
+    }
+
     if (!isSupabaseConfigured()) {
       return {
         success: true,
@@ -330,5 +351,195 @@ export async function createSemester(data: {
     return { success: true, semester: sem };
   } catch (err: any) {
     return { error: err.message || "Failed to create semester." };
+  }
+}
+
+export interface ManagedUser {
+  id: string;
+  email: string;
+  displayName: string;
+  role: "admin" | "student";
+  isPermanentAdmin: boolean;
+  isTemporaryAdmin: boolean;
+  expiresAt: string | null;
+  isExpired: boolean;
+  created_at: string;
+}
+
+export async function listManagedUsers(): Promise<{
+  success?: boolean;
+  error?: string;
+  users?: ManagedUser[];
+}> {
+  try {
+    const adminCheck = await assertAdmin();
+    if (!adminCheck.authorized) {
+      return { error: adminCheck.error || "Privilèges administrateur requis." };
+    }
+
+    if (!isSupabaseConfigured()) {
+      return { success: true, users: [] };
+    }
+
+    const serviceSupabase = getServiceSupabase();
+
+    // 1. Fetch profiles
+    const { data: profiles, error: profError } = await serviceSupabase
+      .from("profiles")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (profError) {
+      return { error: profError.message };
+    }
+
+    // 2. Fetch auth users for email and temporary expiration metadata
+    const { data: authData, error: authError } = await serviceSupabase.auth.admin.listUsers();
+    const authUsers = authData?.users || [];
+    const authMap = new Map<string, any>(authUsers.map((u: any) => [u.id, u]));
+
+    const now = Date.now();
+    const managedUsers: ManagedUser[] = (profiles || []).map((p: any) => {
+      const authUser = authMap.get(p.id);
+      const email = authUser?.email || "etudiant@university.tn";
+      const expiresAt = authUser?.user_metadata?.temporary_admin_expires_at || null;
+      const isTemporaryAdmin = p.role === "admin" && Boolean(expiresAt);
+      const isExpired = isTemporaryAdmin && new Date(expiresAt).getTime() < now;
+      const isPermanentAdmin = p.role === "admin" && !expiresAt;
+
+      return {
+        id: p.id,
+        email,
+        displayName:
+          p.display_name || authUser?.user_metadata?.full_name || email.split("@")[0] || "Utilisateur",
+        role: (isExpired ? "student" : p.role) as "admin" | "student",
+        isPermanentAdmin,
+        isTemporaryAdmin: isTemporaryAdmin && !isExpired,
+        expiresAt,
+        isExpired,
+        created_at: p.created_at,
+      };
+    });
+
+    return { success: true, users: managedUsers };
+  } catch (err: any) {
+    return { error: err.message || "Impossible de récupérer les utilisateurs." };
+  }
+}
+
+export async function grantTemporaryAdminRole(params: {
+  userId: string;
+  durationDays?: number;
+  customExpiresAt?: string;
+}): Promise<{
+  success?: boolean;
+  error?: string;
+  expiresAt?: string;
+}> {
+  try {
+    const adminCheck = await assertAdmin();
+    if (!adminCheck.authorized) {
+      return { error: adminCheck.error || "Privilèges administrateur requis." };
+    }
+
+    if (!params.userId) {
+      return { error: "Identifiant utilisateur requis." };
+    }
+
+    let expiresDate: Date;
+    if (params.customExpiresAt) {
+      expiresDate = new Date(params.customExpiresAt);
+    } else {
+      const days = params.durationDays && params.durationDays > 0 ? params.durationDays : 30;
+      expiresDate = new Date(Date.now() + days * 24 * 3600 * 1000);
+    }
+
+    if (isNaN(expiresDate.getTime()) || expiresDate.getTime() <= Date.now()) {
+      return { error: "La date d'expiration doit être dans le futur." };
+    }
+
+    const expiresAtIso = expiresDate.toISOString();
+    const serviceSupabase = getServiceSupabase();
+
+    // 1. Update user_metadata with temporary admin expiration
+    const { data: userAuth, error: fetchErr } = await serviceSupabase.auth.admin.getUserById(params.userId);
+    if (fetchErr || !userAuth?.user) {
+      return { error: "Utilisateur introuvable." };
+    }
+
+    const updatedMetadata = {
+      ...(userAuth.user.user_metadata || {}),
+      temporary_admin_expires_at: expiresAtIso,
+      temporary_admin_granted_by: adminCheck.user?.email || "admin",
+      temporary_admin_granted_at: new Date().toISOString(),
+    };
+
+    const { error: authUpdateErr } = await serviceSupabase.auth.admin.updateUserById(params.userId, {
+      user_metadata: updatedMetadata,
+    });
+
+    if (authUpdateErr) {
+      return { error: authUpdateErr.message };
+    }
+
+    // 2. Update profile role to admin
+    const { error: profileErr } = await serviceSupabase
+      .from("profiles")
+      .update({ role: "admin", updated_at: new Date().toISOString() })
+      .eq("id", params.userId);
+
+    if (profileErr) {
+      return { error: profileErr.message };
+    }
+
+    safeRevalidate("/admin");
+    return { success: true, expiresAt: expiresAtIso };
+  } catch (err: any) {
+    return { error: err.message || "Échec de l'octroi du rôle administrateur temporaire." };
+  }
+}
+
+export async function revokeAdminRole(userId: string): Promise<{
+  success?: boolean;
+  error?: string;
+}> {
+  try {
+    const adminCheck = await assertAdmin();
+    if (!adminCheck.authorized) {
+      return { error: adminCheck.error || "Privilèges administrateur requis." };
+    }
+
+    // Protect master admin from self-demotion
+    const serviceSupabase = getServiceSupabase();
+    const { data: userAuth } = await serviceSupabase.auth.admin.getUserById(userId);
+    if (userAuth?.user?.email === "yassinedrira3@gmail.com") {
+      return { error: "Impossible de révoquer le compte de l'administrateur principal." };
+    }
+
+    // Clear temporary admin metadata
+    if (userAuth?.user) {
+      const updatedMetadata = {
+        ...(userAuth.user.user_metadata || {}),
+        temporary_admin_expires_at: null,
+      };
+      await serviceSupabase.auth.admin.updateUserById(userId, {
+        user_metadata: updatedMetadata,
+      });
+    }
+
+    // Demote role in profiles
+    const { error: profileErr } = await serviceSupabase
+      .from("profiles")
+      .update({ role: "student", updated_at: new Date().toISOString() })
+      .eq("id", userId);
+
+    if (profileErr) {
+      return { error: profileErr.message };
+    }
+
+    safeRevalidate("/admin");
+    return { success: true };
+  } catch (err: any) {
+    return { error: err.message || "Échec de la révocation du rôle." };
   }
 }
