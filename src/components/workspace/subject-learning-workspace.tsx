@@ -15,6 +15,8 @@ import { SubjectIcon } from "@/components/academic/subject-icon";
 import { Button } from "@/components/ui/button";
 import { PdfViewer } from "@/components/pdf/pdf-viewer";
 import { QuizRunner } from "@/components/quizzes/quiz-runner";
+import { QuizImportModal } from "@/components/quizzes/quiz-import-modal";
+import { InteractiveHtmlRunner } from "@/components/quizzes/interactive-html-runner";
 import {
   createResource,
   updateRevisionStatus,
@@ -48,6 +50,7 @@ import {
   Search,
   Maximize2,
   RotateCcw,
+  Play,
 } from "lucide-react";
 
 interface SubjectLearningWorkspaceProps {
@@ -76,10 +79,16 @@ export function SubjectLearningWorkspace({
   // In-app Viewer Modals
   const [viewingResource, setViewingResource] = useState<AcademicResource | null>(null);
   const [activeQuizToRun, setActiveQuizToRun] = useState<any | null>(null);
+  const [activeHtmlDrillToRun, setActiveHtmlDrillToRun] = useState<{
+    title: string;
+    htmlContent: string;
+    quizId?: string;
+  } | null>(null);
 
   // Modals for additions
   const [isAddResourceModalOpen, setIsAddResourceModalOpen] = useState(false);
   const [isAddQuizModalOpen, setIsAddQuizModalOpen] = useState(false);
+  const [isImportQuizModalOpen, setIsImportQuizModalOpen] = useState(false);
   const [isAddNoteModalOpen, setIsAddNoteModalOpen] = useState(false);
   const [isAddCheatModalOpen, setIsAddCheatModalOpen] = useState(false);
 
@@ -628,93 +637,148 @@ ${resources.map((r) => `<li><strong>${r.title}</strong> (${r.mime_type}) - ${r.s
       {/* --- TAB 2: QCM & QUIZ --- */}
       {activeTab === "quizzes" && (
         <div className="space-y-5">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h2 className="text-base font-bold text-[#111A2E]">
-                QCM et Évaluations pour {subject.name}
+                QCM et Ateliers de Révision pour {subject.name}
               </h2>
               <p className="text-xs text-[#68748A] mt-0.5">
-                Créez et passez vos quiz personnalisés pour tester vos connaissances sur les concepts clés.
+                Passez vos QCM ou importez directement vos ateliers HTML prêts (ex: SAR-revision.html) et fichiers JSON.
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() => setIsAddQuizModalOpen(true)}
-              className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-xs flex items-center space-x-1.5 cursor-pointer"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Créer un Quiz</span>
-            </button>
+            <div className="flex items-center space-x-2">
+              <button
+                type="button"
+                onClick={() => setIsImportQuizModalOpen(true)}
+                className="bg-[#2855D9] hover:bg-[#1E40AF] text-white text-xs font-semibold px-3.5 py-2.5 rounded-xl shadow-xs flex items-center space-x-2 cursor-pointer transition-all"
+              >
+                <FileCode className="w-3.5 h-3.5" />
+                <span>Importer un Quiz / Atelier</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsAddQuizModalOpen(true)}
+                className="bg-[#F4F6FA] hover:bg-[#E4E8F0] text-[#182235] text-xs font-semibold px-3 py-2.5 rounded-xl border border-[#CBD5E1] flex items-center space-x-1.5 cursor-pointer transition-all"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Saisie Manuelle</span>
+              </button>
+            </div>
           </div>
 
           {quizzes.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {quizzes.map((quiz) => (
-                <div
-                  key={quiz.id}
-                  className="bg-white border border-[#E4E8F0] hover:border-[#7C3AED]/40 hover:shadow-sm rounded-2xl p-5 flex flex-col justify-between transition-all"
-                >
-                  <div>
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="bg-[#F5F0FF] text-[#7C3AED] text-[10px] font-bold px-2 py-0.5 rounded-full border border-[#7C3AED]/20 uppercase">
-                        {quiz.difficulty || "Intermédiaire"}
-                      </span>
-                      <span className="text-[11px] font-mono text-[#68748A]">
-                        {quiz.question_count || quiz.questions?.length || 0} questions
-                      </span>
+              {quizzes.map((quiz) => {
+                const isHtml = Boolean(quiz.isHtmlDrill || quiz.htmlContent);
+                return (
+                  <div
+                    key={quiz.id}
+                    className={`bg-white border rounded-2xl p-5 flex flex-col justify-between transition-all hover:shadow-sm ${
+                      isHtml
+                        ? "border-[#2855D9]/30 hover:border-[#2855D9]"
+                        : "border-[#E4E8F0] hover:border-[#7C3AED]/40"
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        {isHtml ? (
+                          <span className="bg-[#EDF2FF] text-[#2855D9] text-[10px] font-bold px-2 py-0.5 rounded-full border border-[#2855D9]/20 uppercase">
+                            Atelier HTML Interactif
+                          </span>
+                        ) : (
+                          <span className="bg-[#F5F0FF] text-[#7C3AED] text-[10px] font-bold px-2 py-0.5 rounded-full border border-[#7C3AED]/20 uppercase">
+                            {quiz.difficulty || "Intermédiaire"}
+                          </span>
+                        )}
+                        <span className="text-[11px] font-mono text-[#68748A]">
+                          {isHtml
+                            ? "Interactif"
+                            : `${quiz.question_count || quiz.questions?.length || 0} questions`}
+                        </span>
+                      </div>
+
+                      <h3 className="font-bold text-sm text-[#111A2E] leading-snug">
+                        {quiz.title}
+                      </h3>
+                      {quiz.description && (
+                        <p className="text-xs text-[#68748A] mt-1.5 leading-relaxed line-clamp-2">
+                          {quiz.description}
+                        </p>
+                      )}
                     </div>
 
-                    <h3 className="font-bold text-sm text-[#111A2E] leading-snug">
-                      {quiz.title}
-                    </h3>
-                    {quiz.description && (
-                      <p className="text-xs text-[#68748A] mt-1.5 leading-relaxed line-clamp-2">
-                        {quiz.description}
-                      </p>
-                    )}
-                  </div>
+                    <div className="pt-4 mt-4 border-t border-[#E4E8F0] flex items-center justify-between">
+                      {isHtml ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setActiveHtmlDrillToRun({
+                              quizId: quiz.id,
+                              title: quiz.title,
+                              htmlContent: quiz.htmlContent,
+                            })
+                          }
+                          className="bg-[#2855D9] hover:bg-[#1E40AF] text-white text-xs font-semibold px-3 py-1.5 rounded-lg flex items-center space-x-1.5 cursor-pointer shadow-2xs"
+                        >
+                          <Play className="w-3.5 h-3.5" />
+                          <span>Lancer l&apos;Atelier</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setActiveQuizToRun(quiz)}
+                          className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-xs font-semibold px-3 py-1.5 rounded-lg flex items-center space-x-1.5 cursor-pointer"
+                        >
+                          <Sparkles className="w-3.5 h-3.5" />
+                          <span>Passer le test</span>
+                        </button>
+                      )}
 
-                  <div className="pt-4 mt-4 border-t border-[#E4E8F0] flex items-center justify-between">
-                    <button
-                      type="button"
-                      onClick={() => setActiveQuizToRun(quiz)}
-                      className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-xs font-semibold px-3 py-1.5 rounded-lg flex items-center space-x-1.5 cursor-pointer"
-                    >
-                      <Sparkles className="w-3.5 h-3.5" />
-                      <span>Passer le test</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteQuiz(quiz.id, quiz.title)}
-                      className="p-1.5 rounded-lg text-[#68748A] hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                      title="Supprimer le quiz"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteQuiz(quiz.id, quiz.title)}
+                        className="p-1.5 rounded-lg text-[#68748A] hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                        title="Supprimer le quiz"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
-            <div className="bg-white border border-dashed border-[#CBD5E1] rounded-2xl p-10 text-center space-y-3">
-              <GraduationCap className="w-8 h-8 text-[#68748A]/40 mx-auto" />
+            <div className="bg-white border border-dashed border-[#CBD5E1] rounded-2xl p-10 text-center space-y-4">
+              <GraduationCap className="w-9 h-9 text-[#2855D9]/50 mx-auto" />
               <div>
                 <h4 className="text-sm font-semibold text-[#182235]">
-                  Aucun QCM créé pour cette matière
+                  Aucun QCM ou Atelier configuré pour {subject.name}
                 </h4>
-                <p className="text-xs text-[#68748A] max-w-md mx-auto mt-1">
-                  Structurez vos révisions en créant vos propres séries de questions avec correction et explications.
+                <p className="text-xs text-[#68748A] max-w-md mx-auto mt-1 leading-relaxed">
+                  Importez vos révisions prêtes en quelques secondes : code HTML interactif, fichiers JSON générés par IA, ou créez une série manuelle.
                 </p>
               </div>
-              <Button
-                size="sm"
-                variant="primary"
-                onClick={() => setIsAddQuizModalOpen(true)}
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Créer le premier quiz</span>
-              </Button>
+              <div className="flex flex-wrap items-center justify-center gap-2.5 pt-1">
+                <Button
+                  size="sm"
+                  variant="primary"
+                  onClick={() => setIsImportQuizModalOpen(true)}
+                  className="bg-[#2855D9] hover:bg-[#1E40AF]"
+                >
+                  <FileCode className="w-3.5 h-3.5 mr-1.5" />
+                  <span>Importer un Quiz / Atelier (.html / .json)</span>
+                </Button>
+
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setIsAddQuizModalOpen(true)}
+                >
+                  <Plus className="w-3.5 h-3.5 mr-1" />
+                  <span>Saisie Manuelle</span>
+                </Button>
+              </div>
             </div>
           )}
         </div>
@@ -1014,14 +1078,14 @@ ${resources.map((r) => `<li><strong>${r.title}</strong> (${r.mime_type}) - ${r.s
               quizTitle={activeQuizToRun.title}
               subjectName={subject.name}
               difficulty={activeQuizToRun.difficulty || "intermediate"}
-              questions={(activeQuizToRun.questions || []).map((q: any) => ({
-                id: q.id,
-                question_text: q.question_text,
+              questions={(activeQuizToRun.questions || []).map((q: any, qIdx: number) => ({
+                id: q.id || `quiz-${activeQuizToRun.id || "drill"}-q-${qIdx}`,
+                question_text: q.question_text || `Question ${qIdx + 1}`,
                 explanation: q.explanation || "Explication officielle fournie pour cette question.",
-                options: (q.options || []).map((opt: any) => ({
-                  id: opt.id,
-                  text: opt.option_text || opt.text,
-                  option_text: opt.option_text || opt.text,
+                options: (q.options || []).map((opt: any, optIdx: number) => ({
+                  id: opt.id || `quiz-${activeQuizToRun.id || "drill"}-q-${qIdx}-opt-${optIdx}`,
+                  text: opt.option_text || opt.text || `Option ${optIdx + 1}`,
+                  option_text: opt.option_text || opt.text || `Option ${optIdx + 1}`,
                   is_correct: Boolean(opt.is_correct),
                 })),
               }))}
@@ -1029,6 +1093,49 @@ ${resources.map((r) => `<li><strong>${r.title}</strong> (${r.mime_type}) - ${r.s
             />
           </div>
         </div>
+      )}
+
+      {/* --- MODAL: IN-APP INTERACTIVE HTML ATELIER / DRILL --- */}
+      {activeHtmlDrillToRun && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-hidden">
+          <InteractiveHtmlRunner
+            quizId={activeHtmlDrillToRun.quizId}
+            title={activeHtmlDrillToRun.title}
+            subjectName={subject.name}
+            htmlContent={activeHtmlDrillToRun.htmlContent}
+            onClose={() => setActiveHtmlDrillToRun(null)}
+          />
+        </div>
+      )}
+
+      {/* --- MODAL: IMPORT QUIZ / ATELIER --- */}
+      {isImportQuizModalOpen && (
+        <QuizImportModal
+          subjectId={subject.id}
+          subjectName={subject.name}
+          isOpen={isImportQuizModalOpen}
+          onClose={() => setIsImportQuizModalOpen(false)}
+          onQuizCreated={(newQuiz) => {
+            setQuizzes([newQuiz, ...quizzes]);
+            showFeedback("Série QCM importée avec succès!");
+          }}
+          onLaunchHtmlDrill={(drill) => {
+            setActiveHtmlDrillToRun(drill);
+            setQuizzes((prev) => [
+              {
+                id: drill.quizId || `drill-${Date.now()}`,
+                title: drill.title,
+                difficulty: "intermediate",
+                question_count: "Atelier",
+                isHtmlDrill: true,
+                htmlContent: drill.htmlContent,
+                description: "Atelier interactif complet (flashcards, QCM avec minuteur, guides).",
+              },
+              ...prev,
+            ]);
+            showFeedback("Atelier interactif prêt et lancé!");
+          }}
+        />
       )}
 
       {/* --- MODAL: AJOUT RESSOURCE --- */}

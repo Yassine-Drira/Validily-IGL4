@@ -1,0 +1,1467 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SAR — Révision Interactive</title>
+<meta name="description" content="Plateforme de révision interactive : RMI, REST, Kafka, RPC — SAR">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#09090b;--panel:#18181b;--border:rgba(255,255,255,0.06);
+  --accent:#8b5cf6;--accent2:#c4b5fd;
+  --ok:#10b981;--warn:#f59e0b;--err:#ef4444;
+  --txt:#fafafa;--txt2:#b5b5c3;
+  --font:'Sora',system-ui,sans-serif;
+  --mono:'JetBrains Mono',monospace;
+}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--txt);font-family:var(--font);font-size:15px;line-height:1.6;min-height:100vh;position:relative;z-index:0}
+body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%;background:radial-gradient(ellipse at top,rgba(139,92,246,.06) 0%,transparent 50%);z-index:-1;pointer-events:none}
+::-webkit-scrollbar{width:8px}::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:10px}
+::-webkit-scrollbar-thumb:hover{background:rgba(139,92,246,0.5)}
+*:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+#scroll-prog{position:fixed;top:0;left:0;height:2px;background:var(--accent);z-index:9999;transition:width .1s;pointer-events:none}
+nav{position:sticky;top:0;z-index:1000;background:rgba(9,9,11,0.8);backdrop-filter:blur(16px);border-bottom:1px solid var(--border);display:flex;align-items:center}
+.nav-brand{padding:0 16px;font-size:13px;font-weight:700;color:var(--accent);white-space:nowrap;border-right:1px solid var(--border);letter-spacing:.5px;height:48px;display:flex;align-items:center}
+.nav-tabs{display:flex;flex:1;overflow-x:auto}
+.tab-btn{padding:0 14px;height:48px;background:none;border:none;border-bottom:2px solid transparent;color:var(--txt2);cursor:pointer;font-family:var(--font);font-size:13px;font-weight:500;white-space:nowrap;transition:all .2s}
+.tab-btn:hover{color:var(--txt);background:rgba(139,92,246,.07)}
+.tab-btn.active{color:var(--accent);border-bottom-color:var(--accent)}
+.nav-right{display:flex;align-items:center;gap:6px;padding:0 8px;border-left:1px solid var(--border)}
+#search-box{background:var(--bg);border:1px solid var(--border);color:var(--txt);padding:7px 10px;border-radius:6px;font-family:var(--font);font-size:13px;width:150px;transition:border .2s}
+#search-box:focus{outline:none;border-color:var(--accent)}
+#search-box::placeholder{color:var(--txt2)}
+main{max-width:1180px;margin:0 auto;padding:24px 16px}
+.tab-panel{display:none;animation:fi .22s ease}
+.tab-panel.active{display:block}
+@keyframes fi{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+.dash{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:22px}
+.stat{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:14px;text-align:center}
+.stat .v{font-size:26px;font-weight:800;color:var(--accent)}
+.stat .l{font-size:11px;color:var(--txt2);margin-top:3px}
+.prog-wrap{background:var(--border);border-radius:4px;height:5px;margin-top:6px;overflow:hidden}
+.prog-bar{height:100%;background:var(--accent);border-radius:4px;transition:width .4s}
+.sec-title{font-size:17px;font-weight:700;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
+.badge{font-size:11px;background:var(--accent);color:#fff;padding:2px 8px;border-radius:20px;font-weight:600}
+.tag{display:inline-block;font-size:11px;padding:2px 7px;border-radius:4px;font-weight:600}
+.tag-rmi{background:rgba(96,165,250,.15);color:var(--accent2)}
+.tag-rest{background:rgba(167,139,250,.15);color:#c4b5fd}
+.tag-kafka{background:rgba(251,191,36,.15);color:#fbbf24}
+.tag-rpc{background:rgba(52,211,153,.15);color:#34d399}
+.tag-adv{background:rgba(251,113,133,.15);color:#fb7185}
+.tag-easy{background:rgba(34,197,94,.15);color:var(--ok)}
+.tag-med{background:rgba(245,158,11,.15);color:var(--warn)}
+.tag-hard{background:rgba(239,68,68,.15);color:var(--err)}
+.tag-intro{background:rgba(236,72,153,.15);color:#f472b6}
+.tag-sockets{background:rgba(6,182,212,.15);color:#22d3ee}
+.btn{display:inline-flex;align-items:center;gap:5px;padding:8px 16px;border-radius:6px;border:none;cursor:pointer;font-family:var(--font);font-size:13px;font-weight:600;transition:all .2s;text-decoration:none}
+.btn-p{background:#8b5cf6;color:#fff;box-shadow:inset 0 1px 1px rgba(255,255,255,0.2),0 2px 8px rgba(139,92,246,0.2)}.btn-p:hover{background:#7c3aed;box-shadow:inset 0 1px 1px rgba(255,255,255,0.2),0 4px 14px rgba(139,92,246,0.4);transform:translateY(-1px)}
+.btn-s{background:var(--panel);border:1px solid var(--border);color:var(--txt2)}.btn-s:hover{border-color:var(--accent);color:var(--txt)}
+.btn-ok{background:rgba(34,197,94,.15);border:1px solid var(--ok);color:var(--ok)}
+.btn-err{background:rgba(239,68,68,.15);border:1px solid var(--err);color:var(--err)}
+.btn-warn{background:rgba(245,158,11,.15);border:1px solid var(--warn);color:var(--warn)}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:24px;margin-bottom:14px;box-shadow:0 4px 20px rgba(0,0,0,.2);transition:all .3s ease}
+.card:hover{border-color:rgba(139,92,246,.3);box-shadow:0 8px 30px rgba(0,0,0,.4);transform:translateY(-2px)}
+.filter-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+.f-btn{padding:5px 13px;border-radius:20px;border:1px solid var(--border);background:none;color:var(--txt2);cursor:pointer;font-size:12px;font-weight:600;transition:all .2s}
+.f-btn:hover,.f-btn.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.hl{background:rgba(245,158,11,.3);color:var(--warn);border-radius:2px;padding:0 2px}
+pre,code{font-family:var(--mono)}
+pre{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:12px;overflow-x:auto;font-size:13px;line-height:1.6;white-space:pre}
+code{background:rgba(139,92,246,.12);padding:1px 5px;border-radius:3px;color:var(--accent2);font-size:13px}
+.kw{color:#c084fc;font-weight:600}.str{color:#86efac}.cmt{color:#6b7280;font-style:italic}.num{color:#fb923c}.cls{color:#fde68a}
+.opt-btn{width:100%;text-align:left;padding:11px 14px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--txt);cursor:pointer;font-family:var(--font);font-size:14px;transition:all .2s;display:flex;gap:10px;align-items:flex-start;margin-bottom:7px}
+.opt-btn:hover:not(:disabled){border-color:var(--accent);color:var(--accent2)}
+.opt-btn:disabled{cursor:default}
+.opt-btn.correct{border-color:var(--ok)!important;background:rgba(34,197,94,.1);color:var(--ok);animation:correctPop .3s ease}
+.opt-btn.wrong{border-color:var(--err)!important;background:rgba(239,68,68,.1);color:var(--err);animation:wrongShake .35s ease}
+@keyframes correctPop{0%{transform:scale(1)}50%{transform:scale(1.01)}100%{transform:scale(1)}}
+@keyframes wrongShake{0%,100%{transform:translateX(0)}20%{transform:translateX(-5px)}40%{transform:translateX(5px)}60%{transform:translateX(-3px)}80%{transform:translateX(3px)}}
+.opt-badge{font-size:10px;font-weight:700;padding:1px 6px;border-radius:3px;margin-left:auto;flex-shrink:0;white-space:nowrap}
+.opt-badge.ok{background:rgba(34,197,94,.2);color:var(--ok)}
+.opt-badge.bad{background:rgba(239,68,68,.2);color:var(--err)}
+.expl{margin-top:12px;padding:12px;background:rgba(139,92,246,.08);border-left:3px solid var(--accent);border-radius:0 6px 6px 0;font-size:13px;color:var(--txt2);display:none}
+.expl.show{display:block}
+.trap-note{margin-top:8px;padding:9px;background:rgba(245,158,11,.08);border-left:3px solid var(--warn);border-radius:0 6px 6px 0;font-size:12px;color:var(--warn);display:none}
+.trap-note.show{display:block}
+.q-nav{display:flex;flex-wrap:wrap;gap:5px;margin:14px 0}
+.qn-btn{width:32px;height:32px;border-radius:5px;border:1px solid var(--border);background:var(--bg);color:var(--txt2);cursor:pointer;font-size:12px;font-weight:700;transition:all .2s}
+.qn-btn.cur{border-color:var(--accent);background:rgba(139,92,246,.2);color:var(--accent)}
+.qn-btn.ans{border-color:var(--ok);background:rgba(34,197,94,.15);color:var(--ok)}
+.qn-btn.bad{border-color:var(--err);background:rgba(239,68,68,.15);color:var(--err)}
+.qn-btn.skip{border-color:var(--warn);background:rgba(245,158,11,.15);color:var(--warn)}
+.qn-btn.bk{border-color:var(--accent2)}
+.timer{font-family:var(--mono);font-size:20px;font-weight:700;color:var(--warn);padding:5px 12px;background:var(--bg);border:1px solid var(--border);border-radius:6px}
+.timer.red{color:var(--err)}
+.fc-arena{display:flex;justify-content:center;perspective:1200px;margin:20px 0;min-height:300px;align-items:center}
+.flashcard{width:100%;max-width:680px;height:280px;position:relative;transform-style:preserve-3d;transition:transform .5s cubic-bezier(.4,0,.2,1);cursor:pointer}
+.flashcard.flipped{transform:rotateY(180deg)}
+.fc-face{position:absolute;inset:0;backface-visibility:hidden;border-radius:10px;padding:28px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;border:1px solid var(--border)}
+.fc-front{background:var(--panel)}
+.fc-back{background:#0f172a;transform:rotateY(180deg)}
+.fc-lbl{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--txt2);margin-bottom:10px}
+.fc-txt{font-size:15px;font-weight:500;line-height:1.6}
+.fc-code{font-family:var(--mono);font-size:12px;background:var(--bg);padding:8px 12px;border-radius:5px;border:1px solid var(--border);margin-top:8px;text-align:left;width:100%}
+.fc-status{display:flex;justify-content:center;gap:8px;margin-top:14px}
+.fcs-btn{padding:7px 16px;border-radius:6px;border:none;cursor:pointer;font-family:var(--font);font-size:12px;font-weight:700;transition:all .2s}
+.fcs-review{background:rgba(239,68,68,.15);border:1px solid var(--err);color:var(--err)}
+.fcs-med{background:rgba(245,158,11,.15);border:1px solid var(--warn);color:var(--warn)}
+.fcs-ok{background:rgba(34,197,94,.15);border:1px solid var(--ok);color:var(--ok)}
+.cheat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px}
+.cc{background:var(--panel);border:1px solid var(--border);border-radius:8px;overflow:hidden;break-inside:avoid}
+.cc-h{padding:10px 14px;background:var(--bg);border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.cc-h h3{font-size:13px;font-weight:700;color:var(--accent2)}
+.copy-btn{padding:3px 9px;background:none;border:1px solid var(--border);border-radius:4px;color:var(--txt2);cursor:pointer;font-size:11px;font-family:var(--mono);transition:all .2s}
+.copy-btn:hover{border-color:var(--accent);color:var(--accent)}
+.cc-b{padding:12px 14px;font-size:13px}
+.ci{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid rgba(35,40,56,.5);gap:10px;align-items:flex-start}
+.ci:last-child{border-bottom:none}
+.ci-k{color:var(--txt2);font-size:12px;max-width:140px;flex-shrink:0}
+.ci-v{font-family:var(--mono);font-size:12px;color:var(--txt);text-align:right}
+.ci-v.ac{color:var(--accent2)}
+.cs{font-family:var(--mono);font-size:12px;padding:8px;background:var(--bg);border-radius:4px;border:1px solid var(--border);margin-top:6px;overflow-x:auto;white-space:pre;display:block}
+.trap-card{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:18px;margin-bottom:12px;border-left:4px solid var(--err)}
+.trap-card.w{border-left-color:var(--warn)}
+.trap-card.i{border-left-color:var(--accent)}
+.tc-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;flex-wrap:wrap;gap:6px}
+.tc-cat{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px}
+.severity{display:flex;gap:3px;align-items:center}
+.s-dot{width:7px;height:7px;border-radius:50%}
+.tw .lbl{font-size:11px;color:var(--err);font-weight:700;text-transform:uppercase;margin-bottom:3px}
+.tc .lbl{font-size:11px;color:var(--ok);font-weight:700;text-transform:uppercase;margin-bottom:3px}
+.tc-rule{margin-top:8px;padding:9px;background:rgba(139,92,246,.08);border-radius:5px;font-size:13px;border-left:2px solid var(--accent)}
+.collapsible{overflow:hidden;max-height:0;transition:max-height .4s ease}
+.collapsible.open{max-height:3000px}
+.coll-btn{display:flex;align-items:center;gap:7px;padding:8px 13px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--txt2);cursor:pointer;font-family:var(--font);font-size:13px;font-weight:600;transition:all .2s;margin-top:9px;width:auto}
+.coll-btn:hover{border-color:var(--accent);color:var(--accent2)}
+.coll-btn .arr{transition:transform .3s}
+.coll-btn.open .arr{transform:rotate(90deg)}
+.jump-idx{display:flex;gap:6px;flex-wrap:wrap;padding:10px;background:var(--panel);border:1px solid var(--border);border-radius:7px;margin-bottom:18px}
+.j-link{color:var(--accent2);font-size:12px;cursor:pointer;padding:2px 7px;border-radius:4px;transition:background .2s;background:none;border:none;font-family:var(--font)}
+.j-link:hover{background:rgba(139,92,246,.15)}
+.modal-ov{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:2000;display:none;place-items:center}
+.modal-ov.open{display:grid}
+.modal{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:26px;max-width:620px;width:90%;max-height:88vh;overflow-y:auto}
+.modal-title{font-size:17px;font-weight:700;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)}
+textarea.code-area{width:100%;min-height:110px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--txt);font-family:var(--mono);font-size:13px;padding:10px;resize:vertical;transition:border .2s}
+textarea.code-area:focus{outline:none;border-color:var(--accent)}
+.ex-problem{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:12px;margin:10px 0;font-size:14px}
+.r-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin:16px 0}
+.r-card{background:var(--bg);border:1px solid var(--border);border-radius:7px;padding:14px;text-align:center}
+.r-card .big{font-size:34px;font-weight:800}
+.big.good{color:var(--ok)}.big.mid{color:var(--warn)}.big.bad{color:var(--err)}
+.hamburger{display:none;background:none;border:none;color:var(--txt);font-size:22px;cursor:pointer;padding:0 14px;height:48px}
+.sidebar-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:950;display:none;backdrop-filter:blur(2px)}
+.sidebar-overlay.open{display:block}
+@media(max-width:850px){nav{flex-wrap:wrap;padding:4px 0}.hamburger{display:block}.nav-brand{border-right:none;padding-left:0;flex:1}.nav-right{width:100%;border-left:none;border-top:1px solid var(--border);padding:8px 16px;justify-content:space-between;margin-top:4px;flex-wrap:wrap;gap:8px}.kbd-btn{display:none}.nav-tabs{position:fixed;top:0;left:-260px;width:260px;height:100vh;background:var(--panel);border-right:1px solid var(--border);border-top:none;flex-direction:column;z-index:1000;transition:left .3s cubic-bezier(.4,0,.2,1);padding-top:20px;overflow-y:auto;align-items:stretch}.nav-tabs.open{left:0}.tab-btn{width:100%;text-align:left;border-bottom:none;border-left:3px solid transparent;padding:15px 20px;height:auto;font-size:14px}.tab-btn.active{border-bottom:none;border-left-color:var(--accent);background:rgba(139,92,246,.07)}.flashcard{height:240px}.fc-txt{font-size:13px}main{padding:14px 10px}#search-box{flex:1;max-width:none;order:3;margin-left:0}#streak-counter{order:1}#session-clock{order:2}.qn-btn{width:38px;height:38px;font-size:14px}.f-btn{padding:8px 16px;font-size:13px}.btn{min-height:40px}.q-player{position:static;order:4;width:100%;margin-top:4px;justify-content:space-between;background:linear-gradient(90deg, rgba(139,92,246,0.15) 0%, rgba(139,92,246,0.03) 100%);border:1px solid rgba(139,92,246,0.4);border-radius:10px;padding:8px 14px;box-shadow:inset 0 0 15px rgba(139,92,246,0.05)}.q-select{flex:1;font-size:14px;width:auto}.q-vol-wrapper{display:flex}.q-btn{width:32px;height:32px;font-size:16px;background:rgba(139,92,246,0.15)}.yd-credit{display:none}.toast{bottom:90px}}
+@media print{nav,#scroll-prog,.f-btn,.filter-bar,.btn,.fc-status,.q-nav,.coll-btn,textarea{display:none!important}body{background:#fff;color:#000}.cc{break-inside:avoid;border:1px solid #ccc}.cc-h{background:#f3f4f6}pre,.cs,code{background:#f9fafb;border:1px solid #ddd}}
+/* === EMPTY STATE === */
+.empty{text-align:center;padding:60px 24px;background:rgba(139,92,246,.03);border:1px solid rgba(139,92,246,.1);border-radius:16px;margin-top:16px;animation:fi .22s ease}
+.empty-icon{font-size:48px;display:block;margin-bottom:16px;line-height:1;opacity:0.8}
+.empty-title{font-size:16px;font-weight:700;color:var(--txt);margin-bottom:8px}
+.empty-sub{font-size:13px;color:var(--txt2);line-height:1.6}
+/* === SESSION CLOCK === */
+#session-clock{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--txt2);padding:4px 9px;background:var(--bg);border:1px solid var(--border);border-radius:6px;white-space:nowrap;letter-spacing:.5px}
+#session-clock.active{color:var(--accent);border-color:rgba(139,92,246,.4)}
+.kbd-btn{padding:5px 9px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--txt2);cursor:pointer;font-size:14px;line-height:1;transition:all .2s}
+.kbd-btn:hover{border-color:var(--accent);color:var(--accent)}
+/* === TOAST === */
+.toast{position:fixed;bottom:80px;right:24px;background:var(--ok);color:#fff;padding:12px 20px;border-radius:8px;font-weight:600;font-size:13px;box-shadow:0 10px 25px rgba(0,0,0,.5);transform:translateY(100px);opacity:0;transition:all .3s cubic-bezier(.4,0,.2,1);z-index:9999;pointer-events:none}
+.toast.show{transform:translateY(0);opacity:1}
+.yd-credit{position:fixed;bottom:24px;right:24px;display:flex;align-items:center;background:rgba(24,24,27,.8);backdrop-filter:blur(12px);border:1px solid rgba(139,92,246,.2);border-radius:30px;padding:8px 14px;cursor:pointer;transition:all .4s cubic-bezier(.4,0,.2,1);overflow:hidden;z-index:900;box-shadow:0 4px 20px rgba(0,0,0,.4)}
+.yd-credit:hover{background:rgba(139,92,246,.1);border-color:rgba(139,92,246,.5);box-shadow:0 4px 20px rgba(139,92,246,.2);padding-right:20px}
+.yd-monogram{font-family:var(--font);font-weight:700;font-size:12px;color:var(--accent);letter-spacing:1px}
+.yd-full{font-family:var(--font);font-size:12px;color:var(--accent2);white-space:nowrap;max-width:0;opacity:0;transition:all .4s cubic-bezier(.4,0,.2,1);overflow:hidden}
+.yd-credit:hover .yd-full{max-width:200px;opacity:1;margin-left:10px}
+/* === SHORTCUT MODAL === */
+.kb-table{width:100%;border-collapse:collapse;font-size:13px}
+.kb-table tr{border-bottom:1px solid var(--border)}
+.kb-table tr:last-child{border-bottom:none}
+.kb-table td{padding:8px 4px}
+.kb-table td:first-child{color:var(--txt2)}
+.kb-table td:last-child{text-align:right;white-space:nowrap}
+kbd{display:inline-block;background:var(--bg);border:1px solid var(--border);border-bottom-width:2px;border-radius:4px;padding:1px 6px;font-family:var(--mono);font-size:11px;color:var(--txt2)}
+/* === QURAN PLAYER === */
+.q-player { display:flex; align-items:center; gap:4px; background:rgba(139,92,246,0.06); border:1px solid rgba(139,92,246,0.2); border-radius:30px; padding:3px 8px; font-size:12px; position:relative; overflow:hidden; transition:all 0.3s cubic-bezier(0.4,0,0.2,1); }
+.q-player:hover { border-color:var(--accent); box-shadow:0 0 12px rgba(139,92,246,0.15); background:rgba(139,92,246,0.08); }
+.q-icon { color:var(--accent); font-size:14px; }
+.q-icon.playing { animation: pulse 2s infinite ease-in-out; }
+@keyframes pulse { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.15); opacity: 0.6; } 100% { transform: scale(1); opacity: 1; } }
+.q-select { background:transparent; border:none; color:var(--txt); font-family:var(--font); font-size:12px; font-weight:600; outline:none; width:95px; cursor:pointer; text-overflow:ellipsis; padding:2px 0; }
+.q-select option { background:#18181b; color:#fafafa; font-size:13px; padding:6px; font-weight:500; }
+.q-btn { background:none; border:none; cursor:pointer; font-size:14px; display:flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:50%; transition:all 0.2s; }
+.q-btn:hover { background:rgba(255,255,255,0.08); }
+.q-btn.play { color:var(--ok); }
+.q-btn.pause { color:var(--warn); }
+.q-vol-wrapper { display:flex; align-items:center; gap:3px; border-left:1px solid var(--border); padding-left:5px; margin-left:2px; }
+.q-vol-icon { font-size:12px; cursor:pointer; transition:color 0.2s; color:var(--txt2); }
+.q-vol-icon:hover { color:var(--txt); }
+.q-vol-slider { width: 30px; accent-color: var(--accent); cursor: pointer; height: 3px; }
+.q-progress { position:absolute; bottom:0; left:0; height:2px; background:var(--accent); width:0%; transition:width 0.1s linear; box-shadow: 0 0 5px var(--accent); }
+</style>
+</head>
+<body>
+<div id="scroll-prog"></div>
+<div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar()"></div>
+<nav>
+  <button class="hamburger" onclick="toggleSidebar()">☰</button>
+  <div class="nav-brand">⚡ SAR Révision</div>
+  <div class="nav-tabs">
+    <button class="tab-btn active" data-tab="qcm">① QCM</button>
+    <button class="tab-btn" data-tab="exercises">② Exercices Code</button>
+    <button class="tab-btn" data-tab="flashcards">③ Flashcards</button>
+    <button class="tab-btn" data-tab="cheatsheet">④ Cheat Sheet</button>
+    <button class="tab-btn" data-tab="traps">⑤ Pièges d'exam</button>
+  </div>
+  <div class="nav-right" style="gap:8px">
+    <div class="q-player" id="quran-player">
+      <div class="q-progress" id="quran-progress"></div>
+      <span class="q-icon" id="quran-icon" title="Abdul Baset Abd al-Samad (Murattal)">🎧</span>
+      <select class="q-select" id="quran-surah"></select>
+      <button class="q-btn play" id="quran-play" title="Jouer">▶</button>
+      <button class="q-btn pause" id="quran-pause" title="Pause" style="display:none">⏸</button>
+      <div class="q-vol-wrapper">
+        <span class="q-vol-icon" id="quran-mute" title="Volume">🔊</span>
+        <input type="range" class="q-vol-slider" id="quran-vol" min="0" max="1" step="0.05" value="0.2" title="Ajuster le volume">
+      </div>
+      <audio id="quran-audio" style="display:none" preload="none"></audio>
+    </div>
+    <div id="streak-counter" title="Série de révision (jours consécutifs)" style="font-size:13px;font-weight:700;color:var(--warn);display:flex;align-items:center;gap:4px">
+      <span style="font-size:16px">🔥</span> <span id="streak-val">0</span>
+    </div>
+    <span id="session-clock" title="Temps de révision cette session">00:00</span>
+    <input type="text" id="search-box" placeholder="🔍 Rechercher…">
+    <button class="kbd-btn" onclick="showShortcuts()" title="Raccourcis clavier">⌨️</button>
+  </div>
+</nav>
+<main>
+  <div id="tab-qcm" class="tab-panel active"></div>
+  <div id="tab-exercises" class="tab-panel"></div>
+  <div id="tab-flashcards" class="tab-panel"></div>
+  <div id="tab-cheatsheet" class="tab-panel"></div>
+  <div id="tab-traps" class="tab-panel"></div>
+</main>
+<div id="toast" class="toast"></div>
+<div class="yd-credit">
+  <span class="yd-monogram">Y.D</span>
+  <span class="yd-full">Crafted by Yassine Drira</span>
+</div>
+<div class="modal-ov" id="modal-ov"><div class="modal" id="modal-box"><div class="modal-title" id="modal-title"></div><div id="modal-body"></div><div style="margin-top:16px;text-align:right"><button class="btn btn-s" onclick="closeModal()">Fermer</button></div></div></div>
+<script>
+/* === DATA === */
+const Q=[
+{id:1,ch:"RMI",diff:"easy",q:"Que signifie RMI ?",opts:["Remote Method Invocation","Remote Machine Interface","Remote Module Integration","Rapid Method Invocation"],ans:0,expl:"RMI = Remote Method Invocation. C'est une API Java permettant d'appeler des méthodes sur des objets distants, extension orientée objet du RPC.",trap:""},
+{id:2,ch:"RMI",diff:"easy",q:"Quel est le port par défaut du RMIRegistry ?",opts:["8080","80","1099","3000"],ans:2,expl:"RMIRegistry s'exécute par défaut sur le port 1099. Si le numéro de port est omis dans l'URL lookup, c'est ce port qui est utilisé.",trap:"Piège classique : confondre avec 8080 (HTTP alternatif) ou 80 (HTTP standard)."},
+{id:3,ch:"RMI",diff:"easy",q:"Quelle interface une interface distante RMI doit-elle étendre ?",opts:["Serializable","Runnable","Remote","UnicastRemoteObject"],ans:2,expl:"Toute interface distante RMI doit étendre java.rmi.Remote. Cela indique que les méthodes peuvent être appelées depuis une JVM distante.",trap:""},
+{id:4,ch:"RMI",diff:"easy",q:"Quelle exception TOUTES les méthodes d'une interface distante doivent-elles déclarer ?",opts:["IOException","RemoteException","NetworkException","RMIException"],ans:1,expl:"RemoteException doit être déclarée par toutes les méthodes d'une interface distante RMI car un appel distant peut échouer pour de nombreuses raisons (connexion refusée, objet inexistant, problème de sérialisation).",trap:""},
+{id:5,ch:"RMI",diff:"med",q:"Pour exposer automatiquement un objet distant à l'instanciation, la classe doit étendre :",opts:["java.rmi.Remote","java.io.Serializable","java.rmi.server.UnicastRemoteObject","java.rmi.registry.Registry"],ans:2,expl:"Étendre UnicastRemoteObject provoque l'exposition automatique de l'objet à l'instanciation. Sans cela, il faut appeler UnicastRemoteObject.exportObject(objet) manuellement.",trap:"Piège : UnicastRemoteObject est dans le package java.rmi.server, pas java.rmi."},
+{id:6,ch:"RMI",diff:"med",q:"Quelle est la différence entre Naming.bind() et Naming.rebind() ?",opts:["bind() remplace, rebind() échoue si existe","rebind() remplace même si le nom existe, bind() échoue si le nom existe déjà","Aucune différence","bind() est pour les clients, rebind() pour les serveurs"],ans:1,expl:"rebind() associe un nom à un objet et remplace l'ancien si le nom existe déjà. bind() échoue (AlreadyBoundException) si le nom est déjà utilisé.",trap:""},
+{id:7,ch:"RMI",diff:"med",q:"Que retourne Naming.lookup() et que faut-il faire avec le résultat ?",opts:["Il retourne directement l'interface distante, pas de cast nécessaire","Il retourne Object, un cast vers l'interface est nécessaire","Il retourne une String avec l'URL de l'objet","Il retourne null si l'objet n'existe pas"],ans:1,expl:"lookup() retourne Object. Un cast explicite vers l'interface distante est nécessaire. Un cast incorrect lèverait une ClassCastException.",trap:"Piège : oublier le cast est une erreur de compilation fréquente."},
+{id:8,ch:"RMI",diff:"easy",q:"Quel protocole de transport RMI utilise-t-il par défaut ?",opts:["HTTP","UDP","JRMP basé sur TCP/IP","SOAP"],ans:2,expl:"RMI utilise JRMP (Java Remote Method Protocol) basé sur TCP/IP pour le transport des appels, paramètres et résultats entre JVMs.",trap:""},
+{id:9,ch:"RMI",diff:"med",q:"Quel est le rôle du Stub (talon client) ?",opts:["Exécuter la vraie méthode côté serveur","Représenter localement l'objet distant et masquer la complexité de l'appel","Gérer l'authentification entre client et serveur","Stocker les résultats dans un cache"],ans:1,expl:"Le Stub est le représentant local de l'objet distant côté client. Il initie la connexion, sérialise les paramètres, envoie la requête, attend la réponse et retourne le résultat — masquant toute la complexité réseau.",trap:""},
+{id:10,ch:"RMI",diff:"med",q:"Que fait le Skeleton (talon serveur) ?",opts:["Crée les stubs pour le client","Désassemble les paramètres, appelle la vraie méthode, assemble le résultat et l'envoie","Gère le registre RMI","Démarre le serveur web"],ans:1,expl:"Le Skeleton désérialise les paramètres reçus du réseau, appelle la vraie méthode sur l'objet serveur, sérialise le résultat et le renvoie au Stub client.",trap:"Depuis Java 1.2, il n'y a plus de Skeleton par objet — une classe skeleton générique est partagée."},
+{id:11,ch:"RMI",diff:"easy",q:"La sérialisation Java permet de :",opts:["Compiler les classes Java","Rendre un objet persistant pour stockage/échange réseau","Créer des threads Java","Gérer la sécurité réseau"],ans:1,expl:"La sérialisation permet de rendre un objet JVM persistant : le stocker sur disque ou le transmettre sur réseau pour être recréé à l'identique dans une autre JVM.",trap:""},
+{id:12,ch:"RMI",diff:"hard",q:"Quels sont les 2 formats de sérialisation en Java ?",opts:["Compressed et Uncompressed","Binaire (par défaut) et Texte (XML, JSON)","ASCII et Unicode","Statique et Dynamique"],ans:1,expl:"Java supporte deux formats : Binaire (format par défaut, non lisible par l'humain) et Texte (XML, JSON... plus portables et interopérables).",trap:""},
+{id:13,ch:"RMI",diff:"med",q:"Que contient la Couche de Références d'Objets (Remote Reference Layer) ?",opts:["Le code de la méthode distante","Le service de noms RMIRegistry avec une table de hachage (noms → objets distants)","Le protocole JRMP","La politique de sécurité Java"],ans:1,expl:"La couche de références d'objets permet d'obtenir une référence d'objet distant. Elle est assurée par RMIRegistry qui possède une table de hachage (clés=noms, valeurs=objets distants) et s'exécute sur chaque machine hébergeant des objets distants.",trap:""},
+{id:14,ch:"RMI",diff:"hard",q:"Dans RMI, comment un objet LOCAL est-il passé en paramètre à une méthode distante ?",opts:["Par référence (stub)","Par pointeur","Par valeur (copie sérialisée), l'objet doit implémenter Serializable","Pas possible"],ans:2,expl:"Un objet local est passé par valeur : une copie sérialisée est transmise. L'objet doit implémenter java.io.Serializable. Un objet distant (non-local) est passé par référence via son stub.",trap:"Piège classique : confondre passage par valeur (local/Serializable) et passage par référence (non-local/stub)."},
+{id:15,ch:"RMI",diff:"hard",q:"Qu'est-ce qu'une Fabrique (Factory) dans RMI ?",opts:["Un objet spécial qui génère les stubs automatiquement","Un objet distant enregistré dans le registry qui permet au client de créer des instances multiples côté serveur","Le compilateur rmic","Le gestionnaire de sécurité"],ans:1,expl:"Une Fabrique est un objet distant enregistré dans RMIRegistry (rebind). Le client la récupère (lookup), puis appelle fabrique.NewObjet() pour créer des instances côté serveur. Cela résout le problème de 'new' qui gère uniquement la mémoire locale.",trap:""},
+{id:16,ch:"RMI",diff:"med",q:"Quel est l'intérêt principal du Callback RMI ?",opts:["Accélérer les appels RMI","Permettre au serveur d'appeler le client, augmentant l'asynchronisme et le dynamisme","Sécuriser les connexions","Gérer plusieurs clients simultanément"],ans:1,expl:"Le Callback permet au serveur de rappeler le client. Intérêts : augmenter l'asynchronisme (client demande + retour immédiat, serveur rappelle quand terminé) et le dynamisme (serveur interagit pendant l'exécution).",trap:""},
+{id:17,ch:"RMI",diff:"med",q:"À quoi sert le fichier java.policy dans RMI ?",opts:["Configurer le port RMIRegistry","Spécifier les actions autorisées (connect, listen, accept sur sockets) pour le gestionnaire de sécurité","Définir l'URL du codebase","Générer les stubs automatiquement"],ans:1,expl:"java.policy définit la politique de sécurité pour RMISecurityManager. Il spécifie les opérations socket autorisées : connect (établir connexion), listen (accepter connexions serveur), accept (accepter une demande).",trap:""},
+{id:18,ch:"RMI",diff:"hard",q:"Dans le chargement dynamique RMI, que fait la propriété java.rmi.server.codebase ?",opts:["Spécifie l'URL où trouver les fichiers .class pour les stubs et paramètres","Définit le port du RMIRegistry","Configure le gestionnaire de sécurité","Indique l'adresse IP du serveur"],ans:0,expl:"codebase spécifie l'URL (file:// ou http://) où les fichiers .class peuvent être récupérés. RMI envoie l'objet sérialisé + cette URL, permettant aux clients de charger dynamiquement les classes nécessaires.",trap:""},
+{id:19,ch:"RMI",diff:"hard",q:"Depuis Java 1.2, le Skeleton est-il encore généré par objet ?",opts:["Oui, toujours un skeleton par classe distante","Non, une classe skeleton générique est partagée pour tous les objets distants","Non, les skeletons ont été complètement supprimés","Oui, mais uniquement pour les objets complexes"],ans:1,expl:"Depuis Java 1.2, les squelettes individuels ont été supprimés. Une classe skeleton générique partagée gère tous les objets distants, simplifiant l'architecture.",trap:"Piège : confondre 'squelettes supprimés' (faux) avec 'squelettes individuels supprimés, remplacés par un générique' (vrai)."},
+{id:20,ch:"RMI",diff:"easy",q:"RMI/IIOP sert à :",opts:["Accélérer RMI sur les réseaux locaux","Permettre la communication RMI avec des systèmes non-Java","Gérer plusieurs serveurs RMI","Remplacer la sérialisation binaire"],ans:1,expl:"La limitation de RMI est qu'il est restreint à l'environnement Java. RMI/IIOP permet la communication avec d'autres systèmes (CORBA, autres langages), dépassant cette limite.",trap:""},
+{id:21,ch:"REST",diff:"easy",q:"Que signifie REST ?",opts:["Remote Exchange Service Technology","Representational State Transfer","Resource Endpoint Standard Transfer","RESTful Service Template"],ans:1,expl:"REST = Representational State Transfer. C'est un style d'architecture (pas un protocole) défini dans la thèse de Roy Fielding en 2000, inspiré de l'architecture du Web.",trap:""},
+{id:22,ch:"REST",diff:"easy",q:"Qui a défini les principes REST et en quelle année ?",opts:["Tim Berners-Lee en 1991","Roy Fielding en 2000 (Apache)","James Gosling en 1995","Linus Torvalds en 2001"],ans:1,expl:"Roy Fielding (impliqué dans Apache) a défini REST dans sa thèse de doctorat en 2000. REST est inspiré de l'architecture du Web.",trap:""},
+{id:23,ch:"REST",diff:"easy",q:"REST est-il un protocole ?",opts:["Oui, c'est un protocole applicatif","Oui, similaire à SOAP","Non, c'est un style d'architecture : pas de protocole, pas de format, pas de standard","Non, c'est juste une convention de nommage d'URLs"],ans:2,expl:"REST n'est pas un protocole. C'est une approche/style architectural pour construire des APIs. Pas de protocole imposé, pas de format de données imposé, pas de standard officiel.",trap:"Piège majeur d'exam : beaucoup confondent REST (style) avec SOAP (protocole standardisé WS-*)."},
+{id:24,ch:"REST",diff:"easy",q:"Que signifie Stateless dans REST ?",opts:["Le serveur conserve la session entre les requêtes","Le serveur ne conserve aucune session entre deux requêtes. Chaque requête contient toutes les informations nécessaires","Le client ne stocke rien","Les données ne changent jamais"],ans:1,expl:"Stateless = sans état. Le serveur ne garde aucune mémoire des requêtes précédentes. Chaque requête doit contenir toutes les informations pour être traitée. Avantages : meilleure scalabilité, moins de charge serveur.",trap:""},
+{id:25,ch:"REST",diff:"easy",q:"Quel verbe HTTP correspond à CREATE (CRUD) ?",opts:["GET","PUT","POST","DELETE"],ans:2,expl:"POST → Create. La correspondance CRUD : Create=POST, Retrieve=GET, Update=PUT, Delete=DELETE.",trap:""},
+{id:26,ch:"REST",diff:"med",q:"Lequel de ces verbes HTTP est à la fois idempotent ET safe ?",opts:["POST","PUT","DELETE","GET"],ans:3,expl:"GET est idempotent (appeler N fois = même résultat) ET safe (ne modifie pas la ressource). PUT est idempotent mais pas safe. POST n'est ni l'un ni l'autre. DELETE est idempotent mais pas safe.",trap:"Piège classique : confondre idempotent et safe. Safe = pas de modification. Idempotent = résultat identique peu importe le nombre d'appels."},
+{id:27,ch:"REST",diff:"med",q:"POST est-il idempotent ?",opts:["Oui, comme GET","Oui, mais pas safe","Non, POST n'est pas idempotent","Oui, mais seulement pour la création"],ans:2,expl:"POST n'est PAS idempotent. Appeler POST /books deux fois crée deux livres. Pour les méthodes non idempotentes, des contraintes d'accès concurrent dans la BD sont nécessaires.",trap:""},
+{id:28,ch:"REST",diff:"med",q:"Que retourne DELETE si la ressource n'existe pas ?",opts:["Toujours 200","404 uniquement","500 (erreur serveur)","204 ou 404 (les deux sont valides car DELETE est idempotent)"],ans:3,expl:"DELETE est idempotent. Si la ressource n'existe pas, le serveur peut retourner 204 (No Content) ou 404 (Not Found). Les deux sont acceptables — l'important est que l'état final est le même.",trap:"Piège : penser que DELETE doit toujours retourner 200 ou toujours 404."},
+{id:29,ch:"REST",diff:"easy",q:"Les codes HTTP 400-499 signifient :",opts:["Succès","Erreur serveur","Redirection","Problème dans la requête (erreur client)"],ans:3,expl:"400-499 = problème dans la requête côté client. Exemples : 400 Bad Request, 401 Unauthorized, 403 Forbidden, 404 Not Found. 500-599 = erreur serveur.",trap:""},
+{id:30,ch:"REST",diff:"med",q:"Bonne pratique REST : les URIs doivent utiliser :",opts:["Des verbes pour décrire les actions","Des noms pour désigner les ressources","Des adresses IP directement","Des noms de méthodes Java"],ans:1,expl:"L'URI représente une ressource (nom), pas une action (verbe). La méthode HTTP exprime l'action. ❌ /getbook → ✅ GET /book/{id}. ❌ /createUser → ✅ POST /users.",trap:""},
+{id:31,ch:"REST",diff:"med",q:"Pour une collection de ressources vs une instance, quelle convention REST utiliser ?",opts:["/books et /book/123","books/ et /book/123","Aucune convention, c'est libre","/Books et /Book/123"],ans:0,expl:"Convention REST : pluriel pour les collections (/books, /users), singulier ou ID pour une instance (/books/123, /user/234). Éviter les majuscules.",trap:""},
+{id:32,ch:"REST",diff:"easy",q:"Qui maintient l'état dans une architecture REST ?",opts:["Le serveur","La base de données","Le client","Le middleware"],ans:2,expl:"Dans REST (stateless), le serveur ne stocke pas l'état entre requêtes. C'est le client qui maintient l'état. La communication REST = transfert de représentation.",trap:""},
+{id:33,ch:"REST",diff:"hard",q:"Différence entre approche orientée Ressource (REST) et orientée Opérations (SOAP) ?",opts:["REST utilise XML, SOAP utilise JSON","REST manipule des ressources via URI, SOAP fait des appels de fonctions/services nommés","REST est plus ancien que SOAP","Il n'y a pas de différence fondamentale"],ans:1,expl:"REST (approche Ressource) : manipulation de ressources via URIs avec verbes HTTP. SOAP (approche Opération) : appels de fonctions et services nommés, protocole standardisé WS-*.",trap:""},
+{id:34,ch:"REST",diff:"med",q:"Que signifie 'versionner les APIs' comme /v3/books ?",opts:["Sécuriser l'accès aux versions privées","Permettre l'évolution de l'API sans casser les clients existants (bonne pratique)","Indiquer la version de Java utilisée","Gérer la pagination des résultats"],ans:1,expl:"Versionner les APIs (/v1/books, /v2/books) est une bonne pratique qui permet d'introduire des changements incompatibles sans casser les clients qui utilisent une version ancienne.",trap:""},
+{id:35,ch:"Kafka",diff:"easy",q:"Qui a développé Kafka et quand ?",opts:["Google en 2005","LinkedIn en 2010","Amazon en 2008","Twitter en 2012"],ans:1,expl:"Kafka a été développé par LinkedIn et lancé en 2010. Il est conçu pour déplacer de très grands volumes de données de manière fiable et scalable.",trap:""},
+{id:36,ch:"Kafka",diff:"easy",q:"Qu'est-ce qu'un Broker Kafka ?",opts:["Un consommateur de messages","Un serveur Kafka responsable de gérer les topics et messages","Un producteur de messages","Un client Kafka"],ans:1,expl:"Un Broker est un serveur Kafka qui reçoit, stocke, gère les topics/partitions et sert les consommateurs. Plusieurs brokers sont regroupés dans un cluster.",trap:""},
+{id:37,ch:"Kafka",diff:"med",q:"Quel est le rôle de ZooKeeper dans Kafka ?",opts:["Transporter les messages entre producteurs et consommateurs","Coordonner les brokers : métadonnées, détection pannes, coordination cluster","Stocker les messages de façon permanente","Chiffrer les messages"],ans:1,expl:"ZooKeeper NE transporte PAS les messages. Il aide les brokers à se coordonner : gestion des métadonnées du cluster, détection des pannes, coordination.",trap:"Piège : ZooKeeper ne transporte AUCUN message — confusion fréquente."},
+{id:38,ch:"Kafka",diff:"med",q:"Qu'est-ce que KRaft dans Kafka ?",opts:["Un protocole de compression Kafka","Le remplacement moderne de ZooKeeper : Kafka gère lui-même ses métadonnées","Un algorithme de chiffrement","Un type de consumer group"],ans:1,expl:"KRaft est le remplacement moderne de ZooKeeper dans les systèmes Kafka récents. Kafka gère lui-même ses métadonnées sans dépendre d'un système externe.",trap:""},
+{id:39,ch:"Kafka",diff:"hard",q:"Formule du Quorum pour l'élection Kafka. Avec N=5 brokers, quel est Q ?",opts:["Q=2","Q=3","Q=4","Q=5"],ans:1,expl:"Formule : Q = (N/2) + 1. Avec N=5 : Q = (5/2)+1 = 2.5+1 = 3 (arrondi). Le quorum est la majorité minimale pour prendre une décision.",trap:"Avec N=4 : Q=(4/2)+1=3. Avec N=6 : Q=(6/2)+1=4."},
+{id:40,ch:"Kafka",diff:"med",q:"Pourquoi préfère-t-on N impair pour un cluster Kafka ?",opts:["Pour équilibrer la charge","Meilleure tolérance aux pannes (N=3 et N=4 tolèrent tous les deux 1 panne, autant avoir 3)","Pour des raisons de performance","Parce que la formule Q ne fonctionne qu'avec des impairs"],ans:1,expl:"N=3 et N=4 tolèrent tous les deux 1 seule panne. Avoir 4 brokers au lieu de 3 n'apporte pas de tolérance supplémentaire. N impair est plus efficace.",trap:""},
+{id:41,ch:"Kafka",diff:"easy",q:"Qu'est-ce qu'une Partition dans Kafka ?",opts:["Un broker séparé","Une subdivision d'un topic pour permettre la lecture parallèle par plusieurs consommateurs","Un type de message Kafka","Un groupe de consommateurs"],ans:1,expl:"Un Topic est divisé en partitions stockées sur les brokers. Chaque partition a son consommateur, permettant la lecture parallèle et accélérant le débit.",trap:""},
+{id:42,ch:"Kafka",diff:"med",q:"Qu'est-ce que le Replication Factor (RF) dans Kafka ?",opts:["Le nombre de partitions par topic","Le nombre de copies d'une partition sur différents brokers","La vitesse de réplication","Le délai de rétention des messages"],ans:1,expl:"Le Replication Factor est le nombre de copies de chaque partition. Si RF=3, chaque partition est copiée sur 3 brokers. Cela protège contre la perte de données en cas de panne.",trap:""},
+{id:43,ch:"Kafka",diff:"easy",q:"Qu'est-ce que l'Offset dans Kafka ?",opts:["La taille d'un message","La position d'un message dans une partition, servant à suivre la lecture","L'adresse IP du broker","Le délai de traitement d'un message"],ans:1,expl:"L'offset est la position du message dans la partition. Il sert à suivre la lecture des consommateurs et à reprendre après des pannes. Un message lu = offset avancé.",trap:""},
+{id:44,ch:"Kafka",diff:"easy",q:"Quelle est la durée de rétention par défaut des messages dans Kafka ?",opts:["1 jour","24 heures","7 jours","30 jours"],ans:2,expl:"Par défaut, Kafka conserve les messages pendant 7 jours. Chaque topic peut avoir sa propre durée de rétention configurable.",trap:"Piège : les messages consommés existent toujours — Kafka ne les supprime pas à la consommation."},
+{id:45,ch:"Kafka",diff:"med",q:"Après consommation d'un message Kafka, que se passe-t-il au message ?",opts:["Il est immédiatement supprimé","Il reste dans la partition jusqu'à expiration de la rétention","Il est archivé dans ZooKeeper","Il est compressé"],ans:1,expl:"Les messages consommés existent toujours dans Kafka après consommation. Ils sont conservés jusqu'à expiration de la durée de rétention (défaut 7 jours).",trap:"Piège majeur : contrairement à une queue classique, Kafka ne supprime pas les messages après consommation."},
+{id:46,ch:"Kafka",diff:"hard",q:"Dans Kafka, le Leader d'une partition est-il unique au niveau du cluster ?",opts:["Oui, un seul leader par cluster","Non, le leader est défini par rapport à une partition. Un broker peut être leader de plusieurs partitions","Oui, c'est le broker principal","Non, tous les brokers sont leaders"],ans:1,expl:"Le leader est défini PAR RAPPORT À UNE PARTITION, pas au cluster. Un broker peut être leader de plusieurs partitions et follower d'autres simultanément.",trap:"Piège : confondre 'leader de cluster' et 'leader de partition'. Ce sont des concepts différents."},
+{id:47,ch:"Kafka",diff:"med",q:"Comment choisit-on dans quelle partition écrire un message ?",opts:["Toujours partition 0","Round Robin ou clé de hash entre contenu et partition","Aléatoirement","Le producteur décide toujours manuellement"],ans:1,expl:"Le choix de partition se fait par : (a) Round Robin (tour à tour entre partitions) ou (b) Clé de hash (le hash du contenu détermine la partition cible).",trap:""},
+{id:48,ch:"Kafka",diff:"easy",q:"De quoi est constitué un message Kafka ?",opts:["Clé + Valeur uniquement","Timestamp + ID + Payload (contenu)","Sujet + Corps + Signature","Header + Body uniquement"],ans:1,expl:"Chaque message Kafka est constitué de : timestamp (horodatage), id (identifiant), payload (contenu du message).",trap:""},
+{id:49,ch:"Kafka",diff:"med",q:"Qu'est-ce que le Consumer Lag dans Kafka ?",opts:["Le délai de démarrage du consommateur","La différence entre messages produits et messages consommés quand le consommateur est trop lent","La latence réseau entre brokers","Le temps de réplication entre leader et followers"],ans:1,expl:"Consumer Lag = différence entre l'offset du dernier message produit et l'offset du dernier message consommé. Se produit quand le consommateur est trop lent par rapport au producteur.",trap:""},
+{id:50,ch:"Kafka",diff:"med",q:"Qu'est-ce qui caractérise le découplage dans Kafka par rapport au modèle Client/Serveur ?",opts:["Kafka est plus rapide","Le consommateur lit indépendamment du producteur, contrairement au C/S où il y a couplage fort","Kafka utilise HTTP alors que C/S utilise TCP","Kafka n'a pas de serveur central"],ans:1,expl:"Kafka se caractérise par le découplage : le consommateur lit indépendamment, à son rythme. En C/S classique, il y a couplage fort (le message doit être reçu immédiatement).",trap:""},
+{id:51,ch:"RPC",diff:"easy",q:"Que signifie RPC ?",opts:["Remote Process Communication","Remote Procedure Call","Remote Protocol Connection","Relayed Procedure Call"],ans:1,expl:"RPC = Remote Procedure Call (Appel de Procédure à Distance). C'est un outil pour construire des applications Client/Serveur dans un langage de haut niveau, construit sur les sockets.",trap:""},
+{id:52,ch:"RPC",diff:"med",q:"Qu'est-ce que le Marshalling dans RPC ?",opts:["Sécuriser les appels réseau","Encoder (emballer) les paramètres d'appel dans un message réseau","Décoder les paramètres reçus","Authentifier le client"],ans:1,expl:"Marshalling = emballage des paramètres : transformer les paramètres d'un appel local en un message réseau transmissible. L'opération inverse est l'Unmarshalling (déballage).",trap:"Piège : ne pas confondre Marshalling (emballage/encodage) et Unmarshalling (déballage/décodage)."},
+{id:53,ch:"RPC",diff:"easy",q:"Qu'est-ce qu'un IDL (Interface Definition Language) ?",opts:["Un langage de programmation pour serveurs","Un langage pivot indépendant des langages évolués, décrivant les interfaces RPC","Une bibliothèque Java pour RMI","Un protocole de communication réseau"],ans:1,expl:"L'IDL est un langage pivot (intermédiaire) indépendant des langages évolués (C, Java, Python...). Il permet l'appel distant quel que soit le langage utilisé, avec correspondance entre types IDL et types des langages.",trap:"Note : en RMI, l'IDL c'est Java lui-même — pas d'IDL séparé."},
+{id:54,ch:"RPC",diff:"med",q:"Quels sont les modes de passage de paramètres définis dans un IDL ?",opts:["READ, WRITE, READWRITE","IN, OUT, IN-OUT","SEND, RECEIVE, BOTH","LOCAL, REMOTE, SHARED"],ans:1,expl:"L'IDL définit le mode de passage des paramètres : IN (paramètre d'entrée), OUT (paramètre de sortie), IN-OUT (les deux). Cela permet de savoir quelles données sont transmises dans quelle direction.",trap:""},
+{id:55,ch:"RPC",diff:"hard",q:"Quelle est la différence entre liaison statique et liaison tardive dans RPC ?",opts:["Liaison statique est plus sécurisée","Liaison statique : adresse fixée à la compilation, pas de serveur de noms. Liaison tardive : résolution à l'exécution via serveur de noms","Liaison tardive est plus rapide","Il n'y a aucune différence pratique"],ans:1,expl:"Liaison statique : localisation connue avant exécution (compilation), @ fixée dans le code, rapide mais pas flexible. Liaison tardive : localisation résolue à l'exécution via serveur de noms, plus flexible.",trap:""},
+{id:56,ch:"RPC",diff:"med",q:"Quelle est la sémantique RPC idéale mais difficile à atteindre ?",opts:["Au moins une fois","Au plus une fois","Exactement une fois","Zéro fois"],ans:2,expl:"'Exactement une fois' est la sémantique idéale : la procédure est exécutée exactement une fois. C'est difficile à atteindre en cas de pannes réseau ou serveur.",trap:""},
+{id:57,ch:"RPC",diff:"med",q:"La sémantique 'au moins une fois' dans RPC est acceptable si :",opts:["Le serveur est très rapide","L'opération est idempotente (appeler N fois = même résultat)","Le client est fiable","Le réseau est stable"],ans:1,expl:"'Au moins une fois' : appel répété jusqu'au succès. Acceptable seulement si l'opération est idempotente — sinon risque d'effets de bord multiples.",trap:""},
+{id:58,ch:"RPC",diff:"med",q:"Quel mécanisme détecte les pannes dans RPC ?",opts:["Ping périodique","Délai de garde (Timeout) : horloge lancée à l'envoi, action de reprise si dépassé","Heartbeat","Checksum des messages"],ans:1,expl:"Les mécanismes de détection reposent sur des délais de garde (timeout). À l'envoi d'un message, une horloge est lancée. Si le délai est dépassé sans réponse, une action de reprise est déclenchée (renvoi du message).",trap:""},
+{id:59,ch:"RPC",diff:"hard",q:"Quel est l'inconvénient du RPC en mode synchrone ?",opts:["C'est plus complexe à programmer","Le client reste inactif (suspendu) pendant toute l'exécution côté serveur — perte de temps","Le résultat peut être incorrect","Il nécessite deux connexions réseau"],ans:1,expl:"En mode synchrone, l'exécution du client est suspendue jusqu'à la réponse du serveur. Solution : créer des activités concurrentes (threads) — l'un fait un travail, l'autre gère l'appel bloquant.",trap:""},
+{id:60,ch:"RPC",diff:"med",q:"Dans RPC mode asynchrone, que fait le client après avoir envoyé le message ?",opts:["Il attend la réponse","Il abandonne l'appel","Il poursuit son exécution immédiatement en parallèle","Il relance le message immédiatement"],ans:2,expl:"En mode asynchrone, le client poursuit son exécution immédiatement après l'émission du message. La procédure s'exécute en parallèle. Le client récupère les résultats quand il en a besoin.",trap:""},
+{id:61,ch:"RPC",diff:"easy",q:"Qu'est-ce qu'un serveur sans état (Stateless) ?",opts:["Un serveur qui garde toutes les infos de session","Un serveur qui n'a pas de disque dur","Un serveur dont les appels successifs s'exécutent sans lien entre eux — chaque opération sans référence au passé","Un serveur qui ne répond pas aux requêtes"],ans:2,expl:"Serveur stateless : les appels successifs s'exécutent sans lien entre eux. Chaque opération s'effectue sans référence au passé. Exemples : HTTP, NFS de SUN.",trap:""},
+{id:62,ch:"RPC",diff:"med",q:"Exemple de serveur avec état (Stateful) ?",opts:["HTTP","NFS","Paiement électronique","DNS"],ans:2,expl:"Le paiement électronique est un exemple de serveur avec état : les exécutions se font en fonction d'un état de la relation C/S laissé par les appels antérieurs. L'ordre est indispensable.",trap:"HTTP et NFS sont des exemples stateless."},
+{id:63,ch:"RPC",diff:"hard",q:"Quels sont les 3 types de données dans RPC ?",opts:["Locales, distantes, partagées","Applicatives, partagées persistantes, protocolaires","Statiques, dynamiques, temporaires","Client, serveur, réseau"],ans:1,expl:"Les 3 types : (1) Données applicatives (manipulées par l'application), (2) Données partagées persistantes (fichiers, BD — posent des problèmes de tolérance aux pannes et concurrence), (3) Données protocolaires (IP, port — pour la transmission).",trap:""},
+{id:64,ch:"RPC",diff:"med",q:"Si un serveur RPC exécute les appels en parallèle avec des threads, quel problème survient ?",opts:["Performance réduite","Contrôle de concurrence nécessaire si les procédures manipulent des données globales persistantes","Impossibilité de retourner les résultats","Le client ne peut pas recevoir les réponses"],ans:1,expl:"Exécution parallèle (threads) = haute performance, mais si les procédures manipulent des données globales persistantes, un contrôle de concurrence (locks, transactions) devient nécessaire.",trap:""},
+{id:65,ch:"RPC",diff:"easy",q:"Quels sont les avantages des RPC par rapport aux sockets bruts ?",opts:["Plus rapides","Haut niveau : détails de communication cachés, structure d'appel connue (procédure), support naturel C/S, intégration OOP","Pas de besoin de réseau","Gratuits et open source"],ans:1,expl:"RPC offre un niveau d'abstraction plus élevé : les détails de communication sont cachés, la structure d'appel de procédure est familière, support naturel C/S, et intégration avec programmation moderne (objets/composants).",trap:""},
+{id:66,ch:"ADV",diff:"hard",q:"Quelles sont les 3 solutions pour le passage d'adresses (pointeurs) en RPC ?",opts:["Conversion, Compression, Expansion","Interdiction totale des pointeurs, mémoire virtuelle partagée éparse, copie-restauration","Sérialisation, Désérialisation, Reconstruction","Copie locale, Copie distante, Copie partagée"],ans:1,expl:"Les 3 solutions au problème des pointeurs en RPC : (1) Interdiction totale (la plus répandue), (2) Mémoire virtuelle partagée éparse (sites partagent un espace virtuel commun), (3) Simulation par copie-restauration (envoyer copie, récupérer valeur modifiée).",trap:""},
+{id:67,ch:"ADV",diff:"hard",q:"Avec copie-restauration : double_inc(a,a) où a=0, x++ et y++. Quel est le résultat final de a ?",opts:["a=2 (identique au passage par adresse)","a=1 (violation de sémantique)","a=0 (aucune modification)","a=3 (erreur de calcul)"],ans:1,expl:"Copie-restauration : double_inc reçoit deux COPIES de a=0. x++ → copie1=1, y++ → copie2=1. La dernière restauration (copie2=1) écrase la première → a=1. Avec vrai passage par adresse : x++ → a=1, y++ → a=2. La copie-restauration viole la sémantique.",trap:"Piège d'exam classique : l'ordre de restauration des copies détermine le résultat final."},
+{id:68,ch:"RPC",diff:"hard",q:"Dans la liaison tardive, quelle est la différence entre 'liaison au premier appel' et 'liaison à chaque appel' ?",opts:["Aucune différence pratique","Au premier appel : l'@ est demandée une fois puis mise en cache. À chaque appel : consulte le serveur de noms à chaque fois","Au premier appel est plus sécurisé","À chaque appel est plus rapide"],ans:1,expl:"Liaison au premier appel : l'adresse est demandée au serveur de noms une seule fois, mise en cache pour les appels suivants (rapide mais l'@ peut changer). Liaison à chaque appel : consulte le serveur de noms à chaque fois (flexible mais plus lent).",trap:""},
+{id:69,ch:"Kafka",diff:"med",q:"Qu'est-ce que le Broker Bootstrap dans Kafka ?",opts:["Le premier broker créé dans le cluster","Le point d'entrée initial utilisé par producteurs/consommateurs pour découvrir les métadonnées du cluster","Le broker leader par défaut","Un broker de sauvegarde"],ans:1,expl:"Le Broker Bootstrap est le point d'entrée initial utilisé par les producteurs et consommateurs pour découvrir les métadonnées du cluster Kafka. Les infos sont ensuite mises en cache.",trap:""},
+{id:70,ch:"RMI",diff:"med",q:"Quelle commande génère les stubs/skeletons RMI ?",opts:["javac","java","rmic","rmiregistry"],ans:2,expl:"rmic est le compilateur IDL de RMI (l'IDL de RMI c'est Java lui-même). Il génère automatiquement les souches (stubs) : adaptateurs, communication réseau, sérialisation.",trap:""},
+{id:71,ch:"REST",diff:"med",q:"PUT est-il safe ?",opts:["Oui","Non — PUT modifie la ressource mais est idempotent","Oui, comme GET","Seulement si la ressource n'existe pas"],ans:1,expl:"PUT n'est PAS safe car il modifie la ressource (mise à jour complète). Mais PUT EST idempotent : envoyer la même requête PUT plusieurs fois produit le même résultat.",trap:""},
+{id:72,ch:"REST",diff:"easy",q:"Que contient le Content d'une requête HTTP ?",opts:["Toujours du JSON","Les données envoyées au serveur (JSON/XML/fichiers). N'existe pas pour GET ou DELETE","Uniquement les headers","L'URL de la ressource"],ans:1,expl:"Le Content contient les données envoyées au serveur (JSON, XML, fichiers binaires/blob). Il n'existe pas toujours — GET et DELETE n'ont généralement pas de body.",trap:""},
+{id:73,ch:"Kafka",diff:"hard",q:"Si le broker leader tombe en panne dans Kafka, que se passe-t-il ?",opts:["Les données sont perdues","Un vote est organisé entre les followers pour élire un nouveau leader de partition","Le cluster s'arrête","ZooKeeper devient le nouveau leader"],ans:1,expl:"Si le leader d'une partition tombe, un vote est organisé entre les followers éligibles (qui ont répliqué les données) pour élire un nouveau leader. Le système assure ainsi la haute disponibilité.",trap:""},
+{id:74,ch:"RPC",diff:"hard",q:"Dans RPC, qu'arrive-t-il si le serveur tombe en panne APRÈS avoir reçu la requête mais AVANT d'envoyer la réponse ?",opts:["Le client sait exactement que la procédure a été exécutée","3 cas possibles : traitement non fait (0 exec), partiel (état incohérent), ou total (exécution inconnue du client)","Le client reçoit une erreur claire","La requête est automatiquement annulée"],ans:1,expl:"Panne serveur après réception : 3 cas : (1) Traitement pas commencé → 0 exécution, (2) Traitement partiel → état incohérent possible, (3) Traitement total → client ne le sait pas. Détection par timeout client. Reprise : client réémet dès que serveur redémarre.",trap:""},
+{id:75,ch:"RMI",diff:"hard",q:"Quel est l'ordre correct des étapes pour développer une app RMI (côté serveur) ?",opts:["1.Compiler 2.Interface 3.Stubs 4.Démarrer","1.Définir interface 2.Implémenter 3.Compiler 4.Créer stubs 5.Démarrer RMIRegistry 6.Lancer serveur","1.Lancer serveur 2.Définir interface 3.Compiler","1.Stubs 2.Interface 3.Compiler 4.Démarrer"],ans:1,expl:"Ordre correct : (1) Définir interface distante (extends Remote), (2) Implémenter (extends UnicastRemoteObject), (3) Compiler l'implémentation, (4) Créer les stubs/skeletons (rmic), (5) Démarrer RMIRegistry, (6) Lancer le serveur.",trap:""},
+{id:76,ch:"Intro_SR",diff:"easy",q:"Qu'est-ce qui caractérise principalement un système centralisé par rapport à un système réparti ?",opts:["Il s'exécute toujours sur le cloud","Il possède une mémoire partagée entre plusieurs machines","Il a un seul processeur et une horloge commune","Il est plus tolérant aux pannes de réseau"],ans:2,expl:"Un système centralisé a tout sur la même machine : 1 seul processeur, horloge commune, 1 mémoire centrale, et un seul système d'exploitation.",trap:"Un système centralisé n'a pas plusieurs machines ni de mémoire partagée entre machines."},
+{id:77,ch:"Intro_SR",diff:"med",q:"Quel est le rôle du Middleware dans un système réparti ?",opts:["Remplacer le système d'exploitation","Connecter directement les sockets TCP","Gérer la mémoire centrale de la machine","Fournir une couche intermédiaire pour masquer la complexité et l'hétérogénéité"],ans:3,expl:"Le Middleware est un logiciel intermédiaire qui masque l'hétérogénéité, cache la complexité du bas niveau, et rend la répartition transparente pour l'application.",trap:"Le middleware ne remplace pas le SE, il s'appuie dessus."},
+{id:78,ch:"Intro_SR",diff:"med",q:"Dans le modèle de communication par événements (Publish/Subscribe), comment les composants interagissent-ils ?",opts:["Le producteur envoie un message dans un topic, les consommateurs abonnés le reçoivent","Le producteur connaît et appelle directement chaque consommateur","Le client fait une requête HTTP GET au serveur","Une socket TCP est créée entre chaque producteur et consommateur"],ans:0,expl:"C'est un mode asynchrone et anonyme : le producteur envoie à un topic sans connaître les consommateurs. Les consommateurs s'y abonnent pour recevoir les événements.",trap:"Le producteur ne connaît pas ses consommateurs, c'est ce qui fait la force du découplage."},
+{id:79,ch:"Sockets",diff:"easy",q:"Quelle est la différence fondamentale entre TCP et UDP ?",opts:["UDP est utilisé pour les pages web, TCP pour la vidéo","TCP utilise des datagrammes, UDP utilise des flux d'octets","TCP est orienté connexion et fiable, UDP est sans connexion et non fiable","TCP est plus rapide que UDP"],ans:2,expl:"TCP est un mode connecté (flux d'octets, fiable, ordonné, avec accusés de réception). UDP est déconnecté (datagrammes, non fiable, non ordonné).",trap:"C'est TCP qui utilise des flux d'octets, pas UDP."},
+{id:80,ch:"Sockets",diff:"med",q:"En programmation Java, comment un serveur TCP accepte-t-il une nouvelle connexion ?",opts:["En créant une DatagramSocket avec le port du client","En appelant ServerSocket.accept() qui crée une nouvelle socket dédiée au client","En lisant le premier paquet reçu","En utilisant la méthode connect() sur sa socket"],ans:1,expl:"Le serveur utilise ServerSocket.accept() qui est bloquant et, lors d'une connexion, crée et renvoie une nouvelle Socket dédiée à la communication avec ce client spécifique.",trap:"DatagramSocket est pour UDP. connect() est utilisé par le client."},
+{id:81,ch:"Sockets",diff:"hard",q:"Pour gérer plusieurs clients simultanément avec TCP (Mode Concurrent), que doit faire le serveur ?",opts:["Augmenter la taille de ses tampons de réception","Ouvrir un nouveau port pour chaque client","Fermer la connexion après chaque requête pour libérer les ressources","Créer un nouveau thread pour chaque client accepté via ServerSocket.accept()"],ans:3,expl:"Pour être concurrent, le programme principal du serveur fait une boucle d'attente (accept()), et pour chaque client accepté, il délègue le traitement à un nouveau thread.",trap:"Le serveur garde le même port d'écoute principal pour accepter de nouveaux clients."},
+{id:82,ch:"Intro_SR",diff:"med",q:"Qu'est-ce que le mode 'Push' dans la communication par événements ?",opts:["Les consommateurs interrogent périodiquement la file d'attente","Le producteur pousse les données directement dans la base de données","La file d'attente appelle une méthode prédéfinie pour envoyer le message au consommateur","Le client force le serveur à redémarrer"],ans:2,expl:"En mode Push (délivrance implicite), c'est le système (file d'attente) qui appelle automatiquement une méthode du consommateur lorsqu'un événement survient.",trap:"L'interrogation périodique correspond au mode Pull, pas Push."},
+{id:83,ch:"Sockets",diff:"easy",q:"Quels sont les ports standard pour HTTP, FTP et SSH respectivement ?",opts:["80, 21, 22","80, 22, 21","8080, 21, 23","80, 25, 22"],ans:0,expl:"HTTP utilise le port 80, FTP le port 21 et SSH le port 22.",trap:"Telnet c'est 23, SMTP (Mail) c'est 25."},
+{id:84,ch:"Sockets",diff:"med",q:"Lors d'une communication UDP en Java, qui doit ouvrir un socket avec un port explicitement défini ?",opts:["Le client uniquement","Les deux doivent avoir des ports explicites","Le serveur uniquement","Aucun, les ports sont gérés par le middleware"],ans:2,expl:"Le serveur attache sa DatagramSocket à un port précis (explicite) pour pouvoir recevoir des messages. La socket du client est attachée à un port libre automatiquement par le système.",trap:""},
+{id:85,ch:"Intro_SR",diff:"hard",q:"Dans le modèle Client-Serveur synchrone, que se passe-t-il pour le client après l'envoi d'une requête ?",opts:["Il continue son exécution et récupérera le résultat plus tard","Il crée un nouveau thread pour écouter la réponse","Il ferme sa socket pour économiser de la mémoire","Il est bloqué en attente de la réponse du serveur"],ans:3,expl:"En mode de communication synchrone, l'émission est bloquante : le client s'arrête (est bloqué) et attend que le serveur lui transmette le résultat.",trap:"Continuer l'exécution correspond à une communication asynchrone."},
+{id:86,ch:"Intro_SR",diff:"easy",q:"Qu'est-ce qu'une socket dans le contexte réseau ?",opts:["Un composant matériel du serveur","Un point de communication permettant l'envoi et la réception de messages","Un protocole de routage IP","Une base de données partagée"],ans:1,expl:"Une socket est un point de communication logiciel. Chaque processus possède sa socket pour envoyer et recevoir des messages via la couche transport.",trap:"Ce n'est pas un composant matériel ni un protocole de routage."},
+{id:87,ch:"Intro_SR",diff:"med",q:"Dans le modèle producteur-consommateur, comment les messages sont-ils échangés ?",opts:["En utilisant une base de données relationnelle","Par une communication point à point uniquement","Par l'intermédiaire d'un objet comme une file d'attente ou une boîte aux lettres","Via des appels de procédure à distance (RPC)"],ans:2,expl:"Le producteur et le consommateur ne communiquent pas directement, ils utilisent une file d'attente ou boîte aux lettres intermédiaire. La communication peut être point à point ou multi-points.",trap:"La communication n'est pas limitée au point à point."},
+{id:88,ch:"Intro_SR",diff:"med",q:"Quel est le rôle de la désignation externe (ou nommage) dans les sockets ?",opts:["Utiliser une adresse IP et un numéro de port pour identifier le processus","Gérer l'indice dans la table des descripteurs du système","Chiffrer les données avant envoi","Masquer l'hétérogénéité des machines"],ans:0,expl:"La désignation externe utilise l'adresse IP pour identifier la machine et le numéro de port pour identifier le processus cible. La désignation interne est l'indice dans la table des descripteurs.",trap:"L'indice de descripteur correspond à la désignation interne."},
+{id:89,ch:"Sockets",diff:"hard",q:"En TCP, que se passe-t-il si le client meurt soudainement ?",opts:["Le serveur continue d'envoyer des données à l'infini","La socket du serveur est automatiquement redirigée vers un autre client","La nouvelle socket dédiée sur le serveur meurt et le serveur est averti","Le serveur redémarre"],ans:2,expl:"TCP a un protocole de maintien de connexion. Si une extrémité meurt (ex: le client), l'autre extrémité est avertie et la socket correspondante sur le serveur est fermée/meurt.",trap:"Le serveur principal ne meurt pas, seulement la socket dédiée à ce client."},
+{id:90,ch:"Sockets",diff:"easy",q:"Parmi les suivants, quel port correspond au protocole SMTP (Mail) ?",opts:["21","22","23","25"],ans:3,expl:"Le port conventionnel pour le Mail (SMTP) est 25.",trap:"21 est FTP, 22 est SSH, 23 est Telnet."},
+{id:91,ch:"Sockets",diff:"med",q:"En UDP, si le serveur meurt, que se passe-t-il pour le client ?",opts:["Le client reçoit une exception de déconnexion immédiate","Le client n'en sait rien, car c'est un mode déconnecté","Le middleware relance automatiquement le serveur","La socket du client est automatiquement fermée par le système"],ans:1,expl:"En UDP (mode déconnecté), il n'y a pas d'établissement de connexion ni de maintien de connexion. Si l'un des processus meurt, l'autre n'en est pas averti.",trap:"Contrairement à TCP, UDP ne détecte pas la fin de connexion de l'autre extrémité."},
+{id:92,ch:"Intro_SR",diff:"med",q:"Dans le modèle producteur-consommateur, qu'est-ce que l'émission bloquante ?",opts:["Le producteur s'arrête si le réseau est lent","Le producteur émet un message sans attendre de confirmation du récepteur","Le producteur attend que le récepteur confirme la réception avant de continuer","Le consommateur bloque le producteur pour éviter la surcharge"],ans:1,expl:"Dans ce contexte (selon le cours), une émission 'bloquante' signifie que le producteur émet le message dans la file et n'attend pas que le récepteur confirme son arrivée (il est bloqué juste le temps du dépôt).",trap:"Attention à la terminologie du cours : le producteur n'attend rien du consommateur lui-même."},
+{id:93,ch:"Intro_SR",diff:"easy",q:"Comment le client obtient-il l'adresse IP d'un serveur à partir de son nom symbolique (ex: www.site.com) ?",opts:["En utilisant le protocole FTP","En faisant une requête DNS (DNS query)","En envoyant un ping au serveur","En scannant les ports du réseau"],ans:1,expl:"Le client demande au système DNS (Domain Name System) d'obtenir l'adresse IP correspondant au nom symbolique. C'est la base du nommage sur Internet.",trap:""},
+{id:94,ch:"Sockets",diff:"med",q:"Quel protocole utilise-t-on pour la couche transport si l'on a besoin de transmettre des données en streaming vidéo très rapide, où la perte de quelques images est acceptable ?",opts:["TCP","HTTP","UDP","SMTP"],ans:2,expl:"UDP est idéal quand la rapidité prime sur la fiabilité (pas de retransmission, pas de contrôle d'ordre). Parfait pour le streaming vidéo ou la VoIP en temps réel.",trap:"TCP garantit la livraison mais au détriment de la vitesse en cas de perte de paquet (retransmission)."},
+{id:95,ch:"RMI",diff:"med",q:"En Java RMI, que contient le fichier de politique de sécurité (java.policy) concernant les sockets ?",opts:["Les ports autorisés pour le pare-feu","Les permissions connect, listen, et accept","Les mots de passe pour le RMIRegistry","L'adresse IP du client"],ans:1,expl:"La politique de sécurité (RMISecurityManager) vérifie les actions réseau, notamment : établir une connexion (connect), accepter des connexions (listen), et répondre à une demande (accept).",trap:""},
+{id:96,ch:"RMI",diff:"hard",q:"Comment fonctionne le chargement dynamique de classes dans RMI ?",opts:["Le code source est envoyé dans chaque requête","Le serveur FTP télécharge tout le projet client","L'objet est envoyé avec une URL (codebase) indiquant où télécharger la définition (.class)","Java RMI ne supporte pas le chargement dynamique"],ans:2,expl:"La propriété java.rmi.server.codebase spécifie une URL. RMI envoie l'objet sérialisé accompagné de cette URL, permettant au récepteur de télécharger dynamiquement le fichier .class s'il ne l'a pas en local.",trap:""},
+{id:97,ch:"RMI",diff:"med",q:"Quel est l'intérêt principal d'utiliser un Callback en RMI ?",opts:["Réduire la taille des objets sérialisés","Sécuriser la communication entre JVMs","Augmenter l'asynchronisme et permettre au serveur d'interagir dynamiquement avec le client","Remplacer le RMIRegistry"],ans:2,expl:"Le Callback permet au client de passer un objet distant au serveur. Le serveur peut ainsi faire un appel asynchrone vers le client quand il a terminé un travail long ou pour une notification.",trap:""},
+{id:98,ch:"REST",diff:"easy",q:"Dans le protocole HTTP, quel Header indique au serveur le format de réponse souhaité par le client ?",opts:["Content-Type","Accept","Authorization","Cookie"],ans:1,expl:"Le header 'Accept' indique le type de média (MIME) que le client comprend et souhaite recevoir en réponse (ex: application/json). 'Content-Type' décrit le contenu actuellement envoyé.",trap:"Content-Type décrit ce qu'on ENVOIE, Accept décrit ce qu'on VEUT RECEVOIR."},
+{id:99,ch:"Kafka",diff:"med",q:"Comment un producteur Kafka choisit-il dans quelle partition d'un topic écrire un message ?",opts:["Toujours dans la partition 0","Uniquement par ordre alphabétique","Soit par Round-Robin (tour de rôle), soit par un hash de la clé du message","Le ZooKeeper choisit dynamiquement"],ans:2,expl:"Sans clé, Kafka utilise le Round-Robin pour équilibrer la charge. Si le message possède une clé, Kafka hache cette clé pour garantir que les messages avec la même clé aillent dans la même partition.",trap:""},
+{id:100,ch:"Kafka",diff:"easy",q:"Quelle est la structure exacte d'un message Kafka ?",opts:["Header HTTP, Body, Footer","Timestamp, ID, Payload (contenu)","Clé primaire, Valeur, IP de l'émetteur","Topic, Partition, Offset"],ans:1,expl:"Chaque message est physiquement constitué d'un Timestamp (horodatage), d'un ID et de son Payload (le contenu de la donnée).",trap:""},
+{id:101,ch:"RPC",diff:"hard",q:"En RPC, qu'est-ce qu'une exécution 'orpheline' ?",opts:["Un client qui n'a pas de serveur","Un appel correctement traité par le serveur mais pour lequel le client a abandonné (timeout expiré)","Un serveur qui redémarre sans prévenir","Une erreur de réseau indétectable"],ans:1,expl:"L'orphelin se produit quand le serveur exécute la procédure, mais le délai de garde du client a expiré (le client croit à un échec). Le serveur finit par nettoyer après plusieurs timeouts ou réémissions du client avec des ID différents.",trap:""},
+{id:102,ch:"RPC",diff:"med",q:"Lorsqu'on utilise des timeouts en RPC, où sont placées les horloges de garde ?",opts:["Sur le routeur réseau central","Côté client à l'envoi de l'appel, côté serveur à l'envoi de la réponse","Uniquement sur le client","Uniquement sur le serveur"],ans:1,expl:"Le client lance une horloge en envoyant l'appel, et le serveur lance une horloge en envoyant la réponse, pour détecter la perte de leurs messages respectifs.",trap:""}
+];
+const FC=[
+{id:1,ch:"RMI",front:"Que fait rmic ?",back:"Génère les stubs (souches) automatiquement à partir de l'interface Java. L'IDL de RMI est Java lui-même.",code:"rmic MonObjetDistant"},
+{id:2,ch:"RMI",front:"Port par défaut RMIRegistry ?",back:"1099. Omis dans l'URL → 1099 utilisé automatiquement.",code:'Naming.lookup("rmi://host/nom") // port=1099'},
+{id:3,ch:"RMI",front:"Que doit étendre une interface distante RMI ?",back:"java.rmi.Remote — toutes ses méthodes doivent déclarer throws RemoteException.",code:"public interface MonIF extends Remote {\n  void maMethod() throws RemoteException;\n}"},
+{id:4,ch:"RMI",front:"Différence bind() vs rebind() ?",back:"rebind() remplace si nom existe. bind() lève AlreadyBoundException si nom déjà pris.",code:"Naming.rebind(\"obj\", monObj); // toujours OK\nNaming.bind(\"obj\", monObj);   // échoue si existe"},
+{id:5,ch:"RMI",front:"Stub = ?",back:"Représentant LOCAL de l'objet distant. Masque toute la complexité réseau. Sérialise les params, envoie la requête, retourne le résultat.",code:""},
+{id:6,ch:"RMI",front:"Skeleton = ?",back:"Côté serveur. Désérialise les params, appelle la VRAIE méthode, sérialise le résultat, renvoie au stub.",code:"// Depuis Java 1.2 : skeleton générique partagé"},
+{id:7,ch:"RMI",front:"Objet local en param RMI → passage comment ?",back:"Par VALEUR (copie sérialisée). L'objet doit implémenter java.io.Serializable.",code:"// Local → Serializable → copie\n// Non-local → stub → référence"},
+{id:8,ch:"RMI",front:"Callback RMI = ?",back:"Le serveur appelle le client. Le client passe un objet callback en param. Le serveur fait un appel asynchrone dessus.",code:""},
+{id:9,ch:"RMI",front:"codebase RMI ?",back:"Propriété java.rmi.server.codebase. URL (file:// ou http://) où trouver les .class pour le chargement dynamique.",code:"java -Djava.rmi.server.codebase=http://srv/classes/ Srv"},
+{id:10,ch:"RMI",front:"Fabrique (Factory) RMI ?",back:"Objet distant enregistré dans le registry. Permet au client de créer des instances multiples côté serveur via fabrique.newObjet().",code:""},
+{id:11,ch:"REST",front:"REST = protocole ?",back:"NON. REST est un STYLE D'ARCHITECTURE. Pas de protocole, pas de format imposé, pas de standard.",code:""},
+{id:12,ch:"REST",front:"Qui définit REST ? Quand ?",back:"Roy Fielding, en 2000 (thèse de doctorat, Apache).",code:""},
+{id:13,ch:"REST",front:"CRUD ↔ HTTP verbs ?",back:"Create→POST, Retrieve→GET, Update→PUT, Delete→DELETE",code:"GET  /books      → liste\nGET  /books/1    → détail\nPOST /books      → créer\nPUT  /books/1    → modifier\nDELETE /books/1  → supprimer"},
+{id:14,ch:"REST",front:"Idempotent vs Safe ?",back:"Safe = ne MODIFIE pas la ressource (GET). Idempotent = résultat identique N appels (GET, PUT, DELETE). POST = ni l'un ni l'autre.",code:""},
+{id:15,ch:"REST",front:"Codes HTTP à retenir ?",back:"1xx Info | 2xx Succès | 3xx Redirection | 4xx Erreur client | 5xx Erreur serveur",code:"200 OK | 201 Created | 204 No Content\n400 Bad Request | 401 Unauth | 404 Not Found\n500 Internal Server Error"},
+{id:16,ch:"REST",front:"Bonne pratique URI ?",back:"Noms (pas verbes) + pluriel pour collections. Éviter majuscules. Versionner : /v1/books",code:"✅ GET /books/{id}\n❌ GET /getBook/{id}"},
+{id:17,ch:"REST",front:"Qui maintient l'état en REST ?",back:"Le CLIENT. Le serveur est stateless : aucune session entre les requêtes.",code:""},
+{id:18,ch:"Kafka",front:"Architecture Kafka ?",back:"Producteurs → Brokers (Cluster) → Consommateurs. Modèle Publish/Subscribe basé sur les topics.",code:""},
+{id:19,ch:"Kafka",front:"Formule Quorum Kafka ?",back:"Q = (N/2) + 1. N=3→Q=2, N=5→Q=3, N=7→Q=4. Préférer N impair.",code:""},
+{id:20,ch:"Kafka",front:"Offset Kafka ?",back:"Position d'un message dans une partition. Permet de suivre la lecture et reprendre après panne. Messages consommés NON supprimés.",code:""},
+{id:21,ch:"Kafka",front:"Rétention par défaut Kafka ?",back:"7 jours. Configurable par topic. Les messages existent toujours après consommation jusqu'à expiration.",code:""},
+{id:22,ch:"Kafka",front:"ZooKeeper vs KRaft ?",back:"ZooKeeper = système externe de coordination (métadonnées, pannes). KRaft = remplacement moderne intégré à Kafka.",code:"// ZooKeeper NE transporte PAS les messages !"},
+{id:23,ch:"Kafka",front:"Leader de partition ?",back:"Broker responsable des R/W pour une partition. Défini PAR PARTITION (pas par cluster). Un broker peut être leader de plusieurs partitions.",code:""},
+{id:24,ch:"Kafka",front:"Replication Factor ?",back:"Nombre de copies d'une partition. RF=3 → 1 leader + 2 followers. Protège contre les pannes.",code:""},
+{id:25,ch:"RPC",front:"Marshalling / Unmarshalling ?",back:"Marshalling = emballage des params en message réseau. Unmarshalling = déballage. Réalisé par les stubs.",code:""},
+{id:26,ch:"RPC",front:"Sémantiques RPC ?",back:"Au moins une fois (idempotent requis) | Au plus une fois (pas de doublon, pas de garantie) | Exactement une fois (idéal, difficile) | Indéfini",code:""},
+{id:27,ch:"RPC",front:"Liaison statique vs tardive ?",back:"Statique : adresse fixée à la compilation, rapide, inflexible. Tardive : résolution à l'exécution via serveur de noms, flexible.",code:""},
+{id:28,ch:"RPC",front:"RPC synchrone vs asynchrone ?",back:"Synchrone : client suspendu jusqu'à réponse (simple mais perte de temps). Asynchrone : client continue immédiatement, résultats récupérés plus tard.",code:""},
+{id:29,ch:"RPC",front:"IDL contient quoi ?",back:"Noms et versions des procédures. Types des paramètres et résultats. Modes de passage (IN, OUT, IN-OUT).",code:""},
+{id:30,ch:"ADV",front:"Copie-restauration : double_inc(a,a) avec a=0 ?",back:"Résultat a=1 (pas 2). Deux copies de a=0 → x++=1, y++=1. Dernière restauration écrase → a=1. Violation de la sémantique du passage par adresse réel.",code:"// Passage par adresse réel → a=2\n// Copie-restauration → a=1"},
+{id:31,ch:"Intro_SR",front:"Système Réparti vs Centralisé ?",back:"Réparti : plusieurs machines autonomes connectées en réseau apparaissant comme un système unique. Centralisé : 1 machine, 1 mémoire centrale, 1 horloge.",code:""},
+{id:32,ch:"Intro_SR",front:"Qu'est-ce qu'un Middleware ?",back:"Couche logicielle intermédiaire entre le réseau et l'application. Masque l'hétérogénéité, cache la complexité et rend la répartition transparente.",code:""},
+{id:33,ch:"Intro_SR",front:"Publish / Subscribe : comment ça marche ?",back:"Le producteur publie des événements dans un 'topic'. Les consommateurs s'abonnent au topic. Les deux ne se connaissent pas (asynchrone et anonyme).",code:""},
+{id:34,ch:"Intro_SR",front:"Mode Push vs Mode Pull (Evénements) ?",back:"Pull : Le consommateur vérifie périodiquement s'il y a des messages. Push : La file d'attente notifie (appelle) le consommateur dès qu'un message arrive.",code:""},
+{id:35,ch:"Sockets",front:"Caractéristiques TCP (Mode connecté) ?",back:"Transmission fiable (ACK, retransmission), ordonnée, communication par flux d'octets. Orienté connexion.",code:""},
+{id:36,ch:"Sockets",front:"Caractéristiques UDP (Mode déconnecté) ?",back:"Transmission non fiable (pas d'ACK), non ordonnée, communication par datagrammes. Plus rapide mais pas de garantie.",code:""},
+{id:37,ch:"Sockets",front:"Comment un serveur TCP gère plusieurs clients ?",back:"Avec le TCP Mode Concurrent : une boucle principale sur ServerSocket.accept() crée un nouveau THREAD pour chaque client connecté.",code:""},
+{id:38,ch:"Sockets",front:"Classes Java pour TCP et UDP ?",back:"UDP : DatagramSocket (client/serveur). TCP : Socket (client), ServerSocket (serveur).",code:"// TCP\nServerSocket srv = new ServerSocket(8080);\nSocket client = new Socket('host', 8080);"},
+{id:39,ch:"Sockets",front:"Que fait ServerSocket.accept() ?",back:"C'est une méthode bloquante. Lorsqu'une connexion arrive, elle crée et retourne une NOUVELLE Socket dédiée à la communication avec ce client.",code:""},
+{id:40,ch:"Intro_SR",front:"Qu'est-ce que le FAP (Format and Protocol) ?",back:"Mécanisme du middleware qui gère les échanges réseau : synchronisation selon un protocole et mise au format (sérialisation) des données.",code:""},
+{id:41,ch:"Sockets",front:"Différence entre désignation interne et externe (Sockets) ?",back:"Interne : indice dans la table des descripteurs du SE. Externe : Adresse IP + Numéro de port.",code:""},
+];
+const EX=[
+{id:1,ch:"RMI",diff:"med",title:"Créer une interface distante RMI",context:"Vous développez un service de calcul distribué accessible à distance.",task:"Écrivez l'interface Java RMI pour un service de calcul exposant une méthode add(int a, int b) retournant un int.",hint:"N'oubliez pas ce que doit étendre l'interface et quelle exception est obligatoire.",solution:`import java.rmi.Remote;
+import java.rmi.RemoteException;
+
+// L'interface DOIT étendre Remote
+public interface CalculService extends Remote {
+    // TOUTES les méthodes doivent déclarer RemoteException
+    // car un appel distant peut toujours échouer (réseau, objet mort...)
+    int add(int a, int b) throws RemoteException;
+}`,trap:"Oublier 'extends Remote' → l'objet ne sera pas reconnu comme distant. Oublier 'throws RemoteException' → erreur de compilation."},
+{id:2,ch:"RMI",diff:"med",title:"Implémenter un objet distant RMI",context:"Suite de l'exercice 1. Vous devez maintenant implémenter l'interface CalculService.",task:"Écrivez la classe CalculServiceImpl qui implémente CalculService avec exposition automatique.",hint:"Quelle classe étendre pour l'exposition automatique ? Quel constructeur appeler ?",solution:`import java.rmi.server.UnicastRemoteObject;
+import java.rmi.RemoteException;
+
+// Étendre UnicastRemoteObject → exposition AUTOMATIQUE à l'instanciation
+public class CalculServiceImpl extends UnicastRemoteObject implements CalculService {
+
+    // Le constructeur DOIT déclarer RemoteException (hérité de UnicastRemoteObject)
+    public CalculServiceImpl() throws RemoteException {
+        super(); // appelle le constructeur de UnicastRemoteObject
+    }
+
+    @Override
+    public int add(int a, int b) throws RemoteException {
+        return a + b; // logique métier simple
+    }
+}`,trap:"Sans étendre UnicastRemoteObject, l'objet est local. Il faudrait appeler UnicastRemoteObject.exportObject(obj) manuellement."},
+{id:3,ch:"RMI",diff:"hard",title:"Créer un serveur RMI complet",context:"Vous devez démarrer un serveur qui expose CalculServiceImpl dans le RMIRegistry.",task:"Écrivez la classe Server avec la méthode main() complète.",hint:"Pensez à : instancier l'objet, l'enregistrer dans le registry avec rebind().",solution:`import java.rmi.registry.LocateRegistry;
+import java.rmi.registry.Registry;
+import java.rmi.Naming;
+
+public class Server {
+    public static void main(String[] args) throws Exception {
+
+        // 1. Créer l'objet distant (exposition auto via UnicastRemoteObject)
+        CalculServiceImpl service = new CalculServiceImpl();
+
+        // 2. Démarrer le RMIRegistry sur le port par défaut 1099
+        //    (ou lancer rmiregistry en ligne de commande avant)
+        LocateRegistry.createRegistry(1099);
+
+        // 3. Enregistrer l'objet dans le registry
+        //    rebind() : remplace si le nom existe déjà
+        //    bind()   : échoue si le nom existe déjà
+        Naming.rebind("rmi://localhost:1099/CalculService", service);
+
+        System.out.println("Serveur prêt.");
+    }
+}`,trap:"Appeler bind() au lieu de rebind() peut provoquer AlreadyBoundException si le serveur redémarre. Toujours préférer rebind() en développement."},
+{id:4,ch:"RMI",diff:"hard",title:"Créer un client RMI",context:"Le serveur CalculService est démarré sur localhost:1099.",task:"Écrivez la classe Client qui se connecte au serveur, récupère le stub et appelle add(5,3).",hint:"Que retourne Naming.lookup() ? Quel cast est nécessaire ?",solution:`import java.rmi.Naming;
+
+public class Client {
+    public static void main(String[] args) throws Exception {
+
+        // lookup() retourne Object → cast OBLIGATOIRE vers l'interface
+        // Si le nom est incorrect ou le serveur est fermé → RemoteException
+        CalculService service = (CalculService) Naming.lookup(
+            "rmi://localhost:1099/CalculService"
+        );
+        // Si host omis → localhost. Si port omis → 1099.
+
+        // Appeler la méthode comme un objet local !
+        int result = service.add(5, 3);
+        System.out.println("5 + 3 = " + result); // → 8
+    }
+}`,trap:"lookup() retourne Object, pas l'interface. Sans le cast, le code ne compile pas. Si le serveur n'est pas démarré → RemoteException."},
+{id:5,ch:"RMI",diff:"hard",title:"Fabrique d'objets RMI",context:"Vous voulez permettre au client de créer des instances de CalculService à la demande.",task:"Décrivez le mécanisme de Fabrique RMI et expliquez pourquoi 'new' seul ne suffit pas.",hint:"Le problème de 'new' est qu'il gère uniquement la mémoire...",solution:`// PROBLÈME : new gère uniquement la mémoire LOCALE
+// Le client ne peut pas faire : new CalculServiceImpl() sur le serveur
+
+// SOLUTION : Fabrique (Factory)
+
+// 1. Interface Fabrique
+public interface CalculFactory extends Remote {
+    CalculService createCalculService() throws RemoteException;
+}
+
+// 2. Implémentation Fabrique (côté serveur)
+public class CalculFactoryImpl extends UnicastRemoteObject implements CalculFactory {
+    public CalculFactoryImpl() throws RemoteException { super(); }
+
+    @Override
+    public CalculService createCalculService() throws RemoteException {
+        // Crée une nouvelle instance côté SERVEUR et la retourne au client
+        return new CalculServiceImpl();
+    }
+}
+
+// 3. Serveur : enregistre la FABRIQUE (pas le service directement)
+// Naming.rebind("CalculFactory", new CalculFactoryImpl());
+
+// 4. Client :
+// CalculFactory factory = (CalculFactory) Naming.lookup("rmi://host/CalculFactory");
+// CalculService calc = factory.createCalculService(); // instance créée côté serveur!
+// int r = calc.add(1,2); // appel normal`,trap:"La fabrique est la seule façon pour le client de créer des instances multiples côté serveur. Le client obtient une référence (stub) vers l'objet créé."},
+{id:6,ch:"REST",diff:"easy",title:"Concevoir les URIs REST d'une API Livres",context:"Vous concevez une API REST pour gérer des livres et leurs avis.",task:"Donnez les URIs et verbes HTTP corrects pour : lister tous les livres, créer un livre, obtenir le livre #42, modifier complètement le livre #42, supprimer le livre #42, lister les avis du livre #42.",hint:"Noms pluriels pour collections, singulier/ID pour instances.",solution:`// ✅ BONNES PRATIQUES REST - Noms (pas verbes), pluriel pour collections
+
+GET    /books              → Lister tous les livres
+POST   /books              → Créer un nouveau livre
+
+GET    /books/42           → Obtenir le livre #42
+PUT    /books/42           → Modifier COMPLÈTEMENT le livre #42 (idempotent)
+PATCH  /books/42           → Modifier PARTIELLEMENT le livre #42
+DELETE /books/42           → Supprimer le livre #42 (idempotent)
+
+GET    /books/42/reviews   → Lister les avis du livre #42
+POST   /books/42/reviews   → Créer un avis pour le livre #42
+
+// ❌ À ÉVITER
+GET /getBooks              → verbe dans l'URI
+POST /createBook           → verbe dans l'URI
+GET /book?action=delete    → action dans query param`,trap:"Ne jamais mettre de verbes dans l'URI. L'action est exprimée par le verbe HTTP."},
+{id:7,ch:"REST",diff:"med",title:"Analyser idempotence et safety",context:"Un stagiaire pense que toutes les méthodes HTTP qui 'réussissent' sont idempotentes.",task:"Expliquez pour GET, POST, PUT, DELETE : sont-ils idempotents ? Safe ?",hint:"Safe = ne modifie pas. Idempotent = même résultat N fois.",solution:`// ANALYSE COMPLÈTE
+
+// GET : Safe ✅ + Idempotent ✅
+// → Ne modifie rien, retourne toujours la même ressource
+
+// POST : Safe ❌ + Idempotent ❌
+// → POST /books deux fois = DEUX livres créés
+// → Nécessite des contraintes (clés uniques BD) pour éviter les doublons
+// → Exemple problème : double-click sur "Commander" = 2 commandes !
+
+// PUT : Safe ❌ + Idempotent ✅
+// → Modifie la ressource, MAIS envoyer PUT /books/1 {nom:"Java"} 
+//   10 fois → toujours le même résultat final
+
+// DELETE : Safe ❌ + Idempotent ✅
+// → 1er DELETE /books/1 → 204 No Content (supprimé)
+// → 2ème DELETE /books/1 → 204 No Content OU 404 Not Found (les deux OK)
+// → L'état final est identique : la ressource n'existe plus`,trap:"DELETE est idempotent même si le 2ème appel retourne 404. L'état final (ressource absente) est le même — c'est ça l'idempotence."},
+{id:8,ch:"Kafka",diff:"med",title:"Calculer le Quorum Kafka",context:"Vous configurez un cluster Kafka et devez choisir le nombre de brokers.",task:"Calculez le quorum pour N=3,4,5,6,7. Lequel choisir si vous voulez tolérer 2 pannes simultanées ?",hint:"Q=(N/2)+1. Pour tolérer F pannes, il faut N ≥ 2F+1.",solution:`// FORMULE : Q = floor(N/2) + 1
+
+N=3 → Q = 1+1 = 2  (tolère 1 panne)
+N=4 → Q = 2+1 = 3  (tolère 1 panne — même qu'avec 3 !)
+N=5 → Q = 2+1 = 3  (tolère 2 pannes) ← MINIMUM pour 2 pannes
+N=6 → Q = 3+1 = 4  (tolère 2 pannes — même qu'avec 5 !)
+N=7 → Q = 3+1 = 4  (tolère 3 pannes)
+
+// CONCLUSION :
+// Pour tolérer 2 pannes → N=5 (pas 6, inutile d'avoir 1 broker de plus)
+// N impair est TOUJOURS préférable : même tolérance que N+1 avec un broker de moins
+
+// Exemple : N=3, Q=2, B1=leader
+// B2+B3 tombent → B1 seul, Q=2 non atteint → le producteur ne peut PAS écrire
+// (selon config : message critique ou non)`,trap:"N=4 ne tolère PAS plus de pannes que N=3. Choisir N impair est plus économique."},
+{id:9,ch:"Kafka",diff:"hard",title:"Analyser la perte de données dans Kafka",context:"Cluster Kafka : B1=leader partition P0, B2+B3=followers. RF=3.",task:"Décrivez le scénario exact où un message peut être PERDU. Comment l'éviter ?",hint:"Que se passe-t-il si B2 et B3 tombent avant que B1 ait répliqué ?",solution:`// SCÉNARIO DE PERTE :
+// 1. Producteur envoie message M à B1 (leader P0)
+// 2. B2 et B3 tombent en panne AVANT de répliquer M
+// 3. B1 est seul mais Q=2 → selon config, peut encore accepter l'écriture
+// 4. B1 tombe à son tour avant que B2/B3 ne reviennent
+// → Message M PERDU : aucun follower ne l'avait copié
+
+// SOLUTIONS :
+// 1. acks=all (ou acks=-1) : le producteur attend ACK de TOUS les followers
+//    → plus sûr mais latence augmentée
+// 2. min.insync.replicas=2 : au moins 2 replicas doivent avoir confirmé
+// 3. RF élevé : RF=3 minimum en production
+
+// CONCLUSION DU COURS :
+// "Ça dépend de la config (message critique ou non)"
+// Message non critique → tolérer l'écriture sans quorum complet
+// Message critique → acks=all, risque de timeout si followers down`,trap:"Le découplage Kafka ne garantit pas zéro perte. La durabilité dépend de la configuration acks et min.insync.replicas."},
+{id:10,ch:"RPC",diff:"med",title:"Tracer les étapes d'un appel RPC",context:"Un client appelle la procédure distante calculerPrix(produit) sur un serveur.",task:"Listez les 10 étapes du mécanisme RPC par messages dans l'ordre correct.",hint:"Souche client → transport → souche serveur → vraie procédure → retour.",solution:`// LES 10 ÉTAPES DU RPC PAR MESSAGES
+
+1. Client appelle la souche CLIENT (comme un appel local)
+   → La souche récupère les paramètres et les EMBALLE (marshalling) dans un message
+
+2. Souche client demande au service transport LOCAL d'envoyer le message
+
+3. Le message d'appel est transmis sur le RÉSEAU au site serveur
+
+4. Le message d'appel est délivré à la souche SERVEUR
+   → La souche DÉBALLE les paramètres (unmarshalling)
+
+5. La souche serveur réalise l'appel EFFECTIF de la procédure serveur
+
+6. La procédure serveur s'exécute et termine
+   → Renvoie les résultats à la souche serveur
+   → La souche les EMBALLE dans un message de réponse
+
+7. Souche serveur demande au transport d'envoyer le message de RÉPONSE
+
+8. Le message de réponse est transmis sur le réseau au CLIENT
+
+9. Message de réponse délivré à la souche CLIENT
+   → La souche DÉBALLE les paramètres/résultats
+
+10. La souche client transmet le résultat au client
+    → Retour habituel comme pour un appel local`,trap:"L'appel semble local au client mais implique 10 étapes réseau. La transparence est assurée par les souches."},
+{id:11,ch:"RPC",diff:"hard",title:"Analyser les sémantiques de panne RPC",context:"Votre serveur RPC tombe en panne pendant une opération de débit bancaire (non idempotente).",task:"Analysez les sémantiques 'au moins une fois', 'au plus une fois', 'exactement une fois' pour ce cas. Quelle est la bonne ?",hint:"Penser aux conséquences d'un double débit ou d'un débit manquant.",solution:`// CONTEXTE : débiter 100€ du compte X (opération NON idempotente)
+
+// ❌ AU MOINS UNE FOIS :
+// → Client répète l'appel jusqu'au succès
+// → Si le serveur a déjà débité PUIS est tombé avant de répondre
+// → Client répète → DOUBLE DÉBIT !
+// → Inacceptable pour opération non idempotente
+
+// ❌ AU PLUS UNE FOIS :
+// → Évite les doublons (serveur mémorise les IDs de requêtes)
+// → Mais si l'appel n'a pas eu lieu → le débit n'est JAMAIS fait
+// → Client ne sait pas si l'argent a été débité ou non
+
+// ✅ EXACTEMENT UNE FOIS :
+// → Idéal : débit fait exactement une fois
+// → Difficile à atteindre : nécessite journaux, transactions ACID, 2PC
+// → En pratique : combinaison de timeouts + IDs de requête uniques
+//   + transactions BD pour garantir l'idempotence applicative
+
+// SOLUTION PRATIQUE :
+// Rendre l'opération IDEMPOTENTE côté serveur avec un idempotency-key
+// Si même clé reçue deux fois → ignorer le doublon`,trap:"'Au moins une fois' est dangereux pour les opérations non idempotentes. En bancaire, toujours viser 'exactement une fois' avec des IDs de transaction."},
+{id:12,ch:"RPC",diff:"med",title:"Comparer liaison statique et liaison tardive",context:"Vous choisissez une stratégie de liaison pour un service RPC dans un environnement dynamique (serveurs peuvent changer d'IP).",task:"Expliquez pourquoi la liaison statique est inadaptée et quelle sous-forme de liaison tardive choisir.",hint:"Les serveurs peuvent migrer ou changer d'adresse IP.",solution:`// LIAISON STATIQUE (précoce) :
+// → Adresse IP fixée dans le CODE à la compilation
+// → Si le serveur change d'IP → recompiler et redistribuer le client !
+// → INADAPTÉ en environnement dynamique
+
+// LIAISON TARDIVE - 2 options :
+
+// Option A : LIAISON AU PREMIER APPEL
+// → Premier appel : demande l'adresse au serveur de noms
+// → L'adresse est mise en CACHE pour les appels suivants
+// → Plus rapide après le premier appel
+// → ⚠️ Si le serveur migre APRÈS le premier appel → cache périmé !
+
+// Option B : LIAISON À CHAQUE APPEL
+// → Consulte le serveur de noms à CHAQUE appel
+// → Toujours l'adresse à jour
+// → Plus lent (overhead du serveur de noms à chaque fois)
+
+// RECOMMANDATION : Liaison à chaque appel si l'adresse change souvent
+// Ou liaison au premier appel avec un mécanisme d'invalidation du cache`,trap:"La liaison au premier appel peut devenir incorrecte si le serveur migre. Penser à invalider le cache en cas de RemoteException."},
+{id:13,ch:"ADV",diff:"hard",title:"Démontrer le problème de copie-restauration",context:"Un développeur utilise la copie-restauration pour passer des paramètres par adresse en RPC.",task:"Montrez le résultat de double_inc(a, a) avec a=0, avec passage par adresse réel et avec copie-restauration.",hint:"Copie-restauration envoie deux COPIES indépendantes de la même variable.",solution:`// FONCTION : double_inc(x, y) { x++; y++; }
+// APPEL : double_inc(a, a) avec a = 0
+
+// ═══════════════════════════════════════
+// CAS 1 : PASSAGE PAR ADRESSE RÉEL
+// ═══════════════════════════════════════
+// x et y pointent TOUS LES DEUX vers la même case mémoire de 'a'
+// Étape 1 : x++ → *a = 1 (a vaut maintenant 1)
+// Étape 2 : y++ → *a = 2 (a vaut maintenant 2)
+// RÉSULTAT : a = 2 ✅
+
+// ═══════════════════════════════════════
+// CAS 2 : COPIE-RESTAURATION (RPC)
+// ═══════════════════════════════════════
+// Deux COPIES INDÉPENDANTES sont envoyées au serveur :
+// copie1 = 0 (pour x)
+// copie2 = 0 (pour y)
+
+// Exécution sur le serveur :
+// x++ → copie1 = 1
+// y++ → copie2 = 1
+
+// Restauration chez l'appelant :
+// copie1 → a = 1
+// copie2 → a = 1 (écrase copie1 !)
+// RÉSULTAT : a = 1 ❌ (violation de sémantique)
+
+// CONCLUSION : La copie-restauration NE préserve PAS la sémantique
+// du passage par adresse quand le même paramètre est passé deux fois.`,trap:"La copie-restauration est la solution la plus répandue MAIS elle viole la sémantique quand on passe deux fois la même variable."},
+{id:14,ch:"Kafka",diff:"med",title:"Concevoir une architecture Kafka",context:"Une app e-commerce génère des événements de commandes. 3 services consomment ces événements : notification, facturation, stock.",task:"Décrivez l'architecture Kafka : topics, partitions, RF, avantages du découplage vs C/S classique.",hint:"Penser publish/subscribe, découplage producteur/consommateur.",solution:`// ARCHITECTURE KAFKA POUR E-COMMERCE
+
+// Topic : "commandes"
+// Partitions : 3 (une par service consommateur ou plus pour le débit)
+// Replication Factor : 3 (tolérance à 1 panne, Q=2)
+
+// FLUX :
+// [App E-commerce] → Producer → Topic "commandes"
+//                                      ↓ Partition 0
+//                              [Service Notification] ← Consumer 1
+//                                      ↓ Partition 1
+//                              [Service Facturation]  ← Consumer 2
+//                                      ↓ Partition 2
+//                              [Service Stock]        ← Consumer 3
+
+// AVANTAGES vs Client/Serveur classique :
+
+// C/S : App → Notification (couplage fort, doit être disponible)
+//       App → Facturation  (doit être disponible)
+//       App → Stock        (doit être disponible)
+// → Si un service est down → erreur immédiate
+
+// KAFKA : App produit le message → Kafka le stocke
+// → Chaque service consomme INDÉPENDAMMENT à son rythme
+// → Si Notification est down → message attend dans la partition
+// → Offsets permettent de reprendre là où on s'est arrêté
+// → Découplage temporel et logique complet`,trap:"Kafka ne garantit pas l'ordre des messages entre partitions, seulement au sein d'une même partition."},
+{id:15,ch:"REST",diff:"hard",title:"Déboguer un design d'API REST non conforme",context:"Un développeur junior a créé cette API : POST /getUser?id=1, GET /deleteUser/1, POST /updateBook avec body {id:1, titre:'Java'}",task:"Identifiez tous les problèmes et proposez les corrections REST correctes.",hint:"Vérifiez les verbes HTTP utilisés, la présence de verbes dans les URIs.",solution:`// ❌ PROBLÈMES IDENTIFIÉS :
+
+// 1. POST /getUser?id=1
+//    Problème : POST pour une lecture → incorrect (POST = Create)
+//    Problème : verbe 'get' dans l'URI → anti-pattern REST
+//    Problème : paramètre id en query string pour une ressource spécifique
+//    ✅ CORRECTION : GET /users/1
+
+// 2. GET /deleteUser/1
+//    Problème : GET pour une suppression → DANGEREUX (GET est safe !)
+//    Un crawler qui indexe les URLs supprimerait toutes les ressources !
+//    Problème : verbe 'delete' dans l'URI
+//    ✅ CORRECTION : DELETE /users/1
+
+// 3. POST /updateBook {id:1, titre:'Java'}
+//    Problème : POST pour une mise à jour → incorrect (POST = Create)
+//    Problème : verbe 'update' dans l'URI
+//    Problème : l'ID dans le body ET pas dans l'URI → ambiguïté
+//    ✅ CORRECTION : PUT /books/1  body: {titre:'Java'}
+//    (ou PATCH /books/1 si mise à jour partielle)
+
+// RÉSUMÉ DES CORRECTIONS :
+// POST /getUser?id=1      → GET    /users/1
+// GET  /deleteUser/1      → DELETE /users/1
+// POST /updateBook        → PUT    /books/1  (body sans id)`,trap:"Utiliser GET pour des opérations de modification est une faille de sécurité majeure : les navigateurs et proxies peuvent mettre en cache ou précharger des liens GET."},
+{id:16,ch:"Sockets",diff:"med",title:"Serveur TCP Concurrent (Thread)",context:"Vous devez créer un serveur capable d'accepter plusieurs clients en même temps en TCP.",task:"Écrivez la boucle principale d'un serveur TCP sur le port 9000, qui accepte les connexions et lance un nouveau thread ClientHandler pour chaque client.",hint:"Utilisez ServerSocket et sa méthode accept().",solution:`import java.net.ServerSocket;
+import java.net.Socket;
+import java.io.IOException;
+
+public class ServeurConcurrent {
+    public static void main(String[] args) throws IOException {
+        // 1. Création du ServerSocket sur le port 9000
+        ServerSocket srv = new ServerSocket(9000);
+        System.out.println("Serveur en écoute...");
+
+        // 2. Boucle infinie d'acceptation
+        while (true) {
+            // accept() est bloquant jusqu'à connexion d'un client
+            // Il retourne une NOUVELLE socket dédiée
+            Socket clientSocket = srv.accept();
+            
+            // 3. Déléguer le traitement à un Thread (pour être concurrent)
+            new ClientHandler(clientSocket).start();
+        }
+    }
+}
+// ClientHandler étend Thread ou implémente Runnable
+`,trap:"Oublier de créer un Thread bloquera le serveur : il ne pourra traiter qu'un seul client à la fois (mode séquentiel)."},
+];
+const CS={
+  RMI:{title:"Java RMI",items:[
+    {k:"Port RMIRegistry",v:"1099 (défaut)"},
+    {k:"Interface distante",v:"extends Remote"},
+    {k:"Exception obligatoire",v:"throws RemoteException"},
+    {k:"Exposition auto",v:"extends UnicastRemoteObject"},
+    {k:"Exposition manuelle",v:"UnicastRemoteObject.exportObject(obj)"},
+    {k:"Enregistrer (remplace)",v:"Naming.rebind(url, obj)"},
+    {k:"Enregistrer (unique)",v:"Naming.bind(url, obj)"},
+    {k:"Récupérer stub",v:"(MonIF) Naming.lookup(url)"},
+    {k:"URL format",v:'rmi://host:port/nom'},
+    {k:"Protocole transport",v:"JRMP (sur TCP/IP)"},
+    {k:"Compilateur stubs",v:"rmic MonObjetDistant"},
+    {k:"Objet local en param",v:"par valeur (Serializable)"},
+    {k:"Objet distant en param",v:"par référence (stub)"},
+    {k:"Formats sérialisation",v:"Binaire (défaut) | XML/JSON"},
+    {k:"Fichier sécurité",v:"java.policy"},
+    {k:"Codebase",v:"java.rmi.server.codebase=URL"},
+    {k:"Lancer avec sécurité",v:"java -Djava.security.policy=java.policy Cls"},
+    {k:"Java 1.2+",v:"Skeleton générique (pas par objet)"},
+    {k:"Limite RMI",v:"Java uniquement → RMI/IIOP pour interop"},
+  ],code:`// Interface\npublic interface MonIF extends Remote {\n    String hello() throws RemoteException;\n}\n// Implémentation\npublic class MonObj extends UnicastRemoteObject implements MonIF {\n    public MonObj() throws RemoteException { super(); }\n    public String hello() throws RemoteException { return "Hello!"; }\n}\n// Serveur\nNaming.rebind("rmi://localhost:1099/MonObj", new MonObj());\n// Client\nMonIF obj = (MonIF) Naming.lookup("rmi://localhost:1099/MonObj");\nSystem.out.println(obj.hello());`},
+  REST:{title:"API REST",items:[
+    {k:"REST = ?",v:"Style d'architecture (pas protocole)"},
+    {k:"Auteur",v:"Roy Fielding, 2000"},
+    {k:"Stateless",v:"Aucune session serveur entre requêtes"},
+    {k:"GET",v:"Retrieve — Safe ✅ — Idempotent ✅"},
+    {k:"POST",v:"Create — Safe ❌ — Idempotent ❌"},
+    {k:"PUT",v:"Update complet — Safe ❌ — Idempotent ✅"},
+    {k:"PATCH",v:"Update partiel — Safe ❌ — Idempotent (variable)"},
+    {k:"DELETE",v:"Suppression — Safe ❌ — Idempotent ✅"},
+    {k:"2xx Succès",v:"200 OK | 201 Created | 204 No Content"},
+    {k:"4xx Client",v:"400 Bad Req | 401 Unauth | 403 Forbidden | 404 Not Found"},
+    {k:"5xx Serveur",v:"500 Internal Server Error"},
+    {k:"URI = ressource",v:"Noms (pas verbes) | Pluriel pour collections"},
+    {k:"Versionning",v:"/v1/books, /v2/books"},
+    {k:"DELETE non-existant",v:"204 No Content OU 404 (les deux OK)"},
+    {k:"Qui gère l'état ?",v:"Le CLIENT (serveur stateless)"},
+    {k:"REST vs SOAP",v:"REST=Ressources/URI, SOAP=Opérations/fonctions"},
+  ],code:`GET    /books         → liste\nPOST   /books         → créer\nGET    /books/{id}    → détail\nPUT    /books/{id}    → modifier (complet)\nDELETE /books/{id}    → supprimer\n\n✅ GET /books/42\n❌ GET /getBook?id=42`},
+  Kafka:{title:"Apache Kafka",items:[
+    {k:"Créé par",v:"LinkedIn, 2010"},
+    {k:"Modèle",v:"Publish/Subscribe (Producteurs → Brokers → Consommateurs)"},
+    {k:"Broker",v:"Serveur Kafka : reçoit, stocke, sert les messages"},
+    {k:"ZooKeeper",v:"Coordination (métadonnées, pannes) — NE transporte PAS"},
+    {k:"KRaft",v:"Remplacement moderne de ZooKeeper (intégré à Kafka)"},
+    {k:"Bootstrap Broker",v:"Point d'entrée initial pour découverte du cluster"},
+    {k:"Quorum Q",v:"Q = (N/2) + 1 | N=3→Q=2 | N=5→Q=3 | N=7→Q=4"},
+    {k:"N préféré",v:"Impair (N=3 et N=4 tolèrent tous les deux 1 panne)"},
+    {k:"Topic",v:"Canal de messages divisé en partitions"},
+    {k:"Partition",v:"Subdivision d'un topic pour lecture parallèle"},
+    {k:"Replication Factor",v:"Nombre de copies d'une partition"},
+    {k:"Leader partition",v:"Broker gérant R/W d'une partition (par partition, pas cluster)"},
+    {k:"Follower",v:"Réplique le leader, envoie ACK, remplace si panne"},
+    {k:"Offset",v:"Position du message dans la partition"},
+    {k:"Rétention défaut",v:"7 jours (configurable par topic)"},
+    {k:"Après consommation",v:"Message NON supprimé (reste jusqu'à rétention)"},
+    {k:"Consumer Lag",v:"Diff entre offset produit et offset consommé"},
+    {k:"Choix partition",v:"Round Robin OU Hash(clé message)"},
+    {k:"Structure message",v:"Timestamp + ID + Payload"},
+    {k:"Découplage",v:"Consommateur lit indépendamment (vs couplage fort C/S)"},
+  ],code:`Producteurs → [Topic: commandes]\n               ├── Partition 0 → [Consumer: Notification]\n               ├── Partition 1 → [Consumer: Facturation]\n               └── Partition 2 → [Consumer: Stock]\n\nQ = (N/2)+1\nRF=3 → 1 leader + 2 followers`},
+  RPC:{title:"RPC (Remote Procedure Call)",items:[
+    {k:"RPC = ?",v:"Appel de Procédure à Distance (sur TCP/UDP)"},
+    {k:"Stub client",v:"Transforme appel local → message réseau (marshalling)"},
+    {k:"Stub serveur",v:"Reconstruit params (unmarshalling) → appelle procédure"},
+    {k:"Marshalling",v:"Emballage des paramètres en message réseau"},
+    {k:"Unmarshalling",v:"Déballage des paramètres depuis le message"},
+    {k:"IDL",v:"Interface Definition Language — langage pivot indépendant"},
+    {k:"IDL contient",v:"Noms procédures, types params, modes (IN/OUT/IN-OUT)"},
+    {k:"Liaison statique",v:"@ fixée à la compilation, rapide, inflexible"},
+    {k:"Liaison tardive",v:"@ résolue à l'exécution via serveur de noms"},
+    {k:"Liaison 1er appel",v:"@ demandée une fois, mise en cache"},
+    {k:"Liaison chaque appel",v:"Consulte serveur de noms à chaque fois"},
+    {k:"Mode synchrone",v:"Client suspendu jusqu'à réponse"},
+    {k:"Mode asynchrone",v:"Client continue immédiatement"},
+    {k:"Séquentiel serveur",v:"FIFO entre traitements"},
+    {k:"Parallèle serveur",v:"Thread par appel — concurrence si données partagées"},
+    {k:"Timeout",v:"Délai de garde pour détecter les pannes"},
+    {k:"Au moins une fois",v:"Répète jusqu'au succès — OK si idempotent"},
+    {k:"Au plus une fois",v:"Évite doublons, pas de garantie"},
+    {k:"Exactement une fois",v:"Idéal, difficile à atteindre"},
+    {k:"Stateless ex.",v:"HTTP, NFS (appels sans lien entre eux)"},
+    {k:"Stateful ex.",v:"Paiement électronique (état de la relation)"},
+    {k:"3 types données",v:"Applicatives | Partagées persistantes | Protocolaires"},
+  ],code:`// Étapes RPC\n1. Client → souche client (marshalling)\n2. Souche client → transport → réseau\n3. Réseau → souche serveur (unmarshalling)\n4. Souche serveur → procédure réelle\n5. Résultat → souche serveur (marshalling)\n6. Réseau → souche client (unmarshalling)\n7. Souche client → client`},
+  ADV:{title:"RPC Avancé — Passage par Adresse",items:[
+    {k:"Problème pointeurs",v:"Adresse locale sans sens sur site distant"},
+    {k:"Solution 1 (répandue)",v:"Interdiction totale des pointeurs"},
+    {k:"Solution 2",v:"Mémoire virtuelle partagée éparse"},
+    {k:"Solution 3",v:"Copie-restauration (copy-restore)"},
+    {k:"Copie-restauration",v:"Copie envoyée → modifiée → restaurée chez l'appelant"},
+    {k:"double_inc(a,a) adresse",v:"a=0 → a=2 (x++ puis y++ sur même case mémoire)"},
+    {k:"double_inc(a,a) copie-restore",v:"a=0 → a=1 (violation sémantique !)"},
+  ],code:`// PROBLÈME : double_inc(x,y){ x++; y++; }\n// APPEL : double_inc(a,a) avec a=0\n\n// Vrai passage par adresse:\n// x=&a, y=&a → x++→a=1, y++→a=2 → FINAL: a=2\n\n// Copie-restauration:\n// copie1=0, copie2=0\n// x++→copie1=1, y++→copie2=1\n// Restaure: a=copie1=1, a=copie2=1\n// FINAL: a=1 ← VIOLATION DE SÉMANTIQUE`},
+  Intro_SR:{title:"Intro aux Syst. Répartis",items:[
+    {k:"Syst. Réparti",v:"Machines autonomes, réseau, vue unique"},
+    {k:"Client/Serveur (Synchrone)",v:"Client bloqué en attente de réponse"},
+    {k:"Com. par messages",v:"Producteur ↔ File d'attente ↔ Consommateur"},
+    {k:"Com. par événements",v:"Asynchrone, anonyme, publish/subscribe"},
+    {k:"Mode Push",v:"Système notifie le consommateur (délivrance implicite)"},
+    {k:"Mode Pull",v:"Consommateur vérifie (réception explicite)"},
+    {k:"Middleware",v:"Couche intermédiaire (masque hétérogénéité)"},
+    {k:"FAP",v:"Format and Protocol (synchro et format des données)"},
+    {k:"Nommage",v:"Annuaire associant nom logique ↔ @IP (ex: DNS)"},
+  ],code:`// Publish / Subscribe\nProducer → Topic "factures" → Consumer 1\n                            → Consumer 2\n(Les producteurs et consommateurs ne se connaissent pas)`},
+  Sockets:{title:"Les Sockets (TCP/UDP)",items:[
+    {k:"TCP",v:"Connecté, fiable, flux d'octets, ordonné"},
+    {k:"UDP",v:"Déconnecté, non fiable, datagrammes, non ordonné"},
+    {k:"Ports (16 bits)",v:"0 à 65535. 0-1023 réservés"},
+    {k:"Port HTTP / FTP",v:"80 / 21"},
+    {k:"Port SSH / Telnet",v:"22 / 23"},
+    {k:"UDP Java",v:"DatagramSocket"},
+    {k:"TCP Client Java",v:"Socket(ServerName, Port)"},
+    {k:"TCP Serveur Java",v:"ServerSocket(Port) puis accept()"},
+    {k:"accept() (TCP)",v:"Bloque, puis retourne NOUVELLE Socket client"},
+    {k:"TCP Concurrent",v:"Créer un THREAD par socket client acceptée"},
+  ],code:`// TCP Serveur Concurrent\nServerSocket srv = new ServerSocket(8080);\nwhile(true) {\n    Socket client = srv.accept(); // Bloquant\n    new ClientThread(client).start(); // Traite en //\n}`},
+};
+
+const TRAPS=[
+{cat:"Confusion fréquente",sev:3,ch:"REST",wrong:"REST est un protocole comme SOAP",right:"REST est un STYLE D'ARCHITECTURE. Pas de protocole imposé, pas de format, pas de standard.",why:"SOAP est un protocole WS-* standardisé. REST est une approche architecturale inspirée du Web.",rule:"Roy Fielding (2000) : REST = 'Representational State Transfer', un style, pas un protocole."},
+{cat:"Erreur classique",sev:3,ch:"RMI",wrong:"Naming.lookup() retourne directement l'interface distante, pas de cast nécessaire",right:"lookup() retourne Object. Un cast explicite vers l'interface est OBLIGATOIRE.",why:"Java pré-generics : l'API retourne Object pour la compatibilité. Le cast est nécessaire pour utiliser les méthodes.",rule:"MonIF obj = (MonIF) Naming.lookup('rmi://host/nom'); // cast TOUJOURS nécessaire"},
+{cat:"Exception importante",sev:3,ch:"RMI",wrong:"Seule la méthode principale doit déclarer RemoteException",right:"TOUTES les méthodes de l'interface distante doivent déclarer throws RemoteException.",why:"Tout appel distant peut échouer pour des raisons réseau ou serveur indépendantes de la logique métier.",rule:"Interface extends Remote → CHAQUE méthode → throws RemoteException, sans exception."},
+{cat:"Confusion fréquente",sev:3,ch:"RMI",wrong:"bind() et rebind() font la même chose",right:"bind() échoue (AlreadyBoundException) si le nom existe. rebind() remplace toujours.",why:"Distinction importante pour la gestion des redémarrages serveur.",rule:"En développement : toujours rebind(). En production : bind() + gestion d'erreur explicite."},
+{cat:"Erreur classique",sev:2,ch:"RMI",wrong:"Un objet RMI est automatiquement exposé sans rien faire de spécial",right:"Sans étendre UnicastRemoteObject, l'objet est LOCAL. Il faut soit étendre URO, soit appeler exportObject() manuellement.",why:"L'exposition est le mécanisme qui rend l'objet accessible depuis des JVMs distantes.",rule:"extends UnicastRemoteObject → exposition auto. Sinon : UnicastRemoteObject.exportObject(obj, 0)."},
+{cat:"Confusion fréquente",sev:3,ch:"RMI",wrong:"Objet local passé en param RMI → passage par référence",right:"Objet LOCAL → passage par VALEUR (copie sérialisée, doit implémenter Serializable). Objet DISTANT → passage par référence (stub).",why:"La distinction local/non-local détermine le mécanisme de passage.",rule:"Local + Serializable = copie | Non-local = stub (référence distante)."},
+{cat:"Erreur classique",sev:3,ch:"RMI",wrong:"Depuis Java 1.2, il n'y a plus de skeleton du tout",right:"Les skeletons INDIVIDUELS ont été supprimés. Un skeleton générique PARTAGÉ a été introduit pour tous les objets.",why:"Optimisation pour réduire le nombre de classes générées.",rule:"Avant Java 1.2 : rmic générait stub + skeleton. Après : rmic génère stub + skeleton générique unique."},
+{cat:"Confusion fréquente",sev:3,ch:"Kafka",wrong:"ZooKeeper transporte les messages Kafka entre producteurs et consommateurs",right:"ZooKeeper NE transporte AUCUN message. Il coordonne uniquement les brokers (métadonnées, détection pannes).",why:"ZooKeeper est un service de coordination, pas un broker de messages.",rule:"Messages : Producteur → Broker → Consommateur. ZooKeeper = en dehors de ce flux, uniquement coordination."},
+{cat:"Erreur classique",sev:3,ch:"Kafka",wrong:"Kafka supprime les messages après consommation",right:"Les messages consommés EXISTENT TOUJOURS dans la partition jusqu'à l'expiration de la rétention (7 jours par défaut).",why:"C'est un différenciateur clé de Kafka vs queues classiques (RabbitMQ). L'offset permet de relire.",rule:"Message consommé ≠ message supprimé. L'offset avance, le message reste."},
+{cat:"Confusion fréquente",sev:3,ch:"Kafka",wrong:"Le Leader dans Kafka est unique pour tout le cluster",right:"Le Leader est défini PAR PARTITION. Un broker peut être leader de plusieurs partitions et follower d'autres.",why:"La granularité est la partition, pas le cluster. Permet une meilleure distribution de charge.",rule:"Broker B1 peut être leader de P0, P2 et follower de P1, P3 simultanément."},
+{cat:"Erreur classique",sev:2,ch:"Kafka",wrong:"N=4 brokers tolère plus de pannes que N=3",right:"N=3 et N=4 tolèrent tous les deux exactement 1 panne simultanée (Q=2 et Q=3 respectivement).",why:"Q=(N/2)+1. N=4→Q=3. Pour 1 panne on a besoin de Q=2 donc max pannes = N-Q = 4-3=1. Même qu'avec N=3.",rule:"Choisir N impair : N=3 pour 1 panne, N=5 pour 2 pannes, N=7 pour 3 pannes."},
+{cat:"Confusion fréquente",sev:3,ch:"REST",wrong:"GET est idempotent mais pas safe ; POST est safe mais pas idempotent",right:"GET est SAFE ET idempotent. POST n'est NI safe NI idempotent.",why:"Safe = ne modifie pas. Idempotent = N appels = même résultat. GET ne modifie rien.",rule:"GET : safe✅ idempotent✅ | PUT : safe❌ idempotent✅ | POST : safe❌ idempotent❌ | DELETE : safe❌ idempotent✅"},
+{cat:"Exception importante",sev:3,ch:"REST",wrong:"DELETE doit toujours retourner 404 si la ressource n'existe pas",right:"DELETE est idempotent. Retourner 204 NO CONTENT ou 404 sont tous les deux valides.",why:"L'idempotence signifie que l'état final est identique (ressource absente). Peu importe le code retourné.",rule:"1er DELETE → 204. 2ème DELETE → 204 ou 404 (au choix du serveur). Les deux sont corrects."},
+{cat:"Erreur classique",sev:3,ch:"REST",wrong:"Il faut utiliser des verbes dans les URIs pour clarifier l'action",right:"Les URIs doivent utiliser des NOMS (ressources). L'action est exprimée par le verbe HTTP.",why:"Anti-pattern REST : /getUser, /createBook, /deleteProduct. L'URI = ressource, la méthode HTTP = action.",rule:"✅ GET /users/1  ❌ GET /getUser?id=1  ✅ DELETE /books/5  ❌ GET /deleteBook/5"},
+{cat:"Confusion fréquente",sev:2,ch:"RPC",wrong:"Marshalling et Unmarshalling sont synonymes",right:"Marshalling = emballage (encodage des params en message réseau). Unmarshalling = déballage (décodage du message en params).",why:"Deux opérations inverses réalisées par les stubs côté client et serveur respectivement.",rule:"Client stub : marshalling avant envoi. Serveur stub : unmarshalling à la réception."},
+{cat:"Erreur classique",sev:3,ch:"RPC",wrong:"'Au moins une fois' est la meilleure sémantique RPC",right:"'Exactement une fois' est l'idéal. 'Au moins une fois' est dangereux pour les opérations non idempotentes.",why:"Répéter un débit bancaire = double débit. 'Au moins une fois' n'est acceptable que pour les opérations idempotentes.",rule:"Opération idempotente → 'au moins une fois' OK. Non idempotente → viser 'exactement une fois'."},
+{cat:"Cas limite",sev:3,ch:"ADV",wrong:"La copie-restauration préserve toujours la sémantique du passage par adresse",right:"La copie-restauration VIOLE la sémantique quand le même argument est passé deux fois (ex: f(a,a)).",why:"Deux copies indépendantes sont créées. La dernière restauration écrase les précédentes.",rule:"double_inc(a,a) avec a=0 : par adresse→a=2, copie-restore→a=1. Résultats différents !"},
+{cat:"Exception importante",sev:2,ch:"RPC",wrong:"La liaison statique est toujours préférable car plus rapide",right:"La liaison statique est rapide mais pas flexible. Si le serveur change d'adresse, recompilation requise.",why:"Environnements dynamiques (cloud, microservices) nécessitent une liaison tardive.",rule:"Liaison statique → @ fixée compilation. Liaison tardive → @ résolue exécution via serveur de noms."},
+{cat:"Erreur classique",sev:3,ch:"Sockets",wrong:"TCP utilise des datagrammes et UDP des flux d'octets.",right:"TCP utilise des FLUX D'OCTETS (byte streams) et UDP des DATAGRAMMES.",why:"TCP assure l'ordre et la fiabilité via un flux continu. UDP envoie des paquets isolés (datagrammes).",rule:"TCP = Flux (fiable, connecté) | UDP = Datagrammes (rapide, sans garantie)."},
+{cat:"Confusion fréquente",sev:3,ch:"Sockets",wrong:"ServerSocket est utilisé pour envoyer des données aux clients.",right:"ServerSocket ne sert qu'à ÉCOUTER (attendre des connexions). La communication se fait sur la NOUVELLE Socket retournée par accept().",why:"ServerSocket accepte la connexion puis délègue l'échange à un socket standard dédié.",rule:"ServerSocket srv; Socket client = srv.accept(); // On communique avec 'client', pas 'srv'."},
+{cat:"Erreur classique",sev:2,ch:"Intro_SR",wrong:"Un Middleware remplace le système d'exploitation.",right:"Un Middleware S'APPUIE sur le SE. Il se place entre le SE et l'application.",why:"Il ajoute des services réseau de haut niveau et masque la complexité, mais utilise toujours le SE pour l'accès aux ressources.",rule:"Couches : App → Middleware → SE → Matériel."},
+{cat:"Confusion fréquente",sev:3,ch:"Intro_SR",wrong:"Dans un modèle Pub/Sub, le producteur cible un consommateur précis.",right:"C'est un modèle ANONYME. Le producteur publie dans un Topic, il ignore qui (ou combien) sont les consommateurs.",why:"Le but est le découplage total entre émission et réception.",rule:"Producteur ↔ Topic ↔ Consommateur(s). Pas de lien direct."},
+{cat:"Erreur classique",sev:3,ch:"Sockets",wrong:"En UDP, le client doit définir explicitement son port de communication.",right:"En UDP, seul le SERVEUR attache son socket à un port précis. Le port du client est généré automatiquement par le système.",why:"Le serveur doit être trouvé à une adresse connue, le client utilise un port éphémère.",rule:"Serveur UDP → DatagramSocket(port_fixe) | Client UDP → DatagramSocket()"},
+{cat:"Erreur classique",sev:3,ch:"Sockets",wrong:"En UDP, si le client meurt, le serveur est immédiatement notifié.",right:"En UDP, il n'y a PAS de connexion. Si un processus meurt, l'autre n'en sait absolument rien.",why:"C'est un mode déconnecté. Contrairement à TCP qui a un protocole de maintien de connexion, UDP envoie des datagrammes 'à l'aveugle'.",rule:"UDP = déconnecté = aucune notification de mort du processus distant."},
+{cat:"Confusion fréquente",sev:2,ch:"Sockets",wrong:"Le client et le serveur TCP s'implémentent avec la même classe Socket en Java.",right:"En Java, le serveur utilise ServerSocket (pour écouter) et le client utilise Socket (pour se connecter).",why:"Les rôles sont asymétriques dans l'établissement de la connexion TCP.",rule:"Serveur TCP : ServerSocket. Client TCP : Socket."},
+{cat:"Erreur classique",sev:3,ch:"RPC",wrong:"On peut passer des données par pointeur à travers le réseau en RPC.",right:"Le passage par VALEUR est le SEUL mode réel de transmission de données sur le réseau.",why:"Les adresses mémoires (pointeurs) n'ont de sens que sur la machine locale. Les solutions existantes (copie-restauration) ne sont que des simulations par valeur.",rule:"Réseau = toujours transmission par valeur. Pointeurs = simulation ou interdiction."},
+{cat:"Confusion fréquente",sev:2,ch:"REST",wrong:"Les headers 'Content-Type' et 'Accept' ont exactement le même rôle.",right:"'Content-Type' décrit le corps que j'ENVOIE. 'Accept' décrit ce que je VEUX RECEVOIR en retour.",why:"Si j'envoie un formulaire XML mais que je veux une réponse JSON, Content-Type=xml et Accept=json.",rule:"Content-Type = Voici ce que je te donne. Accept = Voici ce que j'attends de toi."},
+{cat:"Exception importante",sev:3,ch:"RMI",wrong:"L'interface d'un objet Fabrique doit étendre UnicastRemoteObject.",right:"L'INTERFACE étend 'Remote'. C'est L'IMPLÉMENTATION (la classe) qui étend 'UnicastRemoteObject'.",why:"Confusion classique entre l'interface distante (contrat) et l'implémentation serveur (code qui s'exécute et s'expose).",rule:"Interface -> extends Remote. Classe -> extends UnicastRemoteObject implements Interface."}
+];
+
+/* === STATE === */
+const ST={
+  qcm:{idx:0,answers:{},bookmarks:{},mode:'all',chapter:'all',timer:null,sec:0,running:false,shuffled:[]},
+  fc:{idx:0,states:{},chapter:'all',shuffled:[]},
+  ex:{completed:{}},
+  search:'',
+  streak:0,
+  lastActive:'',
+  load(){try{const s=localStorage.getItem('sd_state');if(s){const d=JSON.parse(s);this.qcm.answers=d.qa||{};this.qcm.bookmarks=d.bk||{};this.fc.states=d.fs||{};this.ex.completed=d.ec||{};this.streak=d.str||0;this.lastActive=d.la||'';}}catch(e){}},
+  save(){try{localStorage.setItem('sd_state',JSON.stringify({qa:this.qcm.answers,bk:this.qcm.bookmarks,fs:this.fc.states,ec:this.ex.completed,str:this.streak,la:this.lastActive}))}catch(e){}}
+};
+ST.load();
+// In-memory store for exercise textarea drafts (not persisted, session only)
+const EX_DRAFTS={};
+
+function updateStreak(){
+  const today=new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD
+  if(!ST.lastActive){
+    ST.streak=1;ST.lastActive=today;ST.save();
+  }else if(ST.lastActive!==today){
+    const last=new Date(ST.lastActive);
+    const now=new Date(today);
+    const diffDays=Math.floor((now-last)/(1000*60*60*24));
+    if(diffDays===1){ST.streak++;}else if(diffDays>1){ST.streak=1;} // Reset if missed a day
+    ST.lastActive=today;ST.save();
+  }
+  document.getElementById('streak-val').textContent=ST.streak;
+}
+
+/* === TAB ROUTER === */
+function toggleSidebar(){
+  document.querySelector('.nav-tabs').classList.toggle('open');
+  document.getElementById('sidebar-overlay').classList.toggle('open');
+}
+
+function initTabs(){
+  document.querySelectorAll('.tab-btn').forEach(b=>{
+    b.addEventListener('click',()=>{
+      if(window.innerWidth<=850 && document.querySelector('.nav-tabs').classList.contains('open')) toggleSidebar();
+      document.querySelectorAll('.tab-btn').forEach(x=>x.classList.remove('active'));
+      document.querySelectorAll('.tab-panel').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');
+      document.getElementById('tab-'+b.dataset.tab).classList.add('active');
+      if(b.dataset.tab==='qcm') renderQCM();
+      if(b.dataset.tab==='flashcards') renderFC();
+      if(b.dataset.tab==='exercises') renderEX();
+      if(b.dataset.tab==='cheatsheet') renderCS();
+      if(b.dataset.tab==='traps') renderTraps();
+    });
+  });
+}
+window.addEventListener('scroll',()=>{
+  const s=document.documentElement;
+  const p=(s.scrollTop/(s.scrollHeight-s.clientHeight))*100;
+  document.getElementById('scroll-prog').style.width=p+'%';
+});
+
+/* === HELPERS === */
+function shuffle(a){const b=[...a];for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]]}return b;}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function chTag(ch){const m={RMI:'tag-rmi',REST:'tag-rest',Kafka:'tag-kafka',RPC:'tag-rpc',ADV:'tag-adv',Intro_SR:'tag-intro',Sockets:'tag-sockets'};return `<span class="tag ${m[ch]||'tag-rmi'}">${esc(ch)}</span>`;}
+function diffTag(d){const m={easy:'tag-easy',med:'tag-med',hard:'tag-hard'};const l={easy:'Facile',med:'Moyen',hard:'Difficile'};return `<span class="tag ${m[d]}">${l[d]}</span>`;}
+function hlSearch(txt){if(!ST.search||!txt)return esc(txt);const re=new RegExp('('+ST.search.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi');return esc(txt).replace(re,'<span class="hl">$1</span>');}
+function openModal(title,html){document.getElementById('modal-title').textContent=title;document.getElementById('modal-body').innerHTML=html;document.getElementById('modal-ov').classList.add('open');}
+function closeModal(){document.getElementById('modal-ov').classList.remove('open');}
+document.getElementById('modal-ov').addEventListener('click',e=>{if(e.target===document.getElementById('modal-ov'))closeModal();});
+let _tstTO;
+function showToast(msg){
+  const el=document.getElementById('toast');
+  el.textContent=msg;el.classList.add('show');
+  clearTimeout(_tstTO);_tstTO=setTimeout(()=>el.classList.remove('show'),2500);
+}
+
+
+/* === QCM ENGINE === */
+function getFilteredQ(){
+  let pool=Q;
+  if(ST.qcm.chapter!=='all') pool=pool.filter(q=>q.ch===ST.qcm.chapter);
+  if(ST.qcm.mode==='wrong') pool=pool.filter(q=>ST.qcm.answers[q.id]===false);
+  if(ST.qcm.mode==='bookmarks') pool=pool.filter(q=>ST.qcm.bookmarks[q.id]);
+  if(ST.search){
+    const s=ST.search.toLowerCase();
+    pool=pool.filter(q=>q.q.toLowerCase().includes(s) || q.expl.toLowerCase().includes(s) || q.opts.some(o=>o.toLowerCase().includes(s)));
+  }
+  return pool;
+}
+function renderQCM(){
+  const el=document.getElementById('tab-qcm');
+  const total=Q.length;
+  // Only count boolean entries (not the _sel shadow entries)
+  const answeredIds=Object.keys(ST.qcm.answers).filter(k=>!k.endsWith('_sel'));
+  const answered=answeredIds.length;
+  const correct=answeredIds.filter(k=>ST.qcm.answers[k]===true).length;
+  const wrong=answeredIds.filter(k=>ST.qcm.answers[k]===false).length;
+  const chapters=['all','RMI','REST','Kafka','RPC','ADV'];
+  let pool=ST.qcm.shuffled.length?ST.qcm.shuffled:Q;
+  if(!ST.qcm.shuffled.length){ST.qcm.shuffled=shuffle(Q);pool=ST.qcm.shuffled;}
+  const fp=getFilteredQ();
+  if(fp.length===0){
+    let icon='🔍', title='Aucun résultat', sub='Essayez un autre terme de recherche.';
+    if(ST.qcm.mode==='wrong'&&!ST.search){icon='🎉';title='Aucune erreur !';sub='Vous avez répondu correctement à toutes les questions tentées.<br>Continuez ainsi !'}
+    else if(ST.qcm.mode==='bookmarks'&&!ST.search){icon='🔖';title='Aucun signet';sub='Cliquez sur <b>🔖 Sauvegarder</b> sur une question pour la retrouver ici.'}
+    else if(ST.search){sub=`Aucune question ne correspond à <b>&laquo;${esc(ST.search)}&raquo;</b>.`}
+    el.innerHTML=`<div class="empty"><span class="empty-icon">${icon}</span><div class="empty-title">${title}</div><div class="empty-sub">${sub}</div></div>`;
+    return;
+  }
+  const qi=Math.min(ST.qcm.idx,fp.length-1);
+  const q=fp[qi];
+  const isAns=ST.qcm.answers.hasOwnProperty(q.id) && !String(q.id).endsWith('_sel');
+  const isBk=ST.qcm.bookmarks[q.id];
+  let navHtml=fp.map((qq,i)=>{
+    let cls='qn-btn';
+    if(i===qi)cls+=' cur';
+    else if(ST.qcm.answers[qq.id]===true)cls+=' ans';
+    else if(ST.qcm.answers[qq.id]===false)cls+=' bad';
+    if(ST.qcm.bookmarks[qq.id])cls+=' bk';
+    return `<button class="${cls}" onclick="gotoQ(${i})">${i+1}</button>`;
+  }).join('');
+  let optsHtml=q.opts.map((o,i)=>{
+    let cls='opt-btn';
+    let badge='';
+    const selIdx=Number(ST.qcm.answers[String(q.id)+'_sel']);
+    if(isAns){
+      if(i===q.ans){cls+=' correct';badge='<span class="opt-badge ok">✓ Correcte</span>';}
+      else if(ST.qcm.answers[q.id]===false && i===selIdx){cls+=' wrong';badge='<span class="opt-badge bad">✗ Votre réponse</span>';}
+    }
+    return `<button class="${cls}" ${isAns?'disabled':''} onclick="answerQ(${q.id},${i},${q.ans})">${String.fromCharCode(65+i)}. ${hlSearch(o)}${badge}</button>`;
+  }).join('');
+  el.innerHTML=`
+<div class="dash">
+  <div class="stat"><div class="v">${total}</div><div class="l">Questions total</div></div>
+  <div class="stat"><div class="v" style="color:var(--ok)">${correct}</div><div class="l">Correctes</div></div>
+  <div class="stat"><div class="v" style="color:var(--err)">${wrong}</div><div class="l">Erreurs</div></div>
+  <div class="stat"><div class="v" style="color:var(--warn)">${total-answered}</div><div class="l">Restantes</div></div>
+  <div class="stat"><div class="v">${answered?Math.round(correct/answered*100):0}%</div><div class="l">Score</div><div class="prog-wrap"><div class="prog-bar" style="width:${answered?Math.round(correct/answered*100):0}%"></div></div></div>
+</div>
+<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px">
+  ${chapters.map(c=>`<button class="f-btn${ST.qcm.chapter===c?' on':''}" onclick="setQCh('${c}')">${c==='all'?'Tous':c}</button>`).join('')}
+  <button class="f-btn${ST.qcm.mode==='wrong'?' on':''}" onclick="setQMode('wrong')" style="margin-left:8px">❌ Erreurs</button>
+  <button class="f-btn${ST.qcm.mode==='bookmarks'?' on':''}" onclick="setQMode('bookmarks')">🔖 Favoris</button>
+  <button class="f-btn${ST.qcm.mode==='all'?' on':''}" onclick="setQMode('all')">Toutes</button>
+  <button class="btn btn-s" onclick="shuffleQ()" style="margin-left:auto">🔀 Mélanger</button>
+  <button class="btn btn-warn" onclick="resetQCM()">↺ Réinitialiser</button>
+</div>
+<div class="q-nav">${navHtml}</div>
+<div class="card">
+  <div class="question-meta" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
+    <span style="font-size:12px;color:var(--txt2)">Q ${qi+1}/${fp.length}</span>
+    ${chTag(q.ch)} ${diffTag(q.diff)}
+    <button class="btn btn-s" style="margin-left:auto;padding:4px 10px;font-size:12px" onclick="toggleBk(${q.id})">${isBk?'🔖 Sauvegardé':'🔖 Sauvegarder'}</button>
+  </div>
+  <div style="font-size:16px;font-weight:600;margin-bottom:16px;line-height:1.6">${hlSearch(q.q)}</div>
+  <div>${optsHtml}</div>
+  <div class="expl${isAns?' show':''}" id="expl-${q.id}">💡 ${hlSearch(q.expl)}</div>
+  ${q.trap?`<div class="trap-note${isAns?' show':''}" id="trap-${q.id}">⚠️ ${hlSearch(q.trap)}</div>`:''}
+</div>
+<div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">
+  <button class="btn btn-s" onclick="prevQ()" ${qi===0?'disabled':''}>← Précédent</button>
+  <button class="btn btn-s" onclick="skipQ()">⟩ Passer</button>
+  <button class="btn btn-p" onclick="nextQ()" ${qi===fp.length-1?'disabled':''}>Suivant →</button>
+  ${answered>0?`<button class="btn btn-ok" onclick="showResults()">📊 Résultats</button>`:''}
+</div>`;
+}
+function answerQ(id,sel,ans){ST.qcm.answers[id]=(sel===ans);ST.qcm.answers[id+'_sel']=sel;ST.save();updateStreak();renderQCM();}
+function nextQ(){const fp=getFilteredQ();if(ST.qcm.idx<fp.length-1){ST.qcm.idx++;renderQCM();}}
+function prevQ(){if(ST.qcm.idx>0){ST.qcm.idx--;renderQCM();}}
+function skipQ(){nextQ();}
+function gotoQ(i){ST.qcm.idx=i;renderQCM();}
+function setQCh(ch){ST.qcm.chapter=ch;ST.qcm.idx=0;renderQCM();}
+function setQMode(m){ST.qcm.mode=m;ST.qcm.idx=0;renderQCM();}
+function shuffleQ(){ST.qcm.shuffled=shuffle(Q);ST.qcm.idx=0;renderQCM();}
+function toggleBk(id){ST.qcm.bookmarks[id]=!ST.qcm.bookmarks[id];ST.save();renderQCM();}
+function resetQCM(){if(confirm('Réinitialiser toutes les réponses QCM ?')){ST.qcm.answers={};ST.qcm.bookmarks={};ST.save();renderQCM();}}
+function showResults(){
+  const total=Q.length,correct=Object.values(ST.qcm.answers).filter(v=>v===true).length;
+  const wrong=Q.filter(q=>ST.qcm.answers[q.id]===false);
+  const byChapter={};Q.forEach(q=>{if(!byChapter[q.ch])byChapter[q.ch]={c:0,t:0};byChapter[q.ch].t++;if(ST.qcm.answers[q.id]===true)byChapter[q.ch].c++;});
+  const chRows=Object.entries(byChapter).map(([ch,v])=>`<tr><td>${ch}</td><td style="color:var(--ok)">${v.c}/${v.t}</td><td><div class="prog-wrap"><div class="prog-bar" style="width:${Math.round(v.c/v.t*100)}%"></div></div></td></tr>`).join('');
+  const wrongList=wrong.map(q=>`<div style="padding:8px 0;border-bottom:1px solid var(--border)"><b>${esc(q.q)}</b><br><span style="color:var(--ok);font-size:12px">✅ ${esc(q.opts[q.ans])}</span><br><span style="font-size:12px;color:var(--txt2)">${esc(q.expl)}</span></div>`).join('');
+  const pct=Math.round(correct/total*100);
+  const cls=pct>=75?'good':pct>=50?'mid':'bad';
+  openModal('📊 Résultats QCM',`<div class="r-grid"><div class="r-card"><div class="big ${cls}">${pct}%</div><div>Score global</div></div><div class="r-card"><div class="big good">${correct}</div><div>Correctes</div></div><div class="r-card"><div class="big bad">${wrong.length}</div><div>Erreurs</div></div></div><h3 style="margin:14px 0 8px">Par chapitre</h3><table style="width:100%;border-collapse:collapse;font-size:13px"><tr style="color:var(--txt2)"><th style="text-align:left">Chapitre</th><th>Score</th><th style="width:120px">Barre</th></tr>${chRows}</table><h3 style="margin:14px 0 8px">Questions ratées</h3>${wrongList||'<p style="color:var(--ok)">Bravo ! Aucune erreur.</p>'}<div style="margin-top:14px"><button class="btn btn-warn" onclick="closeModal();setQMode('wrong');renderQCM()">Revoir les erreurs</button></div>`);
+}
+
+/* === FLASHCARD ENGINE === */
+function renderFC(){
+  const el=document.getElementById('tab-flashcards');
+  const chapters=['all','RMI','REST','Kafka','RPC','ADV'];
+  let pool=FC.filter(f=>ST.fc.chapter==='all'||f.ch===ST.fc.chapter);
+  if(ST.search){
+    const s=ST.search.toLowerCase();
+    pool=pool.filter(f=>f.front.toLowerCase().includes(s)||f.back.toLowerCase().includes(s)||f.code.toLowerCase().includes(s));
+  }
+  if(!ST.fc.shuffled.length||ST.fc.shuffled[0]&&!pool.find(f=>f.id===ST.fc.shuffled[0].id))ST.fc.shuffled=shuffle(pool);
+  let finalPool=ST.search?pool:ST.fc.shuffled.filter(f=>ST.fc.chapter==='all'||f.ch===ST.fc.chapter);
+  // Spaced repetition: sort by mastery state (rev first, ok last), stable within groups
+  const _srPriority={rev:0,none:1,med:2,ok:3};
+  if(!ST.search){
+    finalPool=[...finalPool].sort((a,b)=>{
+      const pa=_srPriority[ST.fc.states[a.id]||'none'];
+      const pb=_srPriority[ST.fc.states[b.id]||'none'];
+      return pa-pb;
+    });
+  }
+  if(!finalPool.length){
+    const sub=ST.search?`Aucune flashcard ne correspond à <b>&laquo;${esc(ST.search)}&raquo;</b>.`:'Aucune flashcard dans cette catégorie.';
+    el.innerHTML=`<div class="empty"><span class="empty-icon">🃏</span><div class="empty-title">Aucune flashcard</div><div class="empty-sub">${sub}</div></div>`;
+    return;
+  }
+  const i=Math.min(ST.fc.idx,finalPool.length-1);
+  const f=finalPool[i];
+  const st=ST.fc.states[f.id]||'none';
+  const mastered=Object.values(ST.fc.states).filter(v=>v==='ok').length;
+  // State badge for the card face
+  const stateLabel={rev:'❌ À revoir',med:'∼ Moyen',ok:'✅ Maîtrisée',none:'🆕 Nouvelle'}[st];
+  const stateColor={rev:'var(--err)',med:'var(--warn)',ok:'var(--ok)',none:'var(--txt2)'}[st];
+  const stateBorder={rev:'var(--err)',med:'var(--warn)',ok:'var(--ok)',none:'var(--border)'}[st];
+  // Spaced rep queue info
+  const revCount=finalPool.filter(f=>ST.fc.states[f.id]==='rev').length;
+  const srHint=revCount>0?`⚠️ ${revCount} carte${revCount>1?'s':''} à revoir en tête de file`:'✅ Aucune carte à revoir';
+  el.innerHTML=`
+<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:16px">
+  ${chapters.map(c=>`<button class="f-btn${ST.fc.chapter===c?' on':''}" onclick="setFCh('${c}')">${c==='all'?'Tous':c}</button>`).join('')}
+  <button class="btn btn-s" onclick="shuffleFC()" style="margin-left:auto">🔀 Mélanger</button>
+</div>
+<div style="font-size:12px;color:${revCount>0?'var(--warn)':'var(--ok)'};margin-bottom:12px;padding:6px 10px;background:${revCount>0?'rgba(245,158,11,.08)':'rgba(34,197,94,.08)'};border-radius:6px;border-left:3px solid ${revCount>0?'var(--warn)':'var(--ok)'}">
+  🧠 Répétition espacée active &mdash; ${srHint}
+</div>
+<div class="dash" style="margin-bottom:16px">
+  <div class="stat"><div class="v">${pool.length}</div><div class="l">Total</div></div>
+  <div class="stat"><div class="v" style="color:var(--ok)">${mastered}</div><div class="l">Maîtrisées</div></div>
+  <div class="stat"><div class="v" style="color:var(--warn)">${Object.values(ST.fc.states).filter(v=>v==='med').length}</div><div class="l">Moyennes</div></div>
+  <div class="stat"><div class="v" style="color:var(--err)">${Object.values(ST.fc.states).filter(v=>v==='rev').length}</div><div class="l">À revoir</div></div>
+</div>
+<div style="text-align:center;color:var(--txt2);font-size:13px;margin-bottom:8px">${i+1} / ${finalPool.length} — Cliquer pour retourner</div>
+<div class="fc-arena">
+  <div class="flashcard" id="fc-card" onclick="flipFC()" style="--fc-border:${stateBorder}">
+    <div class="fc-face fc-front" style="border-color:${stateBorder}">
+      <div class="fc-lbl">Question — ${f.ch}</div>
+      <div style="font-size:11px;font-weight:700;color:${stateColor};margin-bottom:8px;letter-spacing:.3px">${stateLabel}</div>
+      <div class="fc-txt">${hlSearch(f.front)}</div>
+    </div>
+    <div class="fc-face fc-back">
+      <div class="fc-lbl">Réponse</div>
+      <div class="fc-txt">${hlSearch(f.back)}</div>
+      ${f.code?`<div class="fc-code">${esc(f.code)}</div>`:''}
+    </div>
+  </div>
+</div>
+<div class="fc-status">
+  <button class="fcs-btn fcs-review" onclick="setFCSt(${f.id},'rev')">❌ À revoir</button>
+  <button class="fcs-btn fcs-med" onclick="setFCSt(${f.id},'med')">~ Moyen</button>
+  <button class="fcs-btn fcs-ok" onclick="setFCSt(${f.id},'ok')">✅ Maîtrisé</button>
+</div>
+<div style="display:flex;justify-content:center;gap:12px;margin-top:14px">
+  <button class="btn btn-s" onclick="prevFC()" ${i===0?'disabled':''}>← Préc</button>
+  <button class="btn btn-p" onclick="nextFC()" ${i===pool.length-1?'disabled':''}>Suiv →</button>
+</div>`;
+}
+function flipFC(){document.getElementById('fc-card').classList.toggle('flipped');}
+function nextFC(){const pool=FC.filter(f=>ST.fc.chapter==='all'||f.ch===ST.fc.chapter);if(ST.fc.idx<pool.length-1){ST.fc.idx++;renderFC();}}
+function prevFC(){if(ST.fc.idx>0){ST.fc.idx--;renderFC();}}
+function setFCh(c){ST.fc.chapter=c;ST.fc.idx=0;ST.fc.shuffled=[];renderFC();}
+function shuffleFC(){ST.fc.shuffled=[];ST.fc.idx=0;renderFC();}
+function setFCSt(id,s){ST.fc.states[id]=s;ST.save();updateStreak();renderFC();}
+
+/* === EXERCISES ENGINE === */
+function renderEX(){
+  const el=document.getElementById('tab-exercises');
+  const chapters=['all','RMI','REST','Kafka','RPC','ADV'];
+  const done=Object.keys(ST.ex.completed).length;
+  window._exCh=window._exCh||'all';
+  let filtered=EX.filter(e=>window._exCh==='all'||e.ch===window._exCh);
+  if(ST.search){
+    const s=ST.search.toLowerCase();
+    filtered=filtered.filter(e=>e.title.toLowerCase().includes(s)||e.task.toLowerCase().includes(s)||e.context.toLowerCase().includes(s)||e.solution.toLowerCase().includes(s));
+  }
+  let html=`<div class="dash" style="margin-bottom:16px">
+    <div class="stat"><div class="v">${EX.length}</div><div class="l">Exercices</div></div>
+    <div class="stat"><div class="v" style="color:var(--ok)">${done}</div><div class="l">Complétés</div></div>
+  </div>
+  <div class="filter-bar">${chapters.map(c=>`<button class="f-btn${window._exCh===c?' on':''}" onclick="window._exCh='${c}';renderEX()">${c==='all'?'Tous':c}</button>`).join('')}</div>`;
+  filtered.forEach(ex=>{
+    const isDone=ST.ex.completed[ex.id];
+    html+=`<div class="card" id="ex-${ex.id}">
+      <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+        <div><span style="font-size:16px;font-weight:700">${hlSearch(ex.title)}</span></div>
+        <div style="display:flex;gap:6px">${chTag(ex.ch)} ${diffTag(ex.diff)} ${isDone?'<span class="tag tag-easy">✅ Fait</span>':''}</div>
+      </div>
+      <div style="font-size:13px;color:var(--txt2);margin-bottom:8px"><i>${hlSearch(ex.context)}</i></div>
+      <div class="ex-problem"><b>📋 Tâche :</b> ${hlSearch(ex.task)}</div>
+      <textarea class="code-area" id="ta-${ex.id}" placeholder="Écrivez votre réponse ici…"></textarea>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px" id="ex-btns-${ex.id}">
+        <button class="coll-btn" id="hint-btn-${ex.id}" onclick="toggleHint(${ex.id})"><span class="arr" id="hint-arr-${ex.id}">▶</span> 💡 Indice</button>
+        <button class="coll-btn" id="sol-btn-${ex.id}" onclick="toggleSol(${ex.id})"><span class="arr" id="sol-arr-${ex.id}">▶</span> 📖 Solution</button>
+        <button class="btn btn-ok" onclick="markDone(${ex.id})" style="margin-left:auto">${isDone?'✅ Complété':'Marquer fait'}</button>
+      </div>
+      <div class="collapsible" id="hint-${ex.id}"><div style="padding:10px;margin-top:8px;background:rgba(245,158,11,.08);border-left:3px solid var(--warn);border-radius:0 6px 6px 0;font-size:13px">💡 ${hlSearch(ex.hint)}</div></div>
+      <div class="collapsible" id="sol-${ex.id}"><pre style="margin-top:8px">${esc(ex.solution)}</pre>
+      ${ex.trap?`<div style="margin-top:8px;padding:9px;background:rgba(239,68,68,.08);border-left:3px solid var(--err);border-radius:0 6px 6px 0;font-size:13px">⚠️ <b>Piège :</b> ${hlSearch(ex.trap)}</div>`:''}
+      </div>
+    </div>`;
+  });
+  // ① Save any typed content before wiping the DOM
+  document.querySelectorAll('#tab-exercises textarea[id^="ta-"]').forEach(ta=>{
+    EX_DRAFTS[ta.id]=ta.value;
+  });
+  el.innerHTML=html;
+  // ② Restore drafts into newly rendered textareas
+  Object.entries(EX_DRAFTS).forEach(([taId,val])=>{
+    const ta=document.getElementById(taId);
+    if(ta&&val) ta.value=val;
+  });
+}
+function toggleHint(id){
+  const el=document.getElementById('hint-'+id);
+  const btn=document.getElementById('hint-btn-'+id);
+  const arr=document.getElementById('hint-arr-'+id);
+  el.classList.toggle('open');
+  btn.classList.toggle('open');
+  if(arr) arr.style.transform=el.classList.contains('open')?'rotate(90deg)':'';
+}
+function toggleSol(id){
+  const el=document.getElementById('sol-'+id);
+  const btn=document.getElementById('sol-btn-'+id);
+  const arr=document.getElementById('sol-arr-'+id);
+  el.classList.toggle('open');
+  btn.classList.toggle('open');
+  if(arr) arr.style.transform=el.classList.contains('open')?'rotate(90deg)':'';
+}
+function markDone(id){ST.ex.completed[id]=!ST.ex.completed[id];ST.save();if(ST.ex.completed[id])updateStreak();renderEX();}
+
+/* === CHEATSHEET ENGINE === */
+function renderCS(){
+  const el=document.getElementById('tab-cheatsheet');
+  const keys=Object.keys(CS);
+  const idx=`<div class="jump-idx">${keys.map(k=>`<button class="j-link" onclick="document.getElementById('cs-${k}').scrollIntoView({behavior:'smooth'})">${CS[k].title}</button>`).join('')}</div>`;
+  let html=idx+'<div class="cheat-grid">';
+  keys.forEach(k=>{
+    const c=CS[k];
+    const s=ST.search?ST.search.toLowerCase():'';
+    const items=c.items.filter(it=>!s||it.k.toLowerCase().includes(s)||it.v.toLowerCase().includes(s));
+    if(ST.search && items.length===0 && !c.code.toLowerCase().includes(s)) return;
+    html+=`<div class="cc" id="cs-${k}">
+      <div class="cc-h"><h3>${esc(c.title)}</h3><button class="copy-btn" onclick="copyCS('${k}')">📋 Copier</button></div>
+      <div class="cc-b">
+        ${items.map(it=>`<div class="ci"><span class="ci-k">${hlSearch(it.k)}</span><span class="ci-v ac">${hlSearch(it.v)}</span></div>`).join('')}
+        ${c.code && (!ST.search || c.code.toLowerCase().includes(s))?`<div class="cs">${esc(c.code)}</div>`:''}
+      </div>
+    </div>`;
+  });
+  html+='</div>';
+  el.innerHTML=html;
+}
+function copyCS(k){const c=CS[k];const txt=c.items.map(i=>i.k+': '+i.v).join('\n')+(c.code?'\n\n'+c.code:'');navigator.clipboard.writeText(txt).then(()=>showToast('✓ Copié dans le presse-papiers'));}
+
+/* === TRAPS ENGINE === */
+function renderTraps(){
+  const el=document.getElementById('tab-traps');
+  const cats=['all','Confusion fréquente','Erreur classique','Exception importante','Cas limite'];
+  const chapters=['all','RMI','REST','Kafka','RPC','ADV'];
+  const activeCat=window._trapCat||'all';
+  const activeCh=window._trapCh||'all';
+  let filtered=TRAPS.filter(t=>(activeCat==='all'||t.cat===activeCat)&&(activeCh==='all'||t.ch===activeCh));
+  if(ST.search){
+    const s=ST.search.toLowerCase();
+    filtered=filtered.filter(t=>t.wrong.toLowerCase().includes(s)||t.right.toLowerCase().includes(s)||t.why.toLowerCase().includes(s)||t.rule.toLowerCase().includes(s));
+  }
+  const sevDots=n=>[...Array(3)].map((_,i)=>`<div class="s-dot" style="background:${i<n?'var(--err)':'var(--border)'}"></div>`).join('');
+  let html=`<div class="filter-bar">${cats.map(c=>`<button class="f-btn${activeCat===c?' on':''}" onclick="window._trapCat='${c}';renderTraps()">${c==='all'?'Toutes':c}</button>`).join('')}</div>
+  <div class="filter-bar">${chapters.map(c=>`<button class="f-btn${activeCh===c?' on':''}" onclick="window._trapCh='${c}';renderTraps()">${c==='all'?'Tous':c}</button>`).join('')}</div>`;
+  filtered.forEach(t=>{
+    const cls=t.cat==='Confusion fréquente'?'w':t.cat==='Exception importante'?'i':'';
+    html+=`<div class="trap-card ${cls}">
+      <div class="tc-head">
+        <div><span class="tc-cat" style="color:${cls==='w'?'var(--warn)':cls==='i'?'var(--accent)':'var(--err)'}">${esc(t.cat)}</span> ${chTag(t.ch)}</div>
+        <div class="severity">${sevDots(t.sev)}</div>
+      </div>
+      <div class="tw"><div class="lbl">❌ Erreur fréquente</div><div>${hlSearch(t.wrong)}</div></div>
+      <div class="tc" style="margin-top:8px"><div class="lbl">✅ Réalité</div><div>${hlSearch(t.right)}</div></div>
+      <div style="font-size:12px;color:var(--txt2);margin-top:6px">💬 ${hlSearch(t.why)}</div>
+      <div class="tc-rule">📌 ${hlSearch(t.rule)}</div>
+    </div>`;
+  });
+  if(filtered.length===0){
+    const sub=ST.search?`Aucun piège ne correspond à <b>&laquo;${esc(ST.search)}&raquo;</b>.`:'Aucun piège pour cette combinaison de filtres.';
+    html+=`<div class="empty"><span class="empty-icon">🪤</span><div class="empty-title">Aucun piège trouvé</div><div class="empty-sub">${sub}</div></div>`;
+  }
+  el.innerHTML=html;
+}
+
+/* === SEARCH === */
+function triggerActiveTabRender(){
+  const active=document.querySelector('.tab-btn.active');
+  if(!active) return;
+  const tab=active.dataset.tab;
+  if(tab==='qcm') renderQCM();
+  else if(tab==='flashcards') renderFC();
+  else if(tab==='exercises') renderEX();
+  else if(tab==='cheatsheet') renderCS();
+  else if(tab==='traps') renderTraps();
+}
+document.getElementById('search-box').addEventListener('input',e=>{
+  ST.search=e.target.value.trim();
+  triggerActiveTabRender();
+});
+
+/* === KEYBOARD SHORTCUTS === */
+document.addEventListener('keydown',e=>{
+  // Never hijack typing in inputs/textareas
+  if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA') return;
+
+  // Esc → close modal
+  if(e.key==='Escape'){closeModal();return;}
+
+  // Ctrl/Cmd+K → focus search
+  if((e.ctrlKey||e.metaKey)&&e.key==='k'){e.preventDefault();document.getElementById('search-box').focus();return;}
+
+  const tab=document.querySelector('.tab-btn.active')?.dataset.tab;
+
+  /* ── QCM shortcuts ── */
+  if(tab==='qcm'){
+    if(e.key==='ArrowLeft'){e.preventDefault();prevQ();return;}
+    if(e.key==='ArrowRight'){e.preventDefault();nextQ();return;}
+    // B = toggle bookmark on current question
+    if(e.key==='b'||e.key==='B'){
+      const fp=getFilteredQ();
+      const q=fp[Math.min(ST.qcm.idx,fp.length-1)];
+      if(q) toggleBk(q.id);
+      return;
+    }
+    // 1-4 = select answer option
+    if(['1','2','3','4'].includes(e.key)){
+      const fp=getFilteredQ();
+      const q=fp[Math.min(ST.qcm.idx,fp.length-1)];
+      const idx=parseInt(e.key)-1;
+      if(q && !ST.qcm.answers.hasOwnProperty(q.id) && idx<q.opts.length){
+        answerQ(q.id,idx,q.ans);
+      }
+      return;
+    }
+  }
+
+  /* ── Flashcard shortcuts ── */
+  if(tab==='flashcards'){
+    if(e.key===' '){e.preventDefault();flipFC();return;}
+    if(e.key==='ArrowLeft'){e.preventDefault();prevFC();return;}
+    if(e.key==='ArrowRight'){e.preventDefault();nextFC();return;}
+    // 1/2/3 = rate current card
+    if(['1','2','3'].includes(e.key)){
+      const pool=FC.filter(f=>ST.fc.chapter==='all'||f.ch===ST.fc.chapter);
+      const f=pool[Math.min(ST.fc.idx,pool.length-1)];
+      if(f){
+        const rating=['rev','med','ok'][parseInt(e.key)-1];
+        setFCSt(f.id,rating);
+      }
+      return;
+    }
+  }
+});
+
+/* === SESSION TIMER === */
+const _sessionStart=Date.now();
+setInterval(()=>{
+  const sec=Math.floor((Date.now()-_sessionStart)/1000);
+  const mm=String(Math.floor(sec/60)).padStart(2,'0');
+  const ss=String(sec%60).padStart(2,'0');
+  const el=document.getElementById('session-clock');
+  if(el){el.textContent=mm+':'+ss;if(sec>0)el.classList.add('active');}
+},1000);
+
+/* === SHORTCUT LEGEND === */
+function showShortcuts(){
+  openModal('⌨️ Raccourcis clavier',`
+  <table class="kb-table">
+    <tr><td colspan="2" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--accent);padding-bottom:4px">QCM</td></tr>
+    <tr><td>Question préc / suiv</td><td><kbd>←</kbd> <kbd>→</kbd></td></tr>
+    <tr><td>Sélectionner une réponse</td><td><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> <kbd>4</kbd></td></tr>
+    <tr><td>Basculer signet</td><td><kbd>B</kbd></td></tr>
+    <tr><td colspan="2" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--accent);padding-top:10px;padding-bottom:4px">Flashcards</td></tr>
+    <tr><td>Retourner la carte</td><td><kbd>Space</kbd></td></tr>
+    <tr><td>Carte préc / suiv</td><td><kbd>←</kbd> <kbd>→</kbd></td></tr>
+    <tr><td>À revoir / Moyen / Maîtrisé</td><td><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd></td></tr>
+    <tr><td colspan="2" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--accent);padding-top:10px;padding-bottom:4px">Global</td></tr>
+    <tr><td>Rechercher</td><td><kbd>Ctrl</kbd>+<kbd>K</kbd></td></tr>
+    <tr><td>Fermer modal</td><td><kbd>Esc</kbd></td></tr>
+  </table>`);
+}
+
+/* === QURAN PLAYER === */
+const SURAHS = ["Al-Fatihah","Al-Baqarah","Ali 'Imran","An-Nisa","Al-Ma'idah","Al-An'am","Al-A'raf","Al-Anfal","At-Tawbah","Yunus","Hud","Yusuf","Ar-Ra'd","Ibrahim","Al-Hijr","An-Nahl","Al-Isra","Al-Kahf","Maryam","Ta-Ha","Al-Anbiya","Al-Hajj","Al-Mu'minun","An-Nur","Al-Furqan","Ash-Shu'ara","An-Naml","Al-Qasas","Al-'Ankabut","Ar-Rum","Luqman","As-Sajdah","Al-Ahzab","Saba","Fatir","Ya-Sin","As-Saffat","Sad","Az-Zumar","Ghafir","Fussilat","Ash-Shura","Az-Zukhruf","Ad-Dukhan","Al-Jathiyah","Al-Ahqaf","Muhammad","Al-Fath","Al-Hujurat","Qaf","Ad-Dhariyat","At-Tur","An-Najm","Al-Qamar","Ar-Rahman","Al-Waqi'ah","Al-Hadid","Al-Mujadila","Al-Hashr","Al-Mumtahanah","As-Saff","Al-Jumu'ah","Al-Munafiqun","At-Taghabun","At-Talaq","At-Tahrim","Al-Mulk","Al-Qalam","Al-Haqqah","Al-Ma'arij","Nuh","Al-Jinn","Al-Muzzammil","Al-Muddaththir","Al-Qiyamah","Al-Insan","Al-Mursalat","An-Naba","An-Nazi'at","'Abasa","At-Takwir","Al-Infitar","Al-Mutaffifin","Al-Inshiqaq","Al-Buruj","At-Tariq","Al-A'la","Al-Ghashiyah","Al-Fajr","Al-Balad","Ash-Shams","Al-Lail","Ad-Duha","Ash-Sharh","At-Tin","Al-'Alaq","Al-Qadr","Al-Bayyinah","Az-Zalzalah","Al-'Adiyat","Al-Qari'ah","At-Takathur","Al-'Asr","Al-Humazah","Al-Fil","Quraish","Al-Ma'un","Al-Kawthar","Al-Kafirun","An-Nasr","Al-Masad","Al-Ikhlas","Al-Falaq","An-Nas"];
+function initQuran(){
+  const sel=document.getElementById('quran-surah');
+  if(!sel) return;
+  SURAHS.forEach((s,i)=>{
+    const opt=document.createElement('option');
+    opt.value=String(i+1).padStart(3,'0');
+    opt.textContent=`${String(i+1).padStart(3,'0')} - ${s}`;
+    sel.appendChild(opt);
+  });
+  const aud=document.getElementById('quran-audio');
+  const btnP=document.getElementById('quran-play');
+  const btnPa=document.getElementById('quran-pause');
+  const icon=document.getElementById('quran-icon');
+  const prog=document.getElementById('quran-progress');
+  const volSl=document.getElementById('quran-vol');
+  const btnMute=document.getElementById('quran-mute');
+  
+  aud.volume = volSl.value;
+  let cur='';
+  
+  function playQ(){
+    if(cur!==sel.value){cur=sel.value;aud.src=`https://server7.mp3quran.net/basit/${cur}.mp3`;}
+    aud.play();
+    btnP.style.display='none';
+    btnPa.style.display='flex';
+    icon.classList.add('playing');
+  }
+  
+  function pauseQ(){
+    aud.pause();
+    btnPa.style.display='none';
+    btnP.style.display='flex';
+    icon.classList.remove('playing');
+  }
+  
+  btnP.addEventListener('click',playQ);
+  btnPa.addEventListener('click',pauseQ);
+  sel.addEventListener('change',()=>{if(!aud.paused) playQ();});
+  
+  aud.addEventListener('ended',()=>{
+    if(sel.selectedIndex<sel.options.length-1){sel.selectedIndex++;playQ();}else{pauseQ();}
+  });
+  
+  aud.addEventListener('error', ()=>{
+    pauseQ(); console.error("Erreur audio");
+  });
+  
+  aud.addEventListener('timeupdate', ()=>{
+    if(aud.duration){
+      prog.style.width = ((aud.currentTime / aud.duration) * 100) + '%';
+    }
+  });
+  
+  function updateVolIcon() {
+    if(aud.volume === 0) btnMute.textContent = '🔇';
+    else if(aud.volume < 0.5) btnMute.textContent = '🔉';
+    else btnMute.textContent = '🔊';
+  }
+  
+  volSl.addEventListener('input', (e)=>{
+    aud.volume = e.target.value;
+    updateVolIcon();
+  });
+  
+  let lastVol = 0.2;
+  btnMute.addEventListener('click', ()=>{
+    if(aud.volume > 0) {
+      lastVol = aud.volume;
+      aud.volume = 0;
+      volSl.value = 0;
+    } else {
+      aud.volume = lastVol || 0.2;
+      volSl.value = aud.volume;
+    }
+    updateVolIcon();
+  });
+}
+
+/* === INIT === */
+window.onload=()=>{
+  initTabs();
+  renderQCM();
+  initQuran();
+  // Init streak display on load
+  document.getElementById('streak-val').textContent=ST.streak;
+};
+
+</script>
+</body>
+</html>

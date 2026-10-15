@@ -47,6 +47,22 @@ export function QuizRunner({
   questions,
   onClose,
 }: QuizRunnerProps) {
+  const normalizedQuestions = React.useMemo(() => {
+    return (questions || []).map((q, qIdx) => {
+      const qId = q.id || `q-${qIdx}`;
+      return {
+        ...q,
+        id: qId,
+        options: (q.options || []).map((opt, optIdx) => ({
+          ...opt,
+          id: opt.id || `${qId}-opt-${optIdx}`,
+          option_text: opt.option_text || opt.text || `Option ${optIdx + 1}`,
+          text: opt.text || opt.option_text || `Option ${optIdx + 1}`,
+        })),
+      };
+    });
+  }, [questions]);
+
   const [currentIndex, setCurrentIndex] = useState<number>(0);
   const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null);
   const [isAnswerSubmitted, setIsAnswerSubmitted] = useState<boolean>(false);
@@ -63,7 +79,7 @@ export function QuizRunner({
     message?: string;
   } | null>(null);
 
-  if (!questions || questions.length === 0) {
+  if (!normalizedQuestions || normalizedQuestions.length === 0) {
     return (
       <div className="bg-white border border-[#E4E8F0] rounded-xl p-8 max-w-xl mx-auto text-center space-y-4">
         <HelpCircle className="w-10 h-10 text-[#68748A] mx-auto" />
@@ -86,8 +102,8 @@ export function QuizRunner({
     );
   }
 
-  const currentQ = questions[currentIndex];
-  const isLastQuestion = currentIndex === questions.length - 1;
+  const currentQ = normalizedQuestions[currentIndex];
+  const isLastQuestion = currentIndex === normalizedQuestions.length - 1;
 
   const handleSelectOption = (optionId: string) => {
     if (isAnswerSubmitted) return;
@@ -122,7 +138,7 @@ export function QuizRunner({
         submitQuizAttempt({
           quiz_id: quizId,
           score: finalScore,
-          total_questions: questions.length,
+          total_questions: normalizedQuestions.length,
           answers: answers.map((a) => ({
             question_id: a.questionId,
             selected_option_id: a.selectedId,
@@ -166,7 +182,7 @@ export function QuizRunner({
   };
 
   const score = answers.filter((a) => a.isCorrect).length;
-  const percentage = Math.round((score / questions.length) * 100);
+  const percentage = Math.round((score / normalizedQuestions.length) * 100);
 
   if (isCompleted) {
     return (
@@ -189,7 +205,7 @@ export function QuizRunner({
 
         <div className="bg-[#FAFAF7] border border-[#E4E8F0] rounded-lg p-6 max-w-sm mx-auto">
           <div className="text-4xl font-bold font-mono font-tabular text-[#182235]">
-            {score} / {questions.length}
+            {score} / {normalizedQuestions.length}
           </div>
           <div className="text-xs font-semibold text-[#2855D9] mt-1 font-tabular">
             {percentage}% Mastery Score
@@ -238,11 +254,11 @@ export function QuizRunner({
             Answer Review & Explanations
           </h3>
           <div className="space-y-3">
-            {questions.map((q, idx) => {
+            {normalizedQuestions.map((q, idx) => {
               const attempt = answers.find((a) => a.questionId === q.id);
               return (
                 <div
-                  key={q.id}
+                  key={q.id || `review-q-${idx}`}
                   className={`p-3.5 rounded-lg border text-xs ${
                     attempt?.isCorrect
                       ? "bg-emerald-50/50 border-emerald-200"
@@ -313,13 +329,13 @@ export function QuizRunner({
 
         <div className="text-right">
           <div className="text-xs font-mono font-tabular text-[#68748A]">
-            Question {currentIndex + 1} of {questions.length}
+            Question {currentIndex + 1} of {normalizedQuestions.length}
           </div>
           <div className="w-28 bg-[#F4F6FA] h-1.5 rounded-full mt-1.5 overflow-hidden">
             <div
               className="bg-[#2855D9] h-full transition-all duration-300"
               style={{
-                width: `${((currentIndex + 1) / questions.length) * 100}%`,
+                width: `${((currentIndex + 1) / normalizedQuestions.length) * 100}%`,
               }}
             />
           </div>
@@ -334,7 +350,7 @@ export function QuizRunner({
 
         {/* Options List */}
         <div className="space-y-2.5">
-          {currentQ.options.map((opt) => {
+          {currentQ.options.map((opt, optIdx) => {
             const isSelected = selectedOptionId === opt.id;
             const optionLabel = opt.text || opt.option_text;
             let optionStyles =
@@ -354,7 +370,7 @@ export function QuizRunner({
 
             return (
               <button
-                key={opt.id}
+                key={opt.id || `opt-${optIdx}`}
                 type="button"
                 onClick={() => handleSelectOption(opt.id)}
                 disabled={isAnswerSubmitted}
