@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="none">
+  <!-- Rotated Navy Rounded Card -->
+  <g transform="rotate(-6 128 128)">
+    <rect x="52" y="32" width="152" height="192" rx="28" fill="#111A2E" />
+    
+    <!-- White Bold Geometric Checkmark -->
+    <path 
+      d="M78 116 L124 162 L172 88 L152 74 L120 128 L94 102 Z" 
+      fill="#FFFFFF" 
+    />
+    
+    <!-- Golden Accent Sphere on Checkmark Apex -->
+    <circle cx="166" cy="74" r="14" fill="#D4A346" />
+  </g>
+</svg>

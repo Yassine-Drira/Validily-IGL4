@@ -14,19 +14,25 @@ import {
   Layers,
   ChevronDown,
   Sparkles,
+  Settings,
+  User,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { Subject } from "@/types/database";
 
+import { ValidilyLogo } from "@/components/brand/validily-logo";
+
 const navItems = [
-  { label: "Overview", href: "/", icon: LayoutDashboard },
-  { label: "Semesters", href: "/semesters", icon: Calendar },
-  { label: "Subjects", href: "/subjects", icon: BookOpen },
-  { label: "Resource Library", href: "/library", icon: FolderArchive },
-  { label: "Cheat Sheets & Notes", href: "/notes", icon: FileEdit },
-  { label: "Quizzes", href: "/quizzes", icon: GraduationCap },
-  { label: "Bookmarks", href: "/bookmarks", icon: Bookmark },
+  { label: "Accueil", href: "/", icon: LayoutDashboard },
+  { label: "Semestres", href: "/semesters", icon: Calendar },
+  { label: "Matières", href: "/subjects", icon: BookOpen },
+  { label: "Examens", href: "/library?category=cat-exam", icon: GraduationCap },
+  { label: "Fichiers", href: "/library", icon: FolderArchive },
+  { label: "Quiz & QCM", href: "/quizzes", icon: Sparkles },
+  { label: "Fiches de révision", href: "/notes", icon: FileEdit },
+  { label: "Mes espaces", href: "/bookmarks", icon: Bookmark },
+  { label: "Paramètres", href: "/admin", icon: Settings },
 ];
 
 interface AppSidebarProps {
@@ -41,53 +47,39 @@ export function AppSidebar({ subjects = [] }: AppSidebarProps) {
     <aside className="w-64 border-r border-[#E4E8F0] bg-[#FAFAF7] flex flex-col h-screen shrink-0 sticky top-0 select-none z-20">
       {/* Brand Header */}
       <div className="h-16 px-5 border-b border-[#E4E8F0] flex items-center justify-between bg-white">
-        <Link href="/" className="flex items-center space-x-3 group">
-          <div className="w-8 h-8 rounded-lg bg-[#2855D9] text-white flex items-center justify-center font-bold text-sm tracking-tight shadow-xs group-hover:bg-[#111A2E] transition-colors">
-            V
-          </div>
-          <div className="flex flex-col">
-            <span className="font-semibold text-sm tracking-tight text-[#111A2E]">
-              validily-IGL4
-            </span>
-            <span className="text-[11px] text-[#68748A] font-sans">
-              Academic Library
-            </span>
-          </div>
-        </Link>
+        <ValidilyLogo size="md" subtitle="Bibliothèque Académique" />
+        <span className="sr-only">validily-IGL4</span>
       </div>
 
       {/* Navigation */}
-      <div className="flex-1 overflow-y-auto px-3 py-5 space-y-6">
+      <div className="flex-1 overflow-y-auto px-3 py-4 space-y-5">
         {/* Main Workspace Navigation */}
         <div className="space-y-0.5">
           <div className="px-3 pb-2 text-[10px] font-semibold text-[#68748A] uppercase tracking-wider font-mono">
-            Platform Navigation
+            Navigation
           </div>
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive =
               item.href === "/"
                 ? pathname === "/"
-                : pathname === item.href || pathname.startsWith(item.href + "/");
+                : pathname === item.href || (item.href !== "/" && !item.href.includes("?") && pathname.startsWith(item.href));
 
             return (
               <Link
-                key={item.href}
+                key={item.label}
                 href={item.href}
                 className={cn(
                   "flex items-center space-x-3 px-3 py-2 rounded-lg text-xs font-medium transition-all relative",
                   isActive
-                    ? "bg-[#EDF2FF] text-[#2855D9] font-semibold shadow-2xs"
+                    ? "bg-[#2855D9] text-white font-semibold shadow-xs"
                     : "text-[#182235] hover:text-[#111A2E] hover:bg-[#F4F6FA]"
                 )}
               >
-                {isActive && (
-                  <span className="absolute left-0 top-1.5 bottom-1.5 w-1 bg-[#2855D9] rounded-r" />
-                )}
                 <Icon
                   className={cn(
                     "w-4 h-4 shrink-0",
-                    isActive ? "text-[#2855D9]" : "text-[#68748A]"
+                    isActive ? "text-white" : "text-[#68748A]"
                   )}
                 />
                 <span>{item.label}</span>
@@ -105,7 +97,7 @@ export function AppSidebar({ subjects = [] }: AppSidebarProps) {
             >
               <div className="flex items-center space-x-2">
                 <Layers className="w-3.5 h-3.5 text-[#2855D9]" />
-                <span>Semester 1 Modules</span>
+                <span>Modules Semestre 1</span>
               </div>
               <ChevronDown
                 className={cn(
@@ -143,32 +135,31 @@ export function AppSidebar({ subjects = [] }: AppSidebarProps) {
             )}
           </div>
         )}
-
-        {/* Admin Link */}
-        <div className="pt-3 border-t border-[#E4E8F0]">
-          <Link
-            href="/admin"
-            className={cn(
-              "flex items-center space-x-3 px-3 py-2 rounded-lg text-xs font-medium transition-colors",
-              pathname.startsWith("/admin")
-                ? "bg-[#EDF2FF] text-[#2855D9] font-semibold"
-                : "text-[#68748A] hover:text-[#111A2E] hover:bg-[#F4F6FA]"
-            )}
-          >
-            <Shield className="w-4 h-4 text-[#68748A]" />
-            <span>Admin Console</span>
-          </Link>
-        </div>
       </div>
 
-      {/* Footer Info */}
-      <div className="p-3.5 border-t border-[#E4E8F0] text-[11px] text-[#68748A] bg-white">
-        <div className="flex items-center justify-between font-mono">
-          <span>AY 2024–2025</span>
-          <span className="text-emerald-700 font-medium flex items-center space-x-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
-            <span className="font-sans">IGL4 Track</span>
-          </span>
+      {/* Footer Student Status (Direct from Mockup) */}
+      <div className="p-3 border-t border-[#E4E8F0] bg-white">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2.5">
+            <div className="relative">
+              <div className="w-8 h-8 rounded-full bg-[#EDF2FF] border border-[#2855D9]/30 flex items-center justify-center text-[#2855D9]">
+                <User className="w-4 h-4 text-[#2855D9]" />
+              </div>
+              <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white" />
+            </div>
+            <div>
+              <div className="text-xs font-semibold text-[#111A2E] leading-tight">
+                Étudiant
+              </div>
+              <div className="flex items-center space-x-1 text-[10px] text-emerald-600 font-medium">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span>En ligne</span>
+              </div>
+            </div>
+          </div>
+          <div className="text-[10px] font-mono text-[#68748A] bg-[#F4F6FA] px-2 py-0.5 rounded border border-[#E4E8F0]">
+            IGL4
+          </div>
         </div>
       </div>
     </aside>

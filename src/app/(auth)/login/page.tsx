@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Lock, Mail, AlertCircle } from "lucide-react";
+import { ValidilySymbol } from "@/components/brand/validily-logo";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -42,9 +43,7 @@ export default function LoginPage() {
   return (
     <div className="bg-white border border-[#E4E8F0] rounded-xl p-8 shadow-xs">
       <div className="text-center mb-6">
-        <div className="w-9 h-9 rounded-md bg-[#2855D9] text-white flex items-center justify-center font-bold text-base mx-auto mb-3 shadow-xs">
-          V
-        </div>
+        <ValidilySymbol size="lg" className="mx-auto mb-3" />
         <h1 className="text-xl font-serif font-bold text-[#182235] tracking-tight">
           Sign In to validily-IGL4
         </h1>

@@ -18,6 +18,11 @@ export const metadata: Metadata = {
   title: "validily-IGL4 — University Academic Library & Revision Platform",
   description:
     "Organized university revision materials by semester, subject, and resource category. Lecture notes, exams, labs, cheat sheets, and progress tracking for software engineering.",
+  icons: {
+    icon: "/favicon.svg",
+    shortcut: "/favicon.svg",
+    apple: "/favicon.svg",
+  },
 };
 
 export default function RootLayout({
