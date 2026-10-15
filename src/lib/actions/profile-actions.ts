@@ -37,11 +37,12 @@ export async function updateUserProfile(data: {
     const supabase = await createClient();
     const serviceSupabase = getServiceSupabase();
 
-    // 1. Update Auth metadata
+    // 1. Update Auth metadata (never store giant base64 strings in auth metadata to avoid bloating JWT session cookies)
+    const authMetadataAvatar = avatarUrl && !avatarUrl.startsWith("data:") ? avatarUrl : null;
     await supabase.auth.updateUser({
       data: {
         display_name: cleanName,
-        avatar_url: avatarUrl,
+        avatar_url: authMetadataAvatar,
       },
     });
 
