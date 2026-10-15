@@ -11,7 +11,7 @@ export interface DeleteConfirmModalProps {
   onConfirm: (options?: { deleteContents?: boolean }) => Promise<void>;
   title?: string;
   itemName: string;
-  itemType?: "resource" | "folder" | "quiz" | "note" | "subject";
+  itemType?: "resource" | "folder" | "quiz" | "note" | "subject" | "user";
   itemFormat?: string; // e.g. "PDF", "Google Drive", "Markdown"
   hasChildren?: boolean;
   childCount?: number;
@@ -45,6 +45,8 @@ export function DeleteConfirmModal({
       ? "Supprimer la note"
       : itemType === "subject"
       ? "Supprimer la matière"
+      : itemType === "user"
+      ? "Révoquer les privilèges administrateur"
       : "Supprimer la ressource";
 
   const handleConfirm = async () => {

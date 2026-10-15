@@ -4,6 +4,7 @@ import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { StudentPrivateWorkspace } from "@/components/workspace/student-private-workspace";
 import { getStudentQuizAttempts, getStudentMistakes } from "@/lib/actions/quiz-actions";
 import { getBookmarks } from "@/lib/supabase/repository";
+import { getRecentAuditLogs } from "@/lib/audit/audit-logger";
 
 export const dynamic = "force-dynamic";
 
@@ -12,9 +13,12 @@ export default async function MySpacePage() {
   let isGuest = true;
   let privateNotes: any[] = [];
   let privateResources: any[] = [];
+  let sharedResources: any[] = [];
+  let publicResources: any[] = [];
   let quizAttempts: any[] = [];
   let mistakes: any[] = [];
   let bookmarkedCount = 0;
+  let recentActivity: any[] = [];
 
   try {
     if (isSupabaseConfigured()) {
@@ -34,7 +38,7 @@ export default async function MySpacePage() {
 
         const service = getServiceSupabase();
 
-        // 1. Fetch student's private/personal notes
+        // 1. Fetch student's personal notes
         const { data: notesData } = await service
           .from("notes")
           .select("*, subject:subjects(name)")
@@ -48,7 +52,10 @@ export default async function MySpacePage() {
           .select("*, subject:subjects(name)")
           .eq("owner_id", authUser.id)
           .order("created_at", { ascending: false });
-        privateResources = resData || [];
+        const allUserResources = resData || [];
+        privateResources = allUserResources.filter((r: any) => r.visibility === "private");
+        sharedResources = allUserResources.filter((r: any) => r.visibility === "shared");
+        publicResources = allUserResources.filter((r: any) => r.visibility === "public");
 
         // 3. Quiz attempts and mistakes
         quizAttempts = await getStudentQuizAttempts(authUser.id);
@@ -57,6 +64,11 @@ export default async function MySpacePage() {
         // 4. Bookmarks count
         const bookmarks = await getBookmarks(authUser.id);
         bookmarkedCount = bookmarks.length;
+
+        // 5. Audit Activity history
+        recentActivity = getRecentAuditLogs(30).filter(
+          (log: any) => log.actor_id === authUser.id || log.metadata?.user_id === authUser.id
+        );
       }
     }
   } catch (err) {
@@ -73,7 +85,10 @@ export default async function MySpacePage() {
         mistakes={mistakes}
         privateNotes={privateNotes}
         privateResources={privateResources}
+        sharedResources={sharedResources}
+        publicResources={publicResources}
         bookmarkedCount={bookmarkedCount}
+        recentActivity={recentActivity}
       />
     </div>
   );

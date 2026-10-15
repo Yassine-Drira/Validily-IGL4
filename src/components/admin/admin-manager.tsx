@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import Link from "next/link";
 import {
   Shield,
@@ -13,6 +13,7 @@ import {
   AlertCircle,
   Archive,
   Trash2,
+  Edit2,
   ShieldAlert,
   ArrowRight,
   Lock,
@@ -20,6 +21,11 @@ import {
   UserX,
   Users,
   Clock,
+  Search,
+  Activity,
+  Eye,
+  Sliders,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Semester, Subject, ResourceCategory } from "@/types/database";
@@ -34,6 +40,11 @@ import {
 } from "@/lib/actions/admin-actions";
 import { DeleteConfirmModal } from "@/components/ui/delete-confirm-modal";
 import { AuthenticatedActor } from "@/lib/auth/authorization";
+import {
+  AVAILABLE_SUBJECT_ICONS,
+  PRESET_ACCESSIBLE_COLORS,
+  getSubjectVisual,
+} from "@/components/academic/subject-icon";
 
 interface AdminManagerProps {
   initialSemesters: Semester[];
@@ -43,6 +54,7 @@ interface AdminManagerProps {
   currentUser?: AuthenticatedActor | null;
   isAdmin?: boolean;
   initialUsers?: ManagedUser[];
+  initialAuditLogs?: any[];
 }
 
 export function AdminManager({
@@ -53,27 +65,34 @@ export function AdminManager({
   currentUser = null,
   isAdmin = false,
   initialUsers = [],
+  initialAuditLogs = [],
 }: AdminManagerProps) {
+  const [activeTab, setActiveTab] = useState<"curriculum" | "delegation" | "audit">("curriculum");
   const [semesters, setSemesters] = useState<Semester[]>(initialSemesters);
   const [subjects, setSubjects] = useState<Subject[]>(initialSubjects);
   const [categories, setCategories] = useState<ResourceCategory[]>(initialCategories);
   const [subjectToDelete, setSubjectToDelete] = useState<Subject | null>(null);
+  const [userToRevoke, setUserToRevoke] = useState<ManagedUser | null>(null);
 
   // Role delegation state
   const [users, setUsers] = useState<ManagedUser[]>(initialUsers);
   const [userToDelegate, setUserToDelegate] = useState<ManagedUser | null>(null);
-  const [delegationDuration, setDelegationDuration] = useState<number>(30); // 30 days by default
+  const [delegationDuration, setDelegationDuration] = useState<number>(30); // 30 days
   const [customExpiresDate, setCustomExpiresDate] = useState<string>("");
   const [isDelegating, setIsDelegating] = useState<boolean>(false);
   const [isRevokingId, setIsRevokingId] = useState<string | null>(null);
 
-  // Subject Modal State
+  // Subject Modal State (Create & Edit)
   const [isSubjectModalOpen, setIsSubjectModalOpen] = useState(false);
+  const [subjectToEdit, setSubjectToEdit] = useState<Subject | null>(null);
   const [subName, setSubName] = useState("");
   const [subSlug, setSubSlug] = useState("");
   const [subSemesterId, setSubSemesterId] = useState(semesters[0]?.id || "");
   const [subDescription, setSubDescription] = useState("");
-  const [subIcon, setSubIcon] = useState("BookOpen");
+  const [selectedIconName, setSelectedIconName] = useState("BookOpen");
+  const [selectedHexColor, setSelectedHexColor] = useState("#2563EB");
+  const [customHexInput, setCustomHexInput] = useState("");
+  const [iconSearchQuery, setIconSearchQuery] = useState("");
   const [isSubmittingSub, setIsSubmittingSub] = useState(false);
 
   // Semester Modal State
@@ -82,52 +101,133 @@ export function AdminManager({
   const [semYear, setSemYear] = useState("2024-2025");
   const [isSubmittingSem, setIsSubmittingSem] = useState(false);
 
+  // Audit Logs State
+  const [auditLogs] = useState<any[]>(initialAuditLogs);
+  const [auditFilter, setAuditFilter] = useState("");
+
   const [feedbackMsg, setFeedbackMsg] = useState("");
+  const [errorMsg, setErrorMsg] = useState("");
+
+  // Filtered icons for picker
+  const filteredIcons = useMemo(() => {
+    if (!iconSearchQuery.trim()) return AVAILABLE_SUBJECT_ICONS;
+    const q = iconSearchQuery.toLowerCase();
+    return AVAILABLE_SUBJECT_ICONS.filter(
+      (i) => i.name.toLowerCase().includes(q) || i.label.toLowerCase().includes(q)
+    );
+  }, [iconSearchQuery]);
+
+  // Dynamic preview visual
+  const previewVisual = useMemo(() => {
+    return getSubjectVisual(subName || "Aperçu Matière", `${selectedIconName}:${selectedHexColor}`);
+  }, [subName, selectedIconName, selectedHexColor]);
+  const PreviewIcon = previewVisual.icon;
 
   const handleSubNameChange = (name: string) => {
     setSubName(name);
-    const slug = name
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "");
-    setSubSlug(slug);
+    if (!subjectToEdit) {
+      const slug = name
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "");
+      setSubSlug(slug);
+    }
   };
 
-  const [errorMsg, setErrorMsg] = useState("");
+  const openCreateSubjectModal = () => {
+    setSubjectToEdit(null);
+    setSubName("");
+    setSubSlug("");
+    setSubDescription("");
+    setSubSemesterId(semesters[0]?.id || "");
+    setSelectedIconName("BookOpen");
+    setSelectedHexColor("#2563EB");
+    setCustomHexInput("");
+    setIconSearchQuery("");
+    setErrorMsg("");
+    setIsSubjectModalOpen(true);
+  };
 
-  const handleCreateSubject = async (e: React.FormEvent) => {
+  const openEditSubjectModal = (sub: Subject) => {
+    setSubjectToEdit(sub);
+    setSubName(sub.name);
+    setSubSlug(sub.slug);
+    setSubDescription(sub.description || "");
+    setSubSemesterId(sub.semester_id);
+
+    // Parse icon and color
+    if (sub.icon?.includes(":")) {
+      const [ic, col] = sub.icon.split(":");
+      setSelectedIconName(ic || "BookOpen");
+      setSelectedHexColor(col || "#2563EB");
+    } else {
+      setSelectedIconName(sub.icon || "BookOpen");
+      setSelectedHexColor("#2563EB");
+    }
+    setCustomHexInput("");
+    setIconSearchQuery("");
+    setErrorMsg("");
+    setIsSubjectModalOpen(true);
+  };
+
+  const handleSaveSubject = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!subName.trim()) return;
 
     setIsSubmittingSub(true);
     setErrorMsg("");
+
+    const finalIconConfig = `${selectedIconName}:${selectedHexColor}`;
+
     try {
-      const res = await createSubject({
-        semester_id: subSemesterId || semesters[0]?.id,
-        name: subName,
-        slug: subSlug,
-        description: subDescription,
-        icon: subIcon,
-        sort_order: subjects.length + 1,
-      });
+      if (subjectToEdit) {
+        // Edit Mode
+        const res = await updateSubject(subjectToEdit.id, {
+          name: subName,
+          description: subDescription,
+          semester_id: subSemesterId,
+          icon: finalIconConfig,
+        });
 
-      if (res.error) {
-        setErrorMsg(res.error);
-        return;
-      }
+        if (res.error) {
+          setErrorMsg(res.error);
+          return;
+        }
 
-      if (res.subject) {
-        setSubjects([...subjects, res.subject]);
-        setIsSubjectModalOpen(false);
-        setSubName("");
-        setSubSlug("");
-        setSubDescription("");
-        setFeedbackMsg(`Subject "${subName}" created and persisted successfully!`);
-        setTimeout(() => setFeedbackMsg(""), 4000);
+        if (res.subject) {
+          setSubjects((prev) =>
+            prev.map((s) => (s.id === subjectToEdit.id ? { ...s, ...res.subject! } : s))
+          );
+          setIsSubjectModalOpen(false);
+          setFeedbackMsg(`Matière "${subName}" mise à jour avec succès !`);
+          setTimeout(() => setFeedbackMsg(""), 4000);
+        }
+      } else {
+        // Create Mode
+        const res = await createSubject({
+          semester_id: subSemesterId || semesters[0]?.id,
+          name: subName,
+          slug: subSlug,
+          description: subDescription,
+          icon: finalIconConfig,
+          sort_order: subjects.length + 1,
+        });
+
+        if (res.error) {
+          setErrorMsg(res.error);
+          return;
+        }
+
+        if (res.subject) {
+          setSubjects([...subjects, res.subject]);
+          setIsSubjectModalOpen(false);
+          setFeedbackMsg(`Matière "${subName}" créée avec succès !`);
+          setTimeout(() => setFeedbackMsg(""), 4000);
+        }
       }
     } catch (err: any) {
-      setErrorMsg(err?.message || "Failed to create subject.");
+      setErrorMsg(err?.message || "Échec de l'enregistrement de la matière.");
     } finally {
       setIsSubmittingSub(false);
     }
@@ -152,49 +252,62 @@ export function AdminManager({
       }
 
       if (res.semester) {
-        setSemesters([...semesters, { ...res.semester, subject_count: 0 }]);
+        setSemesters([...semesters, res.semester]);
+        setIsSemesterModalOpen(false);
+        setSemName("");
+        setFeedbackMsg(`Semestre "${semName}" créé avec succès !`);
+        setTimeout(() => setFeedbackMsg(""), 4000);
       }
-      setIsSemesterModalOpen(false);
-      setSemName("");
-      setFeedbackMsg(`Semester "${semName}" added to curriculum!`);
-      setTimeout(() => setFeedbackMsg(""), 4000);
     } catch (err: any) {
-      setErrorMsg(err?.message || "Failed to create semester.");
+      setErrorMsg(err?.message || "Échec de la création du semestre.");
     } finally {
       setIsSubmittingSem(false);
     }
   };
 
-  const handleArchive = async (subjectId: string, subjectName: string) => {
+  const executeDeleteSubject = async () => {
+    if (!subjectToDelete) return;
+    const sId = subjectToDelete.id;
+    const sName = subjectToDelete.name;
+
     try {
-      const res = await updateSubject(subjectId, { name: subjectName });
+      const res = await deleteSubject(sId);
       if (res.error) {
         setErrorMsg(res.error);
         return;
       }
-      setSubjects(
-        subjects.map((s) => (s.id === subjectId ? { ...s, is_active: false } : s))
-      );
-      setFeedbackMsg(`Matière "${subjectName}" archivée.`);
+      setSubjects((prev) => prev.filter((s) => s.id !== sId));
+      setFeedbackMsg(`Matière "${sName}" supprimée avec succès.`);
       setTimeout(() => setFeedbackMsg(""), 4000);
     } catch (err: any) {
-      setErrorMsg(err?.message || "Échec de l'archivage.");
+      setErrorMsg(err?.message || "Échec de la suppression.");
+    } finally {
+      setSubjectToDelete(null);
     }
   };
 
+  // Delegation Actions
   const handleGrantRole = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!userToDelegate) return;
 
     setIsDelegating(true);
     setErrorMsg("");
+
     try {
+      let expiresAt: string;
+      if (customExpiresDate) {
+        expiresAt = new Date(customExpiresDate).toISOString();
+      } else {
+        const d = new Date();
+        d.setDate(d.getDate() + delegationDuration);
+        expiresAt = d.toISOString();
+      }
+
       const res = await grantTemporaryAdminRole({
         userId: userToDelegate.id,
-        durationDays: customExpiresDate ? undefined : delegationDuration,
-        customExpiresAt: customExpiresDate ? new Date(customExpiresDate).toISOString() : undefined,
+        customExpiresAt: expiresAt,
       });
-
       if (res.error) {
         setErrorMsg(res.error);
         return;
@@ -207,37 +320,31 @@ export function AdminManager({
                 ...u,
                 role: "admin",
                 isTemporaryAdmin: true,
-                isPermanentAdmin: false,
-                expiresAt: res.expiresAt || null,
+                expiresAt,
                 isExpired: false,
               }
             : u
         )
       );
 
-      const formattedDate = res.expiresAt ? new Date(res.expiresAt).toLocaleDateString("fr-FR") : "";
-      setFeedbackMsg(`Privilèges Administrateur temporaires accordés à ${userToDelegate.displayName} jusqu'au ${formattedDate}.`);
+      setFeedbackMsg(`Privilèges Administrateur accordés à ${userToDelegate.displayName}.`);
       setUserToDelegate(null);
-      setCustomExpiresDate("");
-      setDelegationDuration(30);
       setTimeout(() => setFeedbackMsg(""), 5000);
     } catch (err: any) {
-      setErrorMsg(err?.message || "Échec de l'octroi du rôle administrateur.");
+      setErrorMsg(err?.message || "Échec de la délégation.");
     } finally {
       setIsDelegating(false);
     }
   };
 
-  const handleRevokeRole = async (user: ManagedUser) => {
-    if (user.email === "yassinedrira3@gmail.com") {
-      setErrorMsg("Impossible de révoquer l'administrateur principal.");
-      return;
-    }
-
-    setIsRevokingId(user.id);
+  const executeRevokeRole = async () => {
+    if (!userToRevoke) return;
+    const target = userToRevoke;
+    setIsRevokingId(target.id);
     setErrorMsg("");
+
     try {
-      const res = await revokeAdminRole(user.id);
+      const res = await revokeAdminRole(target.id);
       if (res.error) {
         setErrorMsg(res.error);
         return;
@@ -245,7 +352,7 @@ export function AdminManager({
 
       setUsers((prev) =>
         prev.map((u) =>
-          u.id === user.id
+          u.id === target.id
             ? {
                 ...u,
                 role: "student",
@@ -258,422 +365,672 @@ export function AdminManager({
         )
       );
 
-      setFeedbackMsg(`Privilèges Administrateur révoqués pour ${user.displayName}.`);
+      setFeedbackMsg(`Privilèges Administrateur révoqués pour ${target.displayName}.`);
       setTimeout(() => setFeedbackMsg(""), 5000);
     } catch (err: any) {
       setErrorMsg(err?.message || "Échec de la révocation.");
     } finally {
       setIsRevokingId(null);
+      setUserToRevoke(null);
     }
   };
 
   return (
-    <div className="space-y-8">
-      {/* Feedback Alert */}
+    <div className="space-y-6">
+      {/* Feedback Alerts */}
       {feedbackMsg && (
-        <div className="p-3.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center space-x-2 animate-in fade-in duration-200">
-          <CheckCircle2 className="w-4 h-4 shrink-0" />
+        <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center space-x-2 animate-in fade-in duration-200">
+          <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
           <span>{feedbackMsg}</span>
         </div>
       )}
 
       {errorMsg && (
-        <div className="p-3.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center space-x-2 animate-in fade-in duration-200">
+        <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center space-x-2 animate-in fade-in duration-200">
           <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
           <span>{errorMsg}</span>
         </div>
       )}
 
-      {/* Active Admin Session Chip */}
-      <div className="p-3.5 rounded-xl bg-emerald-50/80 border border-emerald-200 text-emerald-900 text-xs flex items-center justify-between shadow-xs">
-        <div className="flex items-center space-x-2.5">
-          <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
-            ✓
+      {/* Admin Session Header */}
+      <div className="bg-white border border-[#E4E8F0] rounded-2xl p-6 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="flex items-center space-x-3.5">
+          <div className="w-12 h-12 rounded-2xl bg-[#EDF2FF] border border-[#2855D9]/20 text-[#2855D9] flex items-center justify-center shrink-0">
+            <Shield className="w-6 h-6" />
           </div>
           <div>
-            <span className="font-semibold text-emerald-800">
-              Session Administrateur Active :
-            </span>{" "}
-            <span className="font-mono text-emerald-950 font-medium">
-              {currentUser?.email || "yassinedrira3@gmail.com"}
-            </span>{" "}
-            <span className="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded font-mono ml-1">
-              Admin Principal
-            </span>
-          </div>
-        </div>
-        <span className="text-[11px] text-emerald-700 font-medium hidden sm:inline">
-          Gestion du curriculum et délégation des rôles activées
-        </span>
-      </div>
-
-      {/* Summary Cards */}
-      <div className="bg-white border border-[#E4E8F0] rounded-xl p-6 shadow-xs">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-lg bg-[#EDF2FF] border border-[#2855D9]/20 text-[#2855D9] flex items-center justify-center">
-              <Shield className="w-5 h-5" />
-            </div>
-            <div>
-              <h1 className="text-xl font-serif font-bold text-[#182235] tracking-tight">
-                Paramètres & Console d&apos;Administration
-              </h1>
-              <p className="text-xs text-[#68748A] mt-0.5">
-                Configuration des semestres, des matières d&apos;IGL4 et gestion des catégories.
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                if (!isAdmin) {
-                  setErrorMsg("Privilèges Administrateur requis. Cliquez sur 'Activer Mode Admin (1 clic)' ci-dessus.");
-                  return;
-                }
-                setIsSemesterModalOpen(true);
-              }}
-            >
-              <Plus className="w-3.5 h-3.5 mr-1" />
-              <span>Add Semester</span>
-            </Button>
-            <Button
-              size="sm"
-              variant="primary"
-              onClick={() => {
-                if (!isAdmin) {
-                  setErrorMsg("Privilèges Administrateur requis. Cliquez sur 'Activer Mode Admin (1 clic)' ci-dessus.");
-                  return;
-                }
-                setIsSubjectModalOpen(true);
-              }}
-            >
-              <Plus className="w-3.5 h-3.5 mr-1" />
-              <span>Create Subject</span>
-            </Button>
-          </div>
-        </div>
-
-        <div className="mt-6 pt-5 border-t border-[#E4E8F0] grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <div className="bg-[#FAFAF7] border border-[#E4E8F0] p-3 rounded-lg">
-            <div className="text-xs text-[#68748A] font-medium">Semesters</div>
-            <div className="text-lg font-bold text-[#182235] mt-1 font-mono font-tabular">
-              {semesters.length}
-            </div>
-          </div>
-          <div className="bg-[#FAFAF7] border border-[#E4E8F0] p-3 rounded-lg">
-            <div className="text-xs text-[#68748A] font-medium">Subjects Active</div>
-            <div className="text-lg font-bold text-[#2855D9] mt-1 font-mono font-tabular">
-              {subjects.filter((s) => s.is_active).length}
-            </div>
-          </div>
-          <div className="bg-[#FAFAF7] border border-[#E4E8F0] p-3 rounded-lg">
-            <div className="text-xs text-[#68748A] font-medium">Categories</div>
-            <div className="text-lg font-bold text-[#182235] mt-1 font-mono font-tabular">
-              {categories.length}
-            </div>
-          </div>
-          <div className="bg-[#FAFAF7] border border-[#E4E8F0] p-3 rounded-lg">
-            <div className="text-xs text-[#68748A] font-medium">Indexed Docs</div>
-            <div className="text-lg font-bold text-[#182235] mt-1 font-mono font-tabular">
-              {totalResources}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Semesters & Categories Breakdown */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Semesters */}
-        <div className="bg-white border border-[#E4E8F0] rounded-xl p-5 shadow-xs space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-[#182235] flex items-center space-x-2">
-              <Calendar className="w-4 h-4 text-[#2855D9]" />
-              <span>Academic Semesters ({semesters.length})</span>
-            </h2>
-            <Button
-              size="sm"
-              variant="outline"
-              className="text-xs h-7"
-              onClick={() => setIsSemesterModalOpen(true)}
-            >
-              <Plus className="w-3 h-3" />
-              <span>Add</span>
-            </Button>
-          </div>
-
-          <div className="space-y-2">
-            {semesters.map((s) => (
-              <div
-                key={s.id}
-                className="flex items-center justify-between p-3 rounded-md border border-[#E4E8F0] bg-[#FAFAF7] text-xs"
-              >
-                <div>
-                  <div className="font-semibold text-[#182235]">{s.name}</div>
-                  <div className="text-[#68748A] font-mono text-[11px]">
-                    AY {s.academic_year} • Order #{s.sort_order}
-                  </div>
-                </div>
-                <span className="bg-[#F4F6FA] text-[#182235] px-2 py-0.5 rounded text-[11px] font-mono font-tabular border border-[#E4E8F0]">
-                  {subjects.filter((sub) => sub.semester_id === s.id).length} subjects
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Categories */}
-        <div className="bg-white border border-[#E4E8F0] rounded-xl p-5 shadow-xs space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-[#182235] flex items-center space-x-2">
-              <Layers className="w-4 h-4 text-[#2855D9]" />
-              <span>Controlled Categories ({categories.length})</span>
-            </h2>
-          </div>
-
-          <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-            {categories.map((c) => (
-              <div
-                key={c.id}
-                className="flex items-center justify-between p-2.5 rounded-md border border-[#E4E8F0] bg-[#FAFAF7] text-xs"
-              >
-                <div>
-                  <div className="font-semibold text-[#182235]">{c.name}</div>
-                  <div className="text-[#68748A] font-mono text-[11px]">
-                    slug: {c.slug}
-                  </div>
-                </div>
-                <span className="bg-[#F4F6FA] text-[#68748A] px-2 py-0.5 rounded text-[11px] font-mono border border-[#E4E8F0]">
-                  Order #{c.sort_order}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Subjects Catalog Table */}
-      <div className="bg-white border border-[#E4E8F0] rounded-xl p-5 shadow-xs space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-sm font-semibold text-[#182235] flex items-center space-x-2">
-              <BookOpen className="w-4 h-4 text-[#2855D9]" />
-              <span>Curriculum Subject Registry ({subjects.length} Modules)</span>
-            </h2>
+            <h1 className="text-xl font-serif font-bold text-[#111A2E] tracking-tight">
+              Paramètres & Console d&apos;Administration
+            </h1>
             <p className="text-xs text-[#68748A] mt-0.5">
-              Administrators can add, edit, and archive subjects without editing application code.
+              Gestion du curriculum IGL4, personnalisation graphique des matières, délégation et audit de sécurité.
             </p>
           </div>
-          <Button
-            size="sm"
-            variant="primary"
-            onClick={() => {
-              if (!isAdmin) {
-                setErrorMsg("Privilèges Administrateur requis pour créer des matières. Activez le mode Administrateur ci-dessus.");
-                return;
-              }
-              setIsSubjectModalOpen(true);
-            }}
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Create Subject</span>
-          </Button>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead>
-              <tr className="border-b border-[#E4E8F0] text-[#68748A] font-mono uppercase text-[10px]">
-                <th className="py-2 px-3 font-semibold">Order</th>
-                <th className="py-2 px-3 font-semibold">Subject Name</th>
-                <th className="py-2 px-3 font-semibold">Slug</th>
-                <th className="py-2 px-3 font-semibold">Semester</th>
-                <th className="py-2 px-3 font-semibold">Status</th>
-                <th className="py-2 px-3 font-semibold text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#E4E8F0]">
-              {subjects.map((sub) => {
-                const parentSem = semesters.find((s) => s.id === sub.semester_id);
-                return (
-                  <tr key={sub.id} className="hover:bg-[#F4F6FA] transition-colors">
-                    <td className="py-2.5 px-3 font-mono font-tabular text-[#68748A]">
-                      #{sub.sort_order}
-                    </td>
-                    <td className="py-2.5 px-3 font-medium text-[#182235]">
-                      {sub.name}
-                    </td>
-                    <td className="py-2.5 px-3 font-mono text-[#68748A]">
-                      {sub.slug}
-                    </td>
-                    <td className="py-2.5 px-3 font-mono text-[#68748A]">
-                      {parentSem?.name || "Semester 1"}
-                    </td>
-                    <td className="py-2.5 px-3">
-                      <span
-                        className={`px-2 py-0.5 rounded text-[10px] font-medium ${
-                          sub.is_active
-                            ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
-                            : "bg-[#F4F6FA] text-[#68748A] border border-[#E4E8F0]"
-                        }`}
-                      >
-                        {sub.is_active ? "Active" : "Archived"}
-                      </span>
-                    </td>
-                    <td className="py-2.5 px-3 text-right space-x-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (!isAdmin) {
-                            setErrorMsg("Privilèges Administrateur requis pour supprimer des matières. Activez le mode Administrateur ci-dessus.");
-                            return;
-                          }
-                          setSubjectToDelete(sub);
-                        }}
-                        className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-semibold text-rose-600 hover:text-white hover:bg-rose-600 border border-rose-200 hover:border-rose-600 transition-colors cursor-pointer shadow-2xs"
-                        title={`Supprimer ${sub.name}`}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        <span>Supprimer</span>
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        <div className="flex items-center space-x-2 shrink-0">
+          <Button size="sm" variant="outline" onClick={() => setIsSemesterModalOpen(true)}>
+            <Plus className="w-3.5 h-3.5 mr-1" />
+            <span>Nouveau Semestre</span>
+          </Button>
+          <Button size="sm" variant="primary" onClick={openCreateSubjectModal}>
+            <Plus className="w-3.5 h-3.5 mr-1" />
+            <span>Créer une Matière</span>
+          </Button>
         </div>
       </div>
 
-      {/* SECTION: USER ROLES & TEMPORARY ADMIN DELEGATION */}
-      <div className="bg-white border border-[#E4E8F0] rounded-xl p-5 shadow-xs space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+      {/* Navigation Tabs */}
+      <div className="flex items-center space-x-1.5 border-b border-[#E4E8F0] pb-2">
+        <button
+          type="button"
+          onClick={() => setActiveTab("curriculum")}
+          className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition-all cursor-pointer ${
+            activeTab === "curriculum"
+              ? "bg-[#2855D9] text-white shadow-2xs"
+              : "text-[#68748A] hover:bg-[#F4F6FA]"
+          }`}
+        >
+          <BookOpen className="w-3.5 h-3.5" />
+          <span>Curriculum & Matières ({subjects.length})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("delegation")}
+          className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition-all cursor-pointer ${
+            activeTab === "delegation"
+              ? "bg-[#2855D9] text-white shadow-2xs"
+              : "text-[#68748A] hover:bg-[#F4F6FA]"
+          }`}
+        >
+          <Users className="w-3.5 h-3.5" />
+          <span>Rôles & Accès Temporaires ({users.length})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("audit")}
+          className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition-all cursor-pointer ${
+            activeTab === "audit"
+              ? "bg-[#2855D9] text-white shadow-2xs"
+              : "text-[#68748A] hover:bg-[#F4F6FA]"
+          }`}
+        >
+          <Activity className="w-3.5 h-3.5" />
+          <span>Surveillance & Journal d&apos;Audit</span>
+        </button>
+      </div>
+
+      {/* TAB 1: CURRICULUM & SUBJECT MANAGEMENT */}
+      {activeTab === "curriculum" && (
+        <div className="space-y-6">
+          {/* Summary metrics */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+            <div className="bg-white border border-[#E4E8F0] p-4 rounded-xl shadow-xs">
+              <div className="text-xs text-[#68748A] font-medium">Semestres Actifs</div>
+              <div className="text-xl font-bold font-mono text-[#111A2E] mt-1">{semesters.length}</div>
+            </div>
+            <div className="bg-white border border-[#E4E8F0] p-4 rounded-xl shadow-xs">
+              <div className="text-xs text-[#68748A] font-medium">Matières Enseignées</div>
+              <div className="text-xl font-bold font-mono text-[#2855D9] mt-1">{subjects.length}</div>
+            </div>
+            <div className="bg-white border border-[#E4E8F0] p-4 rounded-xl shadow-xs">
+              <div className="text-xs text-[#68748A] font-medium">Catégories Contrôlées</div>
+              <div className="text-xl font-bold font-mono text-[#111A2E] mt-1">{categories.length}</div>
+            </div>
+            <div className="bg-white border border-[#E4E8F0] p-4 rounded-xl shadow-xs">
+              <div className="text-xs text-[#68748A] font-medium">Ressources Référencées</div>
+              <div className="text-xl font-bold font-mono text-[#111A2E] mt-1">{totalResources}</div>
+            </div>
+          </div>
+
+          {/* Subjects Table */}
+          <div className="bg-white border border-[#E4E8F0] rounded-2xl p-5 shadow-xs space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-bold text-[#111A2E] flex items-center space-x-2">
+                  <BookOpen className="w-4 h-4 text-[#2855D9]" />
+                  <span>Catalogue des Modules IGL4 ({subjects.length})</span>
+                </h2>
+                <p className="text-xs text-[#68748A] mt-0.5">
+                  Configurez le nom, la couleur thématique, l&apos;icône et le semestre de chaque module.
+                </p>
+              </div>
+              <Button size="sm" variant="primary" onClick={openCreateSubjectModal}>
+                <Plus className="w-3.5 h-3.5 mr-1" />
+                <span>Ajouter un module</span>
+              </Button>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-[#E4E8F0] text-[#68748A] font-mono uppercase text-[10px]">
+                    <th className="py-2.5 px-3 font-semibold">Identité Visuelle</th>
+                    <th className="py-2.5 px-3 font-semibold">Nom de la Matière</th>
+                    <th className="py-2.5 px-3 font-semibold">Slug URL</th>
+                    <th className="py-2.5 px-3 font-semibold">Semestre</th>
+                    <th className="py-2.5 px-3 font-semibold">Statut</th>
+                    <th className="py-2.5 px-3 font-semibold text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#E4E8F0]">
+                  {subjects.map((sub) => {
+                    const parentSem = semesters.find((s) => s.id === sub.semester_id);
+                    const visual = getSubjectVisual(sub.slug || sub.name, sub.icon);
+                    const IconComp = visual.icon;
+                    return (
+                      <tr key={sub.id} className="hover:bg-[#FAFBFD] transition-colors">
+                        <td className="py-2.5 px-3">
+                          <div
+                            className={`w-8 h-8 rounded-xl border flex items-center justify-center ${visual.bgLight} ${visual.borderLight}`}
+                          >
+                            <IconComp className={`w-4 h-4 ${visual.color}`} />
+                          </div>
+                        </td>
+                        <td className="py-2.5 px-3 font-semibold text-[#182235]">
+                          <div>{sub.name}</div>
+                          {sub.description && (
+                            <div className="text-[11px] text-[#68748A] line-clamp-1 max-w-xs font-normal">
+                              {sub.description}
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3 font-mono text-[#68748A]">{sub.slug}</td>
+                        <td className="py-2.5 px-3 font-mono text-[#68748A]">
+                          {parentSem?.name || "Semestre 1"}
+                        </td>
+                        <td className="py-2.5 px-3">
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            Actif
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-right space-x-1.5">
+                          <button
+                            type="button"
+                            onClick={() => openEditSubjectModal(sub)}
+                            className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-semibold text-[#2855D9] hover:bg-[#EDF2FF] border border-[#2855D9]/20 transition-colors cursor-pointer shadow-2xs"
+                            title="Modifier l'apparence et les infos"
+                          >
+                            <Edit2 className="w-3 h-3" />
+                            <span>Modifier</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSubjectToDelete(sub)}
+                            className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-semibold text-rose-600 hover:text-white hover:bg-rose-600 border border-rose-200 hover:border-rose-600 transition-colors cursor-pointer shadow-2xs"
+                            title={`Supprimer ${sub.name}`}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                            <span>Supprimer</span>
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 2: ROLE DELEGATION & USER MANAGEMENT */}
+      {activeTab === "delegation" && (
+        <div className="bg-white border border-[#E4E8F0] rounded-2xl p-5 shadow-xs space-y-4">
           <div>
-            <h2 className="text-sm font-semibold text-[#182235] flex items-center space-x-2">
+            <h2 className="text-sm font-bold text-[#111A2E] flex items-center space-x-2">
               <Users className="w-4 h-4 text-[#2855D9]" />
-              <span>Délégation des Rôles & Accès Administrateur Temporaires</span>
+              <span>Délégation des Rôles & Accès Temporaires</span>
             </h2>
             <p className="text-xs text-[#68748A] mt-0.5">
               En tant qu&apos;administrateur principal, vous pouvez accorder un accès administrateur temporaire à un étudiant (ex: pour 1 mois), révocable à tout moment.
             </p>
           </div>
-          <span className="text-[11px] font-mono text-[#68748A] bg-[#F4F6FA] px-2.5 py-1 rounded-md border border-[#E4E8F0] self-start sm:self-auto">
-            {users.length} compte{users.length > 1 ? "s" : ""} enregistré{users.length > 1 ? "s" : ""}
-          </span>
-        </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead>
-              <tr className="border-b border-[#E4E8F0] text-[#68748A] font-mono uppercase text-[10px]">
-                <th className="py-2.5 px-3 font-semibold">Utilisateur</th>
-                <th className="py-2.5 px-3 font-semibold">Email</th>
-                <th className="py-2.5 px-3 font-semibold">Rôle & Privilèges</th>
-                <th className="py-2.5 px-3 font-semibold">Validité de l&apos;accès</th>
-                <th className="py-2.5 px-3 font-semibold text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#E4E8F0]">
-              {users.map((u) => {
-                const isMaster = u.email === "yassinedrira3@gmail.com";
-                const isTemp = u.isTemporaryAdmin && u.expiresAt;
-                const expiresDate = u.expiresAt ? new Date(u.expiresAt) : null;
-                const daysLeft = expiresDate ? Math.ceil((expiresDate.getTime() - Date.now()) / (1000 * 3600 * 24)) : null;
-
-                return (
-                  <tr key={u.id} className="hover:bg-[#F4F6FA] transition-colors">
-                    <td className="py-2.5 px-3 font-medium text-[#182235]">
-                      <div className="flex items-center space-x-2">
-                        <div className="w-6 h-6 rounded-full bg-[#EDF2FF] text-[#2855D9] flex items-center justify-center font-bold text-[10px]">
-                          {u.displayName.charAt(0).toUpperCase()}
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="border-b border-[#E4E8F0] text-[#68748A] font-mono uppercase text-[10px]">
+                  <th className="py-2.5 px-3 font-semibold">Utilisateur</th>
+                  <th className="py-2.5 px-3 font-semibold">Email</th>
+                  <th className="py-2.5 px-3 font-semibold">Rôle & Privilèges</th>
+                  <th className="py-2.5 px-3 font-semibold">Validité</th>
+                  <th className="py-2.5 px-3 font-semibold text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#E4E8F0]">
+                {users.map((u) => {
+                  const isMaster = u.email === "yassinedrira3@gmail.com";
+                  return (
+                    <tr key={u.id} className="hover:bg-[#FAFBFD] transition-colors">
+                      <td className="py-2.5 px-3 font-semibold text-[#182235]">
+                        <div className="flex items-center space-x-2">
+                          <div className="w-6 h-6 rounded-full bg-[#EDF2FF] text-[#2855D9] flex items-center justify-center font-bold text-[10px]">
+                            {u.displayName.slice(0, 2).toUpperCase()}
+                          </div>
+                          <span>{u.displayName}</span>
                         </div>
-                        <span>{u.displayName}</span>
-                      </div>
-                    </td>
-                    <td className="py-2.5 px-3 font-mono text-[#68748A]">
-                      {u.email}
-                    </td>
-                    <td className="py-2.5 px-3">
-                      {isMaster ? (
-                        <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded text-[10px] font-semibold">
-                          <Shield className="w-3 h-3 text-emerald-600" />
-                          <span>Admin Principal (Propriétaire)</span>
-                        </span>
-                      ) : isTemp ? (
-                        <span className="inline-flex items-center gap-1 bg-indigo-50 text-indigo-800 border border-indigo-200 px-2 py-0.5 rounded text-[10px] font-semibold">
-                          <Clock className="w-3 h-3 text-indigo-600" />
-                          <span>Admin Temporaire</span>
-                        </span>
-                      ) : (
-                        <span className="bg-[#F4F6FA] text-[#68748A] border border-[#E4E8F0] px-2 py-0.5 rounded text-[10px] font-medium">
-                          Étudiant
-                        </span>
-                      )}
-                    </td>
-                    <td className="py-2.5 px-3 font-mono text-[11px] text-[#68748A]">
-                      {isMaster ? (
-                        <span className="text-emerald-700 font-sans font-medium">Permanent</span>
-                      ) : isTemp && expiresDate ? (
-                        <span className="text-indigo-700 font-sans font-medium">
-                          Expire le {expiresDate.toLocaleDateString("fr-FR")} ({daysLeft} jour{daysLeft && daysLeft > 1 ? "s" : ""} restant{daysLeft && daysLeft > 1 ? "s" : ""})
-                        </span>
-                      ) : (
-                        <span className="text-[#A0AEC0]">Accès étudiant standard</span>
-                      )}
-                    </td>
-                    <td className="py-2.5 px-3 text-right">
-                      {isMaster ? (
-                        <span className="text-[10px] font-mono text-[#A0AEC0] italic">
-                          Protégé
-                        </span>
-                      ) : isTemp ? (
-                        <button
-                          type="button"
-                          onClick={() => handleRevokeRole(u)}
-                          disabled={isRevokingId === u.id}
-                          className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-md text-xs font-semibold text-rose-600 hover:text-white hover:bg-rose-600 border border-rose-200 hover:border-rose-600 transition-colors cursor-pointer"
-                          title="Révoquer les droits administrateur"
-                        >
-                          <UserX className="w-3.5 h-3.5" />
-                          <span>{isRevokingId === u.id ? "Révocation..." : "Révoquer Accès"}</span>
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => setUserToDelegate(u)}
-                          className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-md text-xs font-semibold text-[#2855D9] hover:text-white hover:bg-[#2855D9] border border-[#2855D9]/30 hover:border-[#2855D9] transition-colors cursor-pointer"
-                          title="Accorder un accès administrateur temporaire"
-                        >
-                          <UserCheck className="w-3.5 h-3.5" />
-                          <span>Accorder Accès Admin</span>
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                      </td>
+                      <td className="py-2.5 px-3 font-mono text-[#68748A]">{u.email}</td>
+                      <td className="py-2.5 px-3">
+                        {isMaster ? (
+                          <span className="bg-purple-50 text-purple-800 border border-purple-200 px-2 py-0.5 rounded text-[10px] font-mono font-bold">
+                            👑 Admin Permanent
+                          </span>
+                        ) : u.isTemporaryAdmin ? (
+                          <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded text-[10px] font-mono font-bold flex items-center space-x-1 w-fit">
+                            <Clock className="w-3 h-3 text-emerald-600" />
+                            <span>Admin Temporaire</span>
+                          </span>
+                        ) : (
+                          <span className="bg-[#F4F6FA] text-[#68748A] border border-[#E4E8F0] px-2 py-0.5 rounded text-[10px] font-mono">
+                            Étudiant
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-2.5 px-3 font-mono text-[11px] text-[#68748A]">
+                        {isMaster
+                          ? "Illimitée"
+                          : u.expiresAt
+                          ? `Expire le ${new Date(u.expiresAt).toLocaleDateString()}`
+                          : "—"}
+                      </td>
+                      <td className="py-2.5 px-3 text-right">
+                        {isMaster ? (
+                          <span className="text-[11px] text-[#68748A] italic">Protégé</span>
+                        ) : u.isTemporaryAdmin ? (
+                          <button
+                            type="button"
+                            onClick={() => setUserToRevoke(u)}
+                            disabled={isRevokingId === u.id}
+                            className="text-xs text-rose-600 hover:text-rose-800 font-semibold px-2.5 py-1 rounded-lg border border-rose-200 hover:bg-rose-50 cursor-pointer"
+                          >
+                            {isRevokingId === u.id ? "Révocation..." : "Révoquer l'accès"}
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setUserToDelegate(u)}
+                            className="text-xs text-[#2855D9] hover:text-[#1E40AF] font-semibold px-2.5 py-1 rounded-lg border border-[#2855D9]/30 hover:bg-[#EDF2FF] cursor-pointer"
+                          >
+                            Accorder Admin...
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* Modal: Grant Temporary Admin Role */}
-      {userToDelegate && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-2xs flex items-center justify-center p-4">
-          <div className="bg-white border border-[#E4E8F0] rounded-xl max-w-md w-full p-6 shadow-xl space-y-4">
+      {/* TAB 3: AUDIT LOGS & MONITORING */}
+      {activeTab === "audit" && (
+        <div className="bg-white border border-[#E4E8F0] rounded-2xl p-5 shadow-xs space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-bold text-[#111A2E] flex items-center space-x-2">
+                <Activity className="w-4 h-4 text-[#2855D9]" />
+                <span>Surveillance des Événements & Sécurité</span>
+              </h2>
+              <p className="text-xs text-[#68748A] mt-0.5">
+                Audit chronologique des modifications sensibles (accès, suppressions, partages).
+              </p>
+            </div>
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 text-[#68748A] absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={auditFilter}
+                onChange={(e) => setAuditFilter(e.target.value)}
+                placeholder="Filtrer l'audit..."
+                className="bg-[#FAFBFD] border border-[#E4E8F0] rounded-xl pl-8 pr-3 py-1.5 text-xs text-[#111A2E] focus:outline-none focus:border-[#2855D9]"
+              />
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="border-b border-[#E4E8F0] text-[#68748A] font-mono uppercase text-[10px]">
+                  <th className="py-2.5 px-3 font-semibold">Date & Heure</th>
+                  <th className="py-2.5 px-3 font-semibold">Action</th>
+                  <th className="py-2.5 px-3 font-semibold">Acteur</th>
+                  <th className="py-2.5 px-3 font-semibold">Cible</th>
+                  <th className="py-2.5 px-3 font-semibold">Détails</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#E4E8F0]">
+                {auditLogs
+                  .filter((l) =>
+                    auditFilter
+                      ? l.action?.toLowerCase().includes(auditFilter.toLowerCase()) ||
+                        l.actor_id?.toLowerCase().includes(auditFilter.toLowerCase())
+                      : true
+                  )
+                  .map((log, idx) => (
+                    <tr key={idx} className="hover:bg-[#FAFBFD]">
+                      <td className="py-2.5 px-3 font-mono text-[11px] text-[#68748A]">
+                        {log.timestamp ? new Date(log.timestamp).toLocaleString() : "Récent"}
+                      </td>
+                      <td className="py-2.5 px-3">
+                        <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded bg-[#FAFBFD] border border-[#E4E8F0] text-[#111A2E]">
+                          {log.action}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3 font-mono text-[11px] text-[#68748A]">
+                        {log.actor_id?.slice(0, 8)}...
+                      </td>
+                      <td className="py-2.5 px-3 text-[#182235]">
+                        {log.target_type} ({log.target_id?.slice(0, 6)}...)
+                      </td>
+                      <td className="py-2.5 px-3 font-mono text-[11px] text-[#68748A]">
+                        {log.metadata ? JSON.stringify(log.metadata).slice(0, 60) : "—"}
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: CREATE OR EDIT SUBJECT WITH ICON & COLOR PICKER */}
+      {isSubjectModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
+          <div className="bg-white border border-[#E4E8F0] rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-4 my-auto animate-in fade-in duration-200">
             <div className="flex items-center justify-between border-b border-[#E4E8F0] pb-3">
-              <div className="flex items-center space-x-2">
-                <Clock className="w-4 h-4 text-[#2855D9]" />
-                <h3 className="font-semibold text-sm text-[#182235]">
-                  Déléguer l&apos;accès Administrateur
+              <div>
+                <h3 className="font-bold text-sm text-[#111A2E]">
+                  {subjectToEdit ? "Modifier l'apparence du Module" : "Créer un Nouveau Module Académique"}
                 </h3>
+                <p className="text-xs text-[#68748A]">
+                  Configurez son identité visuelle, son icône dynamique et sa palette accessible.
+                </p>
               </div>
               <button
                 type="button"
+                onClick={() => setIsSubjectModalOpen(false)}
+                className="text-[#68748A] hover:text-[#111A2E] p-1 rounded-lg hover:bg-[#F4F6FA]"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {errorMsg && (
+              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center space-x-2">
+                <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                <span>{errorMsg}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSaveSubject} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-[#111A2E] mb-1">
+                    Semestre d&apos;attribution *
+                  </label>
+                  <select
+                    value={subSemesterId}
+                    onChange={(e) => setSubSemesterId(e.target.value)}
+                    required
+                    className="w-full bg-[#FAFBFD] border border-[#E4E8F0] rounded-xl px-3 py-2 text-xs text-[#111A2E] focus:outline-none focus:border-[#2855D9]"
+                  >
+                    {semesters.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name} ({s.academic_year})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-[#111A2E] mb-1">
+                    Titre du Module *
+                  </label>
+                  <input
+                    type="text"
+                    value={subName}
+                    onChange={(e) => handleSubNameChange(e.target.value)}
+                    placeholder="e.g. Distributed Systems"
+                    required
+                    className="w-full bg-[#FAFBFD] border border-[#E4E8F0] rounded-xl px-3 py-2 text-xs text-[#111A2E] focus:outline-none focus:border-[#2855D9]"
+                  />
+                </div>
+              </div>
+
+              {!subjectToEdit && (
+                <div>
+                  <label className="block text-xs font-semibold text-[#111A2E] mb-1">
+                    Slug d&apos;URL *
+                  </label>
+                  <input
+                    type="text"
+                    value={subSlug}
+                    onChange={(e) => setSubSlug(e.target.value)}
+                    placeholder="distributed-systems"
+                    required
+                    className="w-full bg-[#FAFBFD] border border-[#E4E8F0] rounded-xl px-3 py-2 text-xs font-mono text-[#111A2E] focus:outline-none focus:border-[#2855D9]"
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-semibold text-[#111A2E] mb-1">
+                  Description du Module
+                </label>
+                <textarea
+                  rows={2}
+                  value={subDescription}
+                  onChange={(e) => setSubDescription(e.target.value)}
+                  placeholder="Objectifs pédagogiques, compétences et programme..."
+                  className="w-full bg-[#FAFBFD] border border-[#E4E8F0] rounded-xl p-2.5 text-xs text-[#111A2E] focus:outline-none focus:border-[#2855D9]"
+                />
+              </div>
+
+              {/* SECTION: ICON PICKER */}
+              <div className="space-y-2 pt-2 border-t border-[#E4E8F0]">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-[#111A2E]">
+                    Sélection de l&apos;Icône :
+                  </label>
+                  <div className="relative w-48">
+                    <Search className="w-3 h-3 text-[#68748A] absolute left-2.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      value={iconSearchQuery}
+                      onChange={(e) => setIconSearchQuery(e.target.value)}
+                      placeholder="Chercher une icône..."
+                      className="w-full bg-[#FAFBFD] border border-[#E4E8F0] rounded-lg pl-7 pr-2 py-1 text-[11px] focus:outline-none focus:border-[#2855D9]"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-4 sm:grid-cols-5 gap-2 max-h-36 overflow-y-auto p-1.5 border border-[#E4E8F0] rounded-xl bg-[#FAFBFD]">
+                  {filteredIcons.map((ic) => {
+                    const IconComp = ic.icon;
+                    const isSelected = selectedIconName.toLowerCase() === ic.name.toLowerCase();
+                    return (
+                      <button
+                        key={ic.name}
+                        type="button"
+                        onClick={() => setSelectedIconName(ic.name)}
+                        className={`p-2 rounded-xl border flex flex-col items-center justify-center text-center transition-all cursor-pointer ${
+                          isSelected
+                            ? "bg-[#2855D9] text-white border-[#2855D9] shadow-xs"
+                            : "bg-white text-[#182235] border-[#E4E8F0] hover:bg-[#F4F6FA]"
+                        }`}
+                        title={ic.label}
+                      >
+                        <IconComp className="w-4 h-4 mb-1" />
+                        <span className="text-[10px] font-mono truncate w-full">{ic.name}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* SECTION: COLOR SELECTION & HEX INPUT */}
+              <div className="space-y-2 pt-2 border-t border-[#E4E8F0]">
+                <label className="block text-xs font-semibold text-[#111A2E]">
+                  Palette & Couleur Thématique :
+                </label>
+                <div className="flex flex-wrap items-center gap-2">
+                  {PRESET_ACCESSIBLE_COLORS.map((col) => {
+                    const isSelected = selectedHexColor.toLowerCase() === col.hex.toLowerCase();
+                    return (
+                      <button
+                        key={col.hex}
+                        type="button"
+                        onClick={() => {
+                          setSelectedHexColor(col.hex);
+                          setCustomHexInput(col.hex);
+                        }}
+                        className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-lg border text-xs font-semibold cursor-pointer transition-all ${
+                          isSelected
+                            ? "ring-2 ring-[#2855D9] ring-offset-1 border-[#2855D9]"
+                            : "border-[#E4E8F0] bg-white hover:bg-[#FAFBFD]"
+                        }`}
+                      >
+                        <span
+                          className="w-3.5 h-3.5 rounded-full shrink-0 shadow-2xs"
+                          style={{ backgroundColor: col.hex }}
+                        />
+                        <span className="text-[11px] text-[#182235]">{col.name}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="flex items-center space-x-2 pt-1 text-xs">
+                  <span className="text-[#68748A]">Ou code HEX personnalisé :</span>
+                  <input
+                    type="text"
+                    value={customHexInput}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setCustomHexInput(val);
+                      if (/^#[0-9A-Fa-f]{6}$/.test(val)) {
+                        setSelectedHexColor(val);
+                      }
+                    }}
+                    placeholder="#2563EB"
+                    className="w-24 bg-[#FAFBFD] border border-[#E4E8F0] rounded-lg px-2.5 py-1 text-xs font-mono uppercase"
+                  />
+                </div>
+              </div>
+
+              {/* SECTION: LIVE CARD & HEADER PREVIEW */}
+              <div className="pt-2 border-t border-[#E4E8F0] space-y-1.5">
+                <span className="text-xs font-semibold text-[#111A2E] flex items-center space-x-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-[#2855D9]" />
+                  <span>Aperçu en Direct de l&apos;Apparence :</span>
+                </span>
+                <div className="bg-[#FAFBFD] border border-[#E4E8F0] rounded-xl p-3 flex items-center space-x-3.5">
+                  <div
+                    className={`w-12 h-12 rounded-xl border flex items-center justify-center shrink-0 ${previewVisual.bgLight} ${previewVisual.borderLight}`}
+                  >
+                    <PreviewIcon className={`w-6 h-6 ${previewVisual.color}`} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center space-x-2">
+                      <span className={`text-[10px] font-mono font-semibold px-2 py-0.2 rounded-full border ${previewVisual.badgeBg} ${previewVisual.borderLight}`}>
+                        Semestre 1
+                      </span>
+                      <span className="text-xs text-[#68748A]">• Code : {subSlug || "module"}</span>
+                    </div>
+                    <div className="font-bold text-sm text-[#111A2E] mt-0.5 truncate">
+                      {subName || "Nom du Module"}
+                    </div>
+                    <div className="text-[11px] text-[#68748A] truncate">
+                      {subDescription || "Description pédagogique du module..."}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end space-x-2 pt-3 border-t border-[#E4E8F0]">
+                <Button type="button" size="sm" variant="ghost" onClick={() => setIsSubjectModalOpen(false)}>
+                  Annuler
+                </Button>
+                <Button type="submit" size="sm" variant="primary" disabled={isSubmittingSub}>
+                  {isSubmittingSub ? "Enregistrement..." : subjectToEdit ? "Mettre à jour" : "Créer le Module"}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: CREATE SEMESTER */}
+      {isSemesterModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white border border-[#E4E8F0] rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-[#E4E8F0] pb-3">
+              <h3 className="font-bold text-sm text-[#111A2E]">Ajouter un Semestre Académique</h3>
+              <button
+                type="button"
+                onClick={() => setIsSemesterModalOpen(false)}
+                className="text-[#68748A] hover:text-[#111A2E]"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateSemester} className="space-y-4 text-xs">
+              <div>
+                <label className="block font-semibold text-[#111A2E] mb-1">Nom du Semestre *</label>
+                <input
+                  type="text"
+                  value={semName}
+                  onChange={(e) => setSemName(e.target.value)}
+                  placeholder="e.g. Semestre 3"
+                  required
+                  className="w-full bg-[#FAFBFD] border border-[#E4E8F0] rounded-xl px-3 py-2 text-xs text-[#111A2E] focus:outline-none focus:border-[#2855D9]"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-[#111A2E] mb-1">Année Universitaire *</label>
+                <input
+                  type="text"
+                  value={semYear}
+                  onChange={(e) => setSemYear(e.target.value)}
+                  placeholder="2024-2025"
+                  required
+                  className="w-full bg-[#FAFBFD] border border-[#E4E8F0] rounded-xl px-3 py-2 text-xs text-[#111A2E] focus:outline-none focus:border-[#2855D9]"
+                />
+              </div>
+
+              <div className="flex items-center justify-end space-x-2 pt-2 border-t border-[#E4E8F0]">
+                <Button type="button" size="sm" variant="ghost" onClick={() => setIsSemesterModalOpen(false)}>
+                  Annuler
+                </Button>
+                <Button type="submit" size="sm" variant="primary" disabled={isSubmittingSem}>
+                  {isSubmittingSem ? "Enregistrement..." : "Créer le Semestre"}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: ROLE DELEGATION MODAL */}
+      {userToDelegate && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white border border-[#E4E8F0] rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-[#E4E8F0] pb-3">
+              <h3 className="font-bold text-sm text-[#111A2E]">
+                Délégation d&apos;Accès Administrateur Temporaire
+              </h3>
+              <button
+                type="button"
                 onClick={() => setUserToDelegate(null)}
-                className="text-[#68748A] hover:text-[#182235] cursor-pointer"
+                className="text-[#68748A] hover:text-[#111A2E]"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -681,13 +1038,13 @@ export function AdminManager({
 
             <p className="text-xs text-[#68748A]">
               Vous allez accorder un accès administrateur temporaire à{" "}
-              <strong className="text-[#182235]">{userToDelegate.displayName}</strong> ({userToDelegate.email}).
+              <strong className="text-[#111A2E]">{userToDelegate.displayName}</strong> ({userToDelegate.email}).
               Cet utilisateur pourra gérer les matières, semestres et fichiers jusqu&apos;à expiration.
             </p>
 
             <form onSubmit={handleGrantRole} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-[#182235] mb-2">
+                <label className="block text-xs font-semibold text-[#111A2E] mb-2">
                   Durée de validité de l&apos;accès :
                 </label>
                 <div className="grid grid-cols-2 gap-2 text-xs">
@@ -704,10 +1061,10 @@ export function AdminManager({
                         setDelegationDuration(option.days);
                         setCustomExpiresDate("");
                       }}
-                      className={`p-2.5 rounded-lg border text-left font-medium transition-all cursor-pointer ${
+                      className={`p-2.5 rounded-xl border text-left font-medium transition-all cursor-pointer ${
                         delegationDuration === option.days && !customExpiresDate
                           ? "border-[#2855D9] bg-[#EDF2FF] text-[#2855D9] font-semibold"
-                          : "border-[#E4E8F0] bg-[#FAFAF7] text-[#182235] hover:bg-[#F4F6FA]"
+                          : "border-[#E4E8F0] bg-[#FAFBFD] text-[#182235] hover:bg-[#F4F6FA]"
                       }`}
                     >
                       {option.label}
@@ -717,7 +1074,7 @@ export function AdminManager({
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-[#182235] mb-1">
+                <label className="block text-xs font-semibold text-[#111A2E] mb-1">
                   Ou choisir une date personnalisée d&apos;expiration :
                 </label>
                 <input
@@ -725,25 +1082,15 @@ export function AdminManager({
                   value={customExpiresDate}
                   min={new Date(Date.now() + 86400000).toISOString().split("T")[0]}
                   onChange={(e) => setCustomExpiresDate(e.target.value)}
-                  className="w-full bg-[#F4F6FA] border border-[#E4E8F0] rounded-md px-3 py-2 text-xs text-[#182235] focus:outline-none focus:border-[#2855D9]"
+                  className="w-full bg-[#FAFBFD] border border-[#E4E8F0] rounded-xl px-3 py-2 text-xs text-[#182235] focus:outline-none focus:border-[#2855D9]"
                 />
               </div>
 
               <div className="flex items-center justify-end space-x-2 pt-3 border-t border-[#E4E8F0]">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setUserToDelegate(null)}
-                >
+                <Button type="button" size="sm" variant="ghost" onClick={() => setUserToDelegate(null)}>
                   Annuler
                 </Button>
-                <Button
-                  type="submit"
-                  size="sm"
-                  variant="primary"
-                  disabled={isDelegating}
-                >
+                <Button type="submit" size="sm" variant="primary" disabled={isDelegating}>
                   {isDelegating ? "En cours..." : "Confirmer l'accès Administrateur"}
                 </Button>
               </div>
@@ -752,201 +1099,27 @@ export function AdminManager({
         </div>
       )}
 
-      {/* Modal: Create Subject */}
-      {isSubjectModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-2xs flex items-center justify-center p-4">
-          <div className="bg-white border border-[#E4E8F0] rounded-xl max-w-md w-full p-6 shadow-xl space-y-4">
-            <div className="flex items-center justify-between border-b border-[#E4E8F0] pb-3">
-              <h3 className="font-semibold text-sm text-[#182235]">
-                Register New Subject Module
-              </h3>
-              <button
-                type="button"
-                onClick={() => setIsSubjectModalOpen(false)}
-                className="text-[#68748A] hover:text-[#182235] cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {errorMsg && (
-              <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center space-x-2">
-                <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
-                <span>{errorMsg}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleCreateSubject} className="space-y-4">
-              <div>
-                <label className="block text-xs font-medium text-stone-700 mb-1">
-                  Assign to Semester *
-                </label>
-                <select
-                  value={subSemesterId}
-                  onChange={(e) => setSubSemesterId(e.target.value)}
-                  required
-                  className="w-full bg-[#F4F6FA] border border-[#E4E8F0] rounded-md px-3 py-2 text-xs text-[#182235] focus:outline-none focus:border-[#2855D9] cursor-pointer"
-                >
-                  {semesters.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name} ({s.academic_year})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-[#182235] mb-1">
-                  Subject Title *
-                </label>
-                <input
-                  type="text"
-                  value={subName}
-                  onChange={(e) => handleSubNameChange(e.target.value)}
-                  placeholder="e.g. Distributed Systems"
-                  required
-                  className="w-full bg-[#F4F6FA] border border-[#E4E8F0] rounded-md px-3 py-2 text-xs text-[#182235] focus:outline-none focus:border-[#2855D9]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-[#182235] mb-1">
-                  URL Slug *
-                </label>
-                <input
-                  type="text"
-                  value={subSlug}
-                  onChange={(e) => setSubSlug(e.target.value)}
-                  placeholder="distributed-systems"
-                  required
-                  className="w-full bg-[#F4F6FA] border border-[#E4E8F0] rounded-md px-3 py-2 text-xs text-[#182235] font-mono focus:outline-none focus:border-[#2855D9]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-[#182235] mb-1">
-                  Description
-                </label>
-                <textarea
-                  rows={3}
-                  value={subDescription}
-                  onChange={(e) => setSubDescription(e.target.value)}
-                  placeholder="Module scope, topics, and syllabus overview..."
-                  className="w-full bg-[#F4F6FA] border border-[#E4E8F0] rounded-md p-2.5 text-xs text-[#182235] focus:outline-none focus:border-[#2855D9]"
-                />
-              </div>
-
-              <div className="flex items-center justify-end space-x-2 pt-2 border-t border-[#E4E8F0]">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setIsSubjectModalOpen(false)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  size="sm"
-                  variant="primary"
-                  disabled={isSubmittingSub}
-                >
-                  {isSubmittingSub ? "Creating..." : "Save Subject"}
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Modal: Create Semester */}
-      {isSemesterModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-2xs flex items-center justify-center p-4">
-          <div className="bg-white border border-[#E4E8F0] rounded-xl max-w-md w-full p-6 shadow-xl space-y-4">
-            <div className="flex items-center justify-between border-b border-[#E4E8F0] pb-3">
-              <h3 className="font-semibold text-sm text-[#182235]">
-                Add Academic Semester
-              </h3>
-              <button
-                type="button"
-                onClick={() => setIsSemesterModalOpen(false)}
-                className="text-[#68748A] hover:text-[#182235] cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateSemester} className="space-y-4">
-              <div>
-                <label className="block text-xs font-medium text-[#182235] mb-1">
-                  Semester Name *
-                </label>
-                <input
-                  type="text"
-                  value={semName}
-                  onChange={(e) => setSemName(e.target.value)}
-                  placeholder="e.g. Semester 3 or Summer Session"
-                  required
-                  className="w-full bg-[#F4F6FA] border border-[#E4E8F0] rounded-md px-3 py-2 text-xs text-[#182235] focus:outline-none focus:border-[#2855D9]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-[#182235] mb-1">
-                  Academic Year *
-                </label>
-                <input
-                  type="text"
-                  value={semYear}
-                  onChange={(e) => setSemYear(e.target.value)}
-                  placeholder="2025-2026"
-                  required
-                  className="w-full bg-[#F4F6FA] border border-[#E4E8F0] rounded-md px-3 py-2 text-xs text-[#182235] focus:outline-none focus:border-[#2855D9]"
-                />
-              </div>
-
-              <div className="flex items-center justify-end space-x-2 pt-2 border-t border-[#E4E8F0]">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setIsSemesterModalOpen(false)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  size="sm"
-                  variant="primary"
-                  disabled={isSubmittingSem}
-                >
-                  {isSubmittingSem ? "Adding..." : "Add Semester"}
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Modal: Delete Subject Confirmation */}
+      {/* Delete Subject Confirmation Modal */}
       {subjectToDelete && (
         <DeleteConfirmModal
-          isOpen={true}
-          title={`Supprimer la matière ${subjectToDelete.name}`}
+          isOpen={Boolean(subjectToDelete)}
+          onClose={() => setSubjectToDelete(null)}
+          onConfirm={executeDeleteSubject}
           itemName={subjectToDelete.name}
           itemType="subject"
-          warningMessage="Cette action supprimera définitivement cette matière ainsi que tous ses dossiers, ressources, QCM, mémos et données de révision."
-          onClose={() => setSubjectToDelete(null)}
-          onConfirm={async () => {
-            const res = await deleteSubject(subjectToDelete.id);
-            if (res.error) {
-              throw new Error(res.error);
-            }
-            setSubjects((prev) => prev.filter((s) => s.id !== subjectToDelete.id));
-            setFeedbackMsg(`Matière "${subjectToDelete.name}" définitivement supprimée.`);
-            setTimeout(() => setFeedbackMsg(""), 4000);
-            setSubjectToDelete(null);
-          }}
+          itemFormat="Module Académique"
+        />
+      )}
+
+      {/* Revoke Role Confirmation Modal */}
+      {userToRevoke && (
+        <DeleteConfirmModal
+          isOpen={Boolean(userToRevoke)}
+          onClose={() => setUserToRevoke(null)}
+          onConfirm={executeRevokeRole}
+          itemName={userToRevoke.displayName}
+          itemType="user"
+          itemFormat="Privilèges Administrateur"
         />
       )}
     </div>

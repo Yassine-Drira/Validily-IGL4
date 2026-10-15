@@ -154,9 +154,56 @@ export function SubjectLearningWorkspace({
 
   // Subject Visual Theme (Icon Glyph & tailored colors)
   const subjectVisual = React.useMemo(() => {
-    return getSubjectVisual(subject.slug || subject.name);
-  }, [subject.slug, subject.name]);
+    return getSubjectVisual(subject.slug || subject.name, subject.icon);
+  }, [subject.slug, subject.name, subject.icon]);
   const SubjectGlyph = subjectVisual.icon;
+
+  // --- UNIFIED ACADEMIC TAXONOMY FILTERING ---
+  const [taxonomyFilter, setTaxonomyFilter] = useState<"all" | "exams" | "ds" | "tp" | "courses">("all");
+
+  const examsCount = resources.filter(
+    (r) => r.category?.slug?.includes("exam") || r.category?.name?.toLowerCase().includes("exam")
+  ).length;
+  const dsCount = resources.filter(
+    (r) => r.category?.slug?.includes("ds") || r.category?.name?.toLowerCase().includes("ds")
+  ).length;
+  const tpCount = resources.filter(
+    (r) =>
+      r.category?.slug?.includes("tp") ||
+      r.category?.name?.toLowerCase().includes("tp") ||
+      r.category?.name?.toLowerCase().includes("practical")
+  ).length;
+  const coursesCount = resources.filter(
+    (r) => r.category?.slug?.includes("course") || r.category?.name?.toLowerCase().includes("course")
+  ).length;
+
+  const displayedResources = React.useMemo(() => {
+    if (taxonomyFilter === "all") return resources;
+    if (taxonomyFilter === "exams") {
+      return resources.filter(
+        (r) => r.category?.slug?.includes("exam") || r.category?.name?.toLowerCase().includes("exam")
+      );
+    }
+    if (taxonomyFilter === "ds") {
+      return resources.filter(
+        (r) => r.category?.slug?.includes("ds") || r.category?.name?.toLowerCase().includes("ds")
+      );
+    }
+    if (taxonomyFilter === "tp") {
+      return resources.filter(
+        (r) =>
+          r.category?.slug?.includes("tp") ||
+          r.category?.name?.toLowerCase().includes("tp") ||
+          r.category?.name?.toLowerCase().includes("practical")
+      );
+    }
+    if (taxonomyFilter === "courses") {
+      return resources.filter(
+        (r) => r.category?.slug?.includes("course") || r.category?.name?.toLowerCase().includes("course")
+      );
+    }
+    return resources;
+  }, [resources, taxonomyFilter]);
 
   // --- DERIVED METRICS FOR PRACTICAL PROGRESS TRACKER ---
   const cheatSheets = notes.filter((n) => n.tags?.includes("cheat-sheet"));
@@ -289,18 +336,18 @@ ${resources.map((r) => `<li><strong>${r.title}</strong> (${r.mime_type}) - ${r.s
           )}
         />
 
-        <div className="relative flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-          <div className="flex items-start space-x-4">
+        <div className="relative flex flex-col xl:flex-row xl:items-center justify-between gap-6">
+          <div className="flex items-start space-x-4 flex-1 min-w-0">
             <div
               className={cn(
-                "w-16 h-16 rounded-2xl border flex items-center justify-center shrink-0 shadow-sm transition-transform duration-200 group-hover:scale-105",
+                "w-16 h-16 rounded-2xl border flex items-center justify-center shrink-0 shadow-sm transition-transform duration-200",
                 subjectVisual.bgLight,
                 subjectVisual.borderLight
               )}
             >
               <SubjectGlyph className={cn("w-9 h-9", subjectVisual.color)} />
             </div>
-            <div>
+            <div className="flex-1 min-w-0">
               <div className="flex items-center space-x-2 mb-1.5 flex-wrap gap-y-1">
                 <span
                   className={cn(
@@ -321,7 +368,7 @@ ${resources.map((r) => `<li><strong>${r.title}</strong> (${r.mime_type}) - ${r.s
                   <span>Module IGL4</span>
                 </span>
               </div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-[#111A2E] tracking-tight">
+              <h1 className="text-2xl sm:text-3xl font-bold text-[#111A2E] tracking-tight truncate">
                 {subject.name}
               </h1>
               <p className="text-xs sm:text-sm text-[#68748A] mt-1 max-w-2xl leading-relaxed">
@@ -331,7 +378,7 @@ ${resources.map((r) => `<li><strong>${r.title}</strong> (${r.mime_type}) - ${r.s
           </div>
 
           {/* Quick Actions */}
-          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+          <div className="flex flex-wrap items-center gap-2.5 shrink-0 xl:self-center">
             <button
               type="button"
               onClick={() => {
@@ -507,21 +554,134 @@ ${resources.map((r) => `<li><strong>${r.title}</strong> (${r.mime_type}) - ${r.s
 
       {/* --- TAB 1: COURS & RESSOURCES (DYNAMIC FOLDER-BASED FILE LIBRARY) --- */}
       {activeTab === "resources" && (
-        <SubjectFileLibrary
-          subject={subject}
-          categories={categories}
-          resources={resources}
-          folders={folders}
-          onResourcesChange={setResources}
-          onFoldersChange={setFolders}
-          onViewPdf={(res) => setViewingResource(res)}
-          onViewText={(res) => setViewingTextResource(res)}
-          onOpenUploadModal={(folderId) => {
-            setTargetUploadFolderId(folderId);
-            setIsAddResourceModalOpen(true);
-          }}
-          showFeedback={showFeedback}
-        />
+        <div className="space-y-4">
+          {/* Unified Academic Taxonomy Bar */}
+          <div className="flex flex-wrap items-center gap-2 bg-white border border-[#E4E8F0] p-2.5 rounded-xl shadow-2xs">
+            <span className="text-[11px] font-bold text-[#68748A] uppercase tracking-wider px-2">
+              Organisation :
+            </span>
+            <button
+              type="button"
+              onClick={() => setTaxonomyFilter("all")}
+              className={cn(
+                "text-xs px-3 py-1.5 rounded-lg font-medium transition-all flex items-center space-x-1.5 cursor-pointer",
+                taxonomyFilter === "all"
+                  ? "bg-[#2855D9] text-white shadow-xs font-semibold"
+                  : "text-[#68748A] hover:bg-[#F4F6FA] hover:text-[#111A2E]"
+              )}
+            >
+              <span>Tous les documents</span>
+              <span
+                className={cn(
+                  "text-[10px] px-1.5 py-0.2 rounded-full font-mono",
+                  taxonomyFilter === "all" ? "bg-white/20 text-white" : "bg-[#F4F6FA] text-[#68748A]"
+                )}
+              >
+                {resources.length}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setTaxonomyFilter("exams")}
+              className={cn(
+                "text-xs px-3 py-1.5 rounded-lg font-medium transition-all flex items-center space-x-1.5 cursor-pointer",
+                taxonomyFilter === "exams"
+                  ? "bg-[#2855D9] text-white shadow-xs font-semibold"
+                  : "text-[#68748A] hover:bg-[#F4F6FA] hover:text-[#111A2E]"
+              )}
+            >
+              <span>Examens</span>
+              <span
+                className={cn(
+                  "text-[10px] px-1.5 py-0.2 rounded-full font-mono",
+                  taxonomyFilter === "exams" ? "bg-white/20 text-white" : "bg-[#F4F6FA] text-[#68748A]"
+                )}
+              >
+                {examsCount}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setTaxonomyFilter("ds")}
+              className={cn(
+                "text-xs px-3 py-1.5 rounded-lg font-medium transition-all flex items-center space-x-1.5 cursor-pointer",
+                taxonomyFilter === "ds"
+                  ? "bg-[#2855D9] text-white shadow-xs font-semibold"
+                  : "text-[#68748A] hover:bg-[#F4F6FA] hover:text-[#111A2E]"
+              )}
+            >
+              <span>DS & Évaluations</span>
+              <span
+                className={cn(
+                  "text-[10px] px-1.5 py-0.2 rounded-full font-mono",
+                  taxonomyFilter === "ds" ? "bg-white/20 text-white" : "bg-[#F4F6FA] text-[#68748A]"
+                )}
+              >
+                {dsCount}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setTaxonomyFilter("tp")}
+              className={cn(
+                "text-xs px-3 py-1.5 rounded-lg font-medium transition-all flex items-center space-x-1.5 cursor-pointer",
+                taxonomyFilter === "tp"
+                  ? "bg-[#2855D9] text-white shadow-xs font-semibold"
+                  : "text-[#68748A] hover:bg-[#F4F6FA] hover:text-[#111A2E]"
+              )}
+            >
+              <span>TP & Ateliers</span>
+              <span
+                className={cn(
+                  "text-[10px] px-1.5 py-0.2 rounded-full font-mono",
+                  taxonomyFilter === "tp" ? "bg-white/20 text-white" : "bg-[#F4F6FA] text-[#68748A]"
+                )}
+              >
+                {tpCount}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setTaxonomyFilter("courses")}
+              className={cn(
+                "text-xs px-3 py-1.5 rounded-lg font-medium transition-all flex items-center space-x-1.5 cursor-pointer",
+                taxonomyFilter === "courses"
+                  ? "bg-[#2855D9] text-white shadow-xs font-semibold"
+                  : "text-[#68748A] hover:bg-[#F4F6FA] hover:text-[#111A2E]"
+              )}
+            >
+              <span>Cours & Supports</span>
+              <span
+                className={cn(
+                  "text-[10px] px-1.5 py-0.2 rounded-full font-mono",
+                  taxonomyFilter === "courses" ? "bg-white/20 text-white" : "bg-[#F4F6FA] text-[#68748A]"
+                )}
+              >
+                {coursesCount}
+              </span>
+            </button>
+          </div>
+
+          <SubjectFileLibrary
+            subject={subject}
+            categories={categories}
+            resources={displayedResources}
+            folders={folders}
+            onResourcesChange={setResources}
+            onFoldersChange={setFolders}
+            onViewPdf={(res) => setViewingResource(res)}
+            onViewText={(res) => setViewingTextResource(res)}
+            onOpenUploadModal={(folderId) => {
+              setTargetUploadFolderId(folderId);
+              setIsAddResourceModalOpen(true);
+            }}
+            showFeedback={showFeedback}
+          />
+        </div>
       )}
 
       {/* --- TAB 2: QCM & QUIZ --- */}

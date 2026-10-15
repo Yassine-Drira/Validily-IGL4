@@ -14,6 +14,8 @@ import {
   FileText,
 } from "lucide-react";
 
+import { getRequesterUser } from "@/lib/auth/authorization";
+
 export const dynamic = "force-dynamic";
 
 interface ResourceDetailPageProps {
@@ -30,6 +32,14 @@ export default async function ResourceDetailPage({
 
   if (!resource) {
     notFound();
+  }
+
+  // Strict Access Control: Private resources are only visible to the owner or admin
+  if (resource.visibility === "private") {
+    const requester = await getRequesterUser();
+    if (!requester || (requester.id !== resource.owner_id && requester.role !== "admin")) {
+      notFound();
+    }
   }
 
   // Generate signed viewing URL if Supabase is configured

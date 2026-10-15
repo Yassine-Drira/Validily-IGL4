@@ -11,6 +11,7 @@ import { AdminManager } from "@/components/admin/admin-manager";
 import { getRequesterUser, isUserAdmin } from "@/lib/auth/authorization";
 
 import { listManagedUsers } from "@/lib/actions/admin-actions";
+import { getRecentAuditLogs } from "@/lib/audit/audit-logger";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +31,7 @@ export default async function AdminPage() {
   const categories = await getCategories();
   const resources = await getResources();
   const usersRes = await listManagedUsers();
+  const auditLogs = getRecentAuditLogs(50);
 
   return (
     <div className="space-y-6">
@@ -43,6 +45,7 @@ export default async function AdminPage() {
         currentUser={user}
         isAdmin={isAdmin}
         initialUsers={usersRes.users || []}
+        initialAuditLogs={auditLogs}
       />
     </div>
   );

@@ -14,6 +14,13 @@ import {
   Boxes,
   Calendar,
   Layers,
+  Database,
+  Terminal,
+  Sparkles,
+  BookOpen,
+  Atom,
+  Globe,
+  Lock,
   LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -26,6 +33,40 @@ export interface SubjectVisual {
   icon: (props: { className?: string }) => React.ReactElement;
   displayName: string;
 }
+
+export const AVAILABLE_SUBJECT_ICONS = [
+  { name: "Brain", label: "Intelligence Artificielle", icon: Brain },
+  { name: "Cpu", label: "Algorithmique & CPU", icon: Cpu },
+  { name: "Smartphone", label: "Mobile / Flutter", icon: Smartphone },
+  { name: "ShieldCheck", label: "Cybersécurité & Défense", icon: ShieldCheck },
+  { name: "Cloud", label: "Cloud & Virtualisation", icon: Cloud },
+  { name: "Database", label: "Bases de Données & SQL", icon: Database },
+  { name: "Network", label: "Réseaux & Optimisation", icon: Network },
+  { name: "Code2", label: "Génie Logiciel / Code", icon: Code2 },
+  { name: "Building2", label: "Entreprise & Organisation", icon: Building2 },
+  { name: "Calendar", label: "Gestion de Projet / Agile", icon: Calendar },
+  { name: "TrendingUp", label: "Processus Stochastiques", icon: TrendingUp },
+  { name: "Boxes", label: "Architecture / Microservices", icon: Boxes },
+  { name: "Layers", label: "Systèmes Distribués", icon: Layers },
+  { name: "Terminal", label: "Systèmes & Shell", icon: Terminal },
+  { name: "Sparkles", label: "Atelier & Innovation", icon: Sparkles },
+  { name: "BookOpen", label: "Théorie & Fondamentaux", icon: BookOpen },
+  { name: "Atom", label: "Sciences & Recherche", icon: Atom },
+  { name: "Globe", label: "Technologies Web & Réseaux", icon: Globe },
+  { name: "Lock", label: "Sécurité & Chiffrement", icon: Lock },
+  { name: "Folder", label: "Module Général", icon: Folder },
+];
+
+export const PRESET_ACCESSIBLE_COLORS = [
+  { name: "Bleu Océan", hex: "#2563EB", textClass: "text-[#2563EB]", bgLight: "bg-[#EFF6FF]", borderLight: "border-[#BFDBFE]" },
+  { name: "Indigo", hex: "#4F46E5", textClass: "text-[#4F46E5]", bgLight: "bg-[#EEF2FF]", borderLight: "border-[#C7D2FE]" },
+  { name: "Émeraude", hex: "#059669", textClass: "text-[#059669]", bgLight: "bg-[#ECFDF5]", borderLight: "border-[#A7F3D0]" },
+  { name: "Violet", hex: "#7C3AED", textClass: "text-[#7C3AED]", bgLight: "bg-[#F5F3FF]", borderLight: "border-[#DDD6FE]" },
+  { name: "Cyan", hex: "#0284C7", textClass: "text-[#0284C7]", bgLight: "bg-[#E0F2FE]", borderLight: "border-[#BAE6FD]" },
+  { name: "Ambre", hex: "#D97706", textClass: "text-[#D97706]", bgLight: "bg-[#FFFBEB]", borderLight: "border-[#FDE68A]" },
+  { name: "Rose", hex: "#E11D48", textClass: "text-[#E11D48]", bgLight: "bg-[#FFF1F2]", borderLight: "border-[#FECDD3]" },
+  { name: "Ardoise", hex: "#475569", textClass: "text-[#475569]", bgLight: "bg-[#F8FAFC]", borderLight: "border-[#E2E8F0]" },
+];
 
 export function FlutterGlyph({ className = "w-5 h-5" }: { className?: string }) {
   return (
@@ -111,7 +152,53 @@ export function OptimizationGlyph({ className = "w-5 h-5" }: { className?: strin
   );
 }
 
-export function getSubjectVisual(slugOrName: string = ""): SubjectVisual {
+export function getSubjectVisual(
+  slugOrName: string = "",
+  customConfig?: string | null
+): SubjectVisual {
+  // 1. If customConfig is provided (e.g. "Brain:#4F46E5", "Cpu", or JSON)
+  if (customConfig && typeof customConfig === "string") {
+    let iconName = customConfig.trim();
+    let hexColor: string | null = null;
+
+    if (customConfig.includes(":")) {
+      const parts = customConfig.split(":");
+      iconName = parts[0].trim();
+      hexColor = parts[1].trim();
+    } else if (customConfig.startsWith("{")) {
+      try {
+        const parsed = JSON.parse(customConfig);
+        iconName = parsed.icon || iconName;
+        hexColor = parsed.color || null;
+      } catch {
+        // Fall back
+      }
+    }
+
+    const matchedIcon = AVAILABLE_SUBJECT_ICONS.find(
+      (item) => item.name.toLowerCase() === iconName.toLowerCase()
+    );
+
+    const matchedPalette = hexColor
+      ? PRESET_ACCESSIBLE_COLORS.find(
+          (p) => p.hex.toLowerCase() === hexColor!.toLowerCase()
+        )
+      : null;
+
+    if (matchedIcon) {
+      const IconComponent = matchedIcon.icon;
+      const palette = matchedPalette || PRESET_ACCESSIBLE_COLORS[0];
+      return {
+        color: palette.textClass,
+        bgLight: palette.bgLight,
+        borderLight: palette.borderLight,
+        badgeBg: `${palette.bgLight} ${palette.textClass}`,
+        icon: (props) => <IconComponent {...props} />,
+        displayName: slugOrName || matchedIcon.label,
+      };
+    }
+  }
+
   const key = (slugOrName || "").toLowerCase();
 
   if (key.includes("flutter")) {

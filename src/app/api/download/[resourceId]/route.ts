@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getResourceById } from "@/lib/supabase/repository";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
+import { getRequesterUser } from "@/lib/auth/authorization";
 
 export async function GET(
   req: NextRequest,
@@ -11,6 +12,17 @@ export async function GET(
 
   if (!resource) {
     return NextResponse.json({ error: "Resource not found" }, { status: 404 });
+  }
+
+  // Strict Access Control: Private resources are only accessible by owner or admin
+  if (resource.visibility === "private") {
+    const requester = await getRequesterUser();
+    if (!requester || (requester.id !== resource.owner_id && requester.role !== "admin")) {
+      return NextResponse.json(
+        { error: "Accès refusé. Cette ressource est privée." },
+        { status: 403 }
+      );
+    }
   }
 
   // Handle external URLs (Google Drive, GitHub, etc.) by redirecting directly
