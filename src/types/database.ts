@@ -51,6 +51,17 @@ export interface ResourceCategory {
   resource_count?: number;
 }
 
+export interface SubjectFolder {
+  id: string;
+  subject_id: string;
+  name: string;
+  parent_id: string | null;
+  color?: string;
+  sort_order?: number;
+  created_at: string;
+  updated_at?: string;
+}
+
 export interface AcademicResource {
   id: string;
   subject_id: string;
@@ -65,7 +76,7 @@ export interface AcademicResource {
   academic_year: string | null;
   exam_session: string | null;
   instructor: string | null;
-  chapter: string | null;
+  chapter: string | null; // holds folder_id
   tags: string[];
   visibility: ResourceVisibility;
   publication_status: PublicationStatus;
@@ -74,6 +85,7 @@ export interface AcademicResource {
   // joined fields
   subject?: Subject;
   category?: ResourceCategory;
+  folder?: SubjectFolder;
   owner_profile?: Profile;
   is_bookmarked?: boolean;
   revision_status?: RevisionStatus;

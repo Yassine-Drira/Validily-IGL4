@@ -5,6 +5,7 @@ import {
   getCategories,
   getNotes,
   getSubjectQuizzesWithQuestions,
+  getSubjectFolders,
 } from "@/lib/supabase/repository";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { SubjectLearningWorkspace } from "@/components/workspace/subject-learning-workspace";
@@ -27,14 +28,15 @@ export default async function SubjectWorkspace({
     notFound();
   }
 
-  const [categories, resources, allNotes, quizzes] = await Promise.all([
+  const [categories, resources, allNotes, quizzes, folders] = await Promise.all([
     getCategories(),
     getResources({ subjectId: subject.id }),
     getNotes(),
     getSubjectQuizzesWithQuestions(subject.id),
+    getSubjectFolders(subject.id),
   ]);
 
-  const subjectNotes = allNotes.filter((n) => n.subject_id === subject.id);
+  const subjectNotes = allNotes.filter((n: any) => n.subject_id === subject.id);
 
   const semesterLabel =
     subject.semester?.name ||
@@ -61,6 +63,7 @@ export default async function SubjectWorkspace({
         initialResources={resources}
         initialNotes={subjectNotes}
         initialQuizzes={quizzes}
+        initialFolders={folders}
       />
     </div>
   );

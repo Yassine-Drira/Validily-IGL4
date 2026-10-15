@@ -17,14 +17,15 @@ export async function createResource(data: {
   subject_id: string;
   category_id: string;
   title: string;
-  description?: string;
+  description?: string | null;
   storage_path?: string;
   external_url?: string;
   original_filename?: string;
   mime_type?: string;
   file_size_bytes?: number;
   exam_session?: string;
-  instructor?: string;
+  instructor?: string | null;
+  chapter?: string | null;
   tags?: string[];
 }): Promise<{ success?: boolean; error?: string; resource?: AcademicResource }> {
   try {
@@ -61,6 +62,7 @@ export async function createResource(data: {
         file_size_bytes: data.file_size_bytes || 0,
         exam_session: data.exam_session || null,
         instructor: data.instructor || null,
+        chapter: data.chapter || null,
         tags: data.tags || [],
         visibility: "public",
         publication_status: "published",
@@ -80,6 +82,135 @@ export async function createResource(data: {
     return { success: true, resource };
   } catch (err: any) {
     return { error: err.message || "Failed to create resource." };
+  }
+}
+
+/**
+ * Add an external link (Google Drive, Dropbox, Web resource) without duplicating storage
+ */
+export async function createExternalLinkResource(data: {
+  subject_id: string;
+  category_id?: string;
+  title: string;
+  url: string;
+  folder_id?: string | null;
+  description?: string;
+  instructor?: string;
+}): Promise<{ success?: boolean; error?: string; resource?: AcademicResource }> {
+  try {
+    if (!data.url?.trim() || !data.title?.trim() || !data.subject_id) {
+      return { error: "URL, Titre et Matière sont requis." };
+    }
+
+    let normalizedUrl = data.url.trim();
+    if (!/^https?:\/\//i.test(normalizedUrl)) {
+      normalizedUrl = `https://${normalizedUrl}`;
+    }
+
+    const isGoogleDrive = normalizedUrl.includes("drive.google.com");
+    const isGithub = normalizedUrl.includes("github.com");
+    const mimeType = isGoogleDrive ? "application/vnd.google-apps" : "application/x-url";
+    const filename = isGoogleDrive ? "Google Drive Resource" : isGithub ? "GitHub Repo" : "External Web Link";
+
+    const tags: string[] = ["external_link"];
+    if (isGoogleDrive) tags.push("gdrive");
+    if (isGithub) tags.push("github");
+
+    let categoryId = data.category_id;
+    if (!categoryId) {
+      const serviceSupabase = getServiceSupabase();
+      const { data: firstCat } = await serviceSupabase
+        .from("resource_categories")
+        .select("id")
+        .limit(1)
+        .maybeSingle();
+      categoryId = firstCat?.id || "cat-courses";
+    }
+
+    return await createResource({
+      subject_id: data.subject_id,
+      category_id: categoryId || "cat-courses",
+      title: data.title.trim(),
+      description: data.description?.trim() || null,
+      storage_path: normalizedUrl,
+      external_url: normalizedUrl,
+      original_filename: filename,
+      mime_type: mimeType,
+      file_size_bytes: 0,
+      instructor: data.instructor || null,
+      chapter: data.folder_id || null,
+      tags,
+    });
+  } catch (err: any) {
+    return { error: err.message || "Échec de l'ajout du lien externe." };
+  }
+}
+
+/**
+ * Move a resource into a folder or to the root of the subject
+ */
+export async function moveResourceAction(
+  resourceId: string,
+  targetFolderId: string | null
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    if (!isSupabaseConfigured()) {
+      return { success: true };
+    }
+
+    const serviceSupabase = getServiceSupabase();
+    const { error } = await serviceSupabase
+      .from("resources")
+      .update({
+        chapter: targetFolderId || null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", resourceId);
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    safeRevalidate("/subjects");
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Échec du déplacement de la ressource." };
+  }
+}
+
+/**
+ * Rename a resource
+ */
+export async function renameResourceAction(
+  resourceId: string,
+  newTitle: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    if (!newTitle?.trim()) {
+      return { success: false, error: "Le nouveau titre est requis." };
+    }
+
+    if (!isSupabaseConfigured()) {
+      return { success: true };
+    }
+
+    const serviceSupabase = getServiceSupabase();
+    const { error } = await serviceSupabase
+      .from("resources")
+      .update({
+        title: newTitle.trim(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", resourceId);
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    safeRevalidate("/subjects");
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Échec du renommage de la ressource." };
   }
 }
 

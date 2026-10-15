@@ -322,9 +322,34 @@ export async function getNotes(userId?: string): Promise<Note[]> {
       return [];
     }
 
-    return data;
+    return data.filter((n: any) => !n.tags?.includes("system_folder_registry"));
   } catch (err) {
     console.error("Failed to query notes from database:", err);
+    return [];
+  }
+}
+
+export async function getSubjectFolders(subjectId: string): Promise<import("@/types/database").SubjectFolder[]> {
+  try {
+    const supabase = await getDbClient();
+    const { data, error } = await supabase
+      .from("notes")
+      .select("id, content")
+      .eq("subject_id", subjectId)
+      .contains("tags", ["system_folder_registry"])
+      .maybeSingle();
+
+    if (error || !data || !data.content) {
+      return [];
+    }
+
+    try {
+      const parsed = JSON.parse(data.content);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  } catch {
     return [];
   }
 }

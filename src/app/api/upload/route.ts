@@ -12,6 +12,8 @@ export async function POST(req: NextRequest) {
     const instructor = formData.get("instructor") as string | null;
     const submitShared = formData.get("submitShared") === "on";
 
+    const folderId = (formData.get("folderId") as string | null) || (formData.get("chapter") as string | null);
+
     // 1. Validation
     if (!file || !subjectId || !categoryId || !title) {
       return NextResponse.json(
@@ -20,12 +22,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 2. MIME type & Extension Validation (PDF or HTML)
-    const isPdf = file.name.toLowerCase().endsWith(".pdf") || file.type === "application/pdf";
-    const isHtml = file.name.toLowerCase().endsWith(".html") || file.type === "text/html";
-    if (!isPdf && !isHtml) {
+    // 2. MIME type & Extension Validation (PDF, TXT, Markdown, HTML)
+    const lowerName = file.name.toLowerCase();
+    const isPdf = lowerName.endsWith(".pdf") || file.type === "application/pdf";
+    const isHtml = lowerName.endsWith(".html") || file.type === "text/html";
+    const isTxt = lowerName.endsWith(".txt") || file.type === "text/plain";
+    const isMd = lowerName.endsWith(".md") || lowerName.endsWith(".markdown") || file.type === "text/markdown";
+
+    if (!isPdf && !isHtml && !isTxt && !isMd) {
       return NextResponse.json(
-        { error: "Invalid file type. Only PDF (.pdf) and HTML (.html) documents are permitted." },
+        { error: "Type de fichier non autorisé. Formats acceptés : PDF (.pdf), Markdown (.md), Texte brut (.txt) et HTML (.html)." },
         { status: 400 }
       );
     }
@@ -51,7 +57,13 @@ export async function POST(req: NextRequest) {
     const uniqueStoragePath = `${userId}/${Date.now()}-${sanitizedFilename}`;
 
     const fileBuffer = await file.arrayBuffer();
-    const mimeType = isHtml ? "text/html" : "application/pdf";
+    const mimeType = isHtml
+      ? "text/html"
+      : isMd
+      ? "text/markdown"
+      : isTxt
+      ? "text/plain"
+      : "application/pdf";
 
     const { error: storageError } = await serviceSupabase.storage
       .from("academic-resources")
@@ -84,6 +96,7 @@ export async function POST(req: NextRequest) {
         mime_type: mimeType,
         file_size_bytes: file.size,
         instructor: instructor?.trim() || null,
+        chapter: folderId || null,
         visibility,
         publication_status,
       })
