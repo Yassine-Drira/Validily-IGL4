@@ -136,7 +136,7 @@ export default async function HomePage() {
     getDashboardMetrics(),
     getSubjects("sem-1"),
     getSubjects("sem-2"),
-    getResources({ limit: 4 }),
+    getResources({ limit: 4, userId: currentUser?.id }),
     getCategories(),
   ]);
 

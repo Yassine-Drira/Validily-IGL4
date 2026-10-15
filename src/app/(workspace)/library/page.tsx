@@ -1,4 +1,5 @@
 import { getSubjects, getCategories, getResources } from "@/lib/supabase/repository";
+import { getRequesterUser } from "@/lib/auth/authorization";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { ResourceCard } from "@/components/academic/resource-card";
 import { Button } from "@/components/ui/button";
@@ -45,11 +46,14 @@ export default async function LibraryPage({ searchParams }: LibraryPageProps) {
 
   const targetCategoryId = matchedCategory ? matchedCategory.id : effectiveCategoryParam;
 
-  // Dynamic PostgreSQL query with search and filters
+  const requester = await getRequesterUser();
+
+  // Dynamic PostgreSQL query with search and filters (strict privacy boundary)
   const resources = await getResources({
     subjectId: subjectId || undefined,
     categoryId: targetCategoryId || undefined,
     search: q?.trim() || undefined,
+    userId: requester?.id || undefined,
   });
 
   const isUploadModalOpen = action === "upload";

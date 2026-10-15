@@ -218,6 +218,8 @@ export async function getResources(options?: {
   categoryId?: string;
   search?: string;
   limit?: number;
+  userId?: string;
+  includeAll?: boolean;
 }): Promise<AcademicResource[]> {
   try {
     const supabase = await getDbClient();
@@ -226,6 +228,17 @@ export async function getResources(options?: {
       .select("*, subject:subjects(*), category:resource_categories(*)")
       .eq("publication_status", "published")
       .order("created_at", { ascending: false });
+
+    // Strict visibility and privacy isolation
+    if (options?.includeAll) {
+      // Administrative or explicitly unfiltered context
+    } else if (options?.userId) {
+      // Authenticated user: public resources OR owned by this user
+      query = query.or(`visibility.eq.public,owner_id.eq.${options.userId}`);
+    } else {
+      // Anonymous / public context (e.g. homepage, public library): strictly public resources only
+      query = query.eq("visibility", "public");
+    }
 
     if (options?.subjectId) {
       if (UUID_REGEX.test(options.subjectId)) {

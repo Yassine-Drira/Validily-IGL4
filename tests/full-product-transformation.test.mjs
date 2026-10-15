@@ -43,6 +43,10 @@ test("Acceptance 2: Privacy Isolation & Inaccessible Direct Endpoints for Unauth
 
   // 3. Unauthenticated note queries strictly isolate private notes
   assert.ok(repoCode.includes('query.eq("visibility", "public")'), "Unauthenticated notes query enforces public visibility filter");
+
+  // 4. Public getResources queries strictly filter for public documents
+  assert.ok(repoCode.includes('.eq("visibility", "public")'), "Public getResources strictly queries visibility: public");
+  assert.ok(repoCode.includes("owner_id.eq."), "Permits authenticated users to query their own resources");
 });
 
 // --- ACCEPTANCE TEST 3: CONSISTENCY & UNIFIED TAXONOMY ---

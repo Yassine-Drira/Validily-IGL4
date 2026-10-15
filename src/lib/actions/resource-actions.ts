@@ -6,10 +6,12 @@ import { getServiceSupabase, getEffectiveUserId } from "@/lib/supabase/admin";
 import { RevisionStatus, AcademicResource } from "@/types/database";
 import { logAuditEvent } from "@/lib/audit/audit-logger";
 import { getRequesterUser, assertOwnershipOrAdmin } from "@/lib/auth/authorization";
+import { invalidateRepositoryCache } from "@/lib/supabase/repository";
 
 function safeRevalidate(path: string) {
   try {
     revalidatePath(path);
+    invalidateRepositoryCache();
   } catch {
     // Outside active Next.js request context
   }
@@ -483,9 +485,11 @@ export async function updateResourceVisibility(
       metadata: { old_visibility: resource.visibility, new_visibility: visibility, title: resource.title },
     });
 
-    safeRevalidate(`/resources/${resourceId}`);
+    safeRevalidate("/");
+    safeRevalidate("/my-space");
     safeRevalidate("/library");
     safeRevalidate("/subjects");
+    safeRevalidate(`/resources/${resourceId}`);
     return { success: true };
   } catch (err: any) {
     return { error: err.message || "Échec de modification de la visibilité." };

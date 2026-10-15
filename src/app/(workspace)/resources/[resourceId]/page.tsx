@@ -8,10 +8,13 @@ import { PdfViewer } from "@/components/pdf/pdf-viewer";
 import { ExternalLinkViewer } from "@/components/resources/external-link-viewer";
 import { ResourceActionsBar } from "@/components/resources/resource-actions-bar";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
+import { Button } from "@/components/ui/button";
 import {
   Calendar,
   User,
   FileText,
+  Lock,
+  ShieldAlert,
 } from "lucide-react";
 
 import { getRequesterUser } from "@/lib/auth/authorization";
@@ -37,8 +40,64 @@ export default async function ResourceDetailPage({
   // Strict Access Control: Private resources are only visible to the owner or admin
   if (resource.visibility === "private") {
     const requester = await getRequesterUser();
-    if (!requester || (requester.id !== resource.owner_id && requester.role !== "admin")) {
-      notFound();
+    if (!requester) {
+      return (
+        <div className="max-w-md mx-auto my-16 bg-white border border-[#E4E8F0] rounded-2xl p-8 text-center shadow-xs space-y-4">
+          <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto border border-amber-200">
+            <Lock className="w-6 h-6" />
+          </div>
+          <div>
+            <h2 className="text-base font-bold text-[#111A2E]">
+              Document Privé — Connexion Requise
+            </h2>
+            <p className="text-xs text-[#68748A] mt-1.5 leading-relaxed">
+              Ce document a été configuré comme privé. Connectez-vous à votre compte étudiant pour y accéder si vous en êtes le propriétaire.
+            </p>
+          </div>
+          <div className="flex items-center justify-center space-x-2 pt-2">
+            <Link href={`/login?next=/resources/${resourceId}`}>
+              <Button size="sm" variant="primary" className="text-xs">
+                Se connecter
+              </Button>
+            </Link>
+            <Link href="/">
+              <Button size="sm" variant="outline" className="text-xs">
+                Retour à l&apos;accueil
+              </Button>
+            </Link>
+          </div>
+        </div>
+      );
+    }
+
+    if (requester.id !== resource.owner_id && requester.role !== "admin") {
+      return (
+        <div className="max-w-md mx-auto my-16 bg-white border border-[#E4E8F0] rounded-2xl p-8 text-center shadow-xs space-y-4">
+          <div className="w-14 h-14 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto border border-rose-200">
+            <ShieldAlert className="w-6 h-6" />
+          </div>
+          <div>
+            <h2 className="text-base font-bold text-[#111A2E]">
+              Accès Restreint
+            </h2>
+            <p className="text-xs text-[#68748A] mt-1.5 leading-relaxed">
+              Ce document est privé et appartient à un autre étudiant. Vous n&apos;avez pas les autorisations nécessaires pour le consulter.
+            </p>
+          </div>
+          <div className="flex items-center justify-center space-x-2 pt-2">
+            <Link href="/library">
+              <Button size="sm" variant="primary" className="text-xs">
+                Bibliothèque
+              </Button>
+            </Link>
+            <Link href="/my-space">
+              <Button size="sm" variant="outline" className="text-xs">
+                Mon Espace
+              </Button>
+            </Link>
+          </div>
+        </div>
+      );
     }
   }
 

@@ -9,6 +9,7 @@ import {
 } from "@/lib/supabase/repository";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { SubjectLearningWorkspace } from "@/components/workspace/subject-learning-workspace";
+import { getRequesterUser } from "@/lib/auth/authorization";
 
 export const dynamic = "force-dynamic";
 
@@ -28,10 +29,12 @@ export default async function SubjectWorkspace({
     notFound();
   }
 
+  const requester = await getRequesterUser();
+
   const [categories, resources, allNotes, quizzes, folders] = await Promise.all([
     getCategories(),
-    getResources({ subjectId: subject.id }),
-    getNotes(),
+    getResources({ subjectId: subject.id, userId: requester?.id }),
+    getNotes(requester?.id),
     getSubjectQuizzesWithQuestions(subject.id),
     getSubjectFolders(subject.id),
   ]);
