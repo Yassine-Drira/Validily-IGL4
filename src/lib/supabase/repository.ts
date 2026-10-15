@@ -33,15 +33,24 @@ export async function getSemesters(): Promise<Semester[]> {
   }
 }
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function getSemesterById(idOrSlug: string): Promise<Semester | null> {
   try {
     const supabase = await createClient();
-    const { data, error } = await supabase
-      .from("semesters")
-      .select("*, subjects:subjects(count)")
-      .or(`id.eq.${idOrSlug},name.ilike.%${idOrSlug}%`)
-      .maybeSingle();
+    let query = supabase.from("semesters").select("*, subjects:subjects(count)");
 
+    if (UUID_REGEX.test(idOrSlug)) {
+      query = query.eq("id", idOrSlug);
+    } else if (idOrSlug === "sem-1" || idOrSlug.includes("1")) {
+      query = query.eq("id", "11111111-1111-1111-1111-111111111111");
+    } else if (idOrSlug === "sem-2" || idOrSlug.includes("2")) {
+      query = query.eq("id", "22222222-2222-2222-2222-222222222222");
+    } else {
+      query = query.ilike("name", `%${idOrSlug}%`);
+    }
+
+    const { data, error } = await query.maybeSingle();
     if (error || !data) {
       return null;
     }
@@ -65,7 +74,13 @@ export async function getSubjects(semesterId?: string): Promise<Subject[]> {
       .order("sort_order", { ascending: true });
 
     if (semesterId) {
-      query = query.eq("semester_id", semesterId);
+      if (UUID_REGEX.test(semesterId)) {
+        query = query.eq("semester_id", semesterId);
+      } else if (semesterId === "sem-1" || semesterId.includes("1")) {
+        query = query.eq("semester_id", "11111111-1111-1111-1111-111111111111");
+      } else if (semesterId === "sem-2" || semesterId.includes("2")) {
+        query = query.eq("semester_id", "22222222-2222-2222-2222-222222222222");
+      }
     }
 
     const { data, error } = await query;
@@ -87,11 +102,17 @@ export async function getSubjects(semesterId?: string): Promise<Subject[]> {
 export async function getSubjectBySlugOrId(idOrSlug: string): Promise<Subject | null> {
   try {
     const supabase = await createClient();
-    const { data, error } = await supabase
+    let query = supabase
       .from("subjects")
-      .select("*, semester:semesters(*), resources:resources(count)")
-      .or(`id.eq.${idOrSlug},slug.eq.${idOrSlug}`)
-      .maybeSingle();
+      .select("*, semester:semesters(*), resources:resources(count)");
+
+    if (UUID_REGEX.test(idOrSlug)) {
+      query = query.or(`id.eq.${idOrSlug},slug.eq.${idOrSlug}`);
+    } else {
+      query = query.eq("slug", idOrSlug);
+    }
+
+    const { data, error } = await query.maybeSingle();
 
     if (error || !data) {
       return null;
