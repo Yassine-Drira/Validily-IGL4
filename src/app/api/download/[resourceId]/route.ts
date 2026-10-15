@@ -13,6 +13,22 @@ export async function GET(
     return NextResponse.json({ error: "Resource not found" }, { status: 404 });
   }
 
+  // Handle external URLs (Google Drive, GitHub, etc.) by redirecting directly
+  const isExternalUrl =
+    resource.storage_path?.startsWith("http://") ||
+    resource.storage_path?.startsWith("https://") ||
+    resource.mime_type === "application/x-url" ||
+    resource.mime_type === "application/vnd.google-apps" ||
+    Boolean(resource.external_url);
+
+  if (isExternalUrl) {
+    const targetUrl =
+      (resource.storage_path?.startsWith("http") ? resource.storage_path : null) ||
+      resource.external_url ||
+      "https://drive.google.com";
+    return NextResponse.redirect(targetUrl, 303);
+  }
+
   if (!isSupabaseConfigured()) {
     // Return sample PDF stream or informative message
     return new NextResponse(

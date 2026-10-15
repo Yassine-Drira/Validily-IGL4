@@ -62,6 +62,7 @@ import {
   Filter,
   Folder,
   ShieldCheck,
+  Loader2,
 } from "lucide-react";
 
 interface SubjectLearningWorkspaceProps {
@@ -107,6 +108,39 @@ export function SubjectLearningWorkspace({
   const [isAddCheatModalOpen, setIsAddCheatModalOpen] = useState(false);
   const [quizToDelete, setQuizToDelete] = useState<any | null>(null);
   const [noteToDelete, setNoteToDelete] = useState<Note | null>(null);
+  const [isUploadingResource, setIsUploadingResource] = useState(false);
+  const [uploadError, setUploadError] = useState("");
+
+  const handleUploadSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIsUploadingResource(true);
+    setUploadError("");
+
+    try {
+      const formEl = e.currentTarget;
+      const formData = new FormData(formEl);
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        headers: { Accept: "application/json" },
+        body: formData,
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.error) {
+        throw new Error(data.error || "Échec de l'upload du fichier.");
+      }
+
+      if (data.resource) {
+        setResources((prev) => [data.resource, ...prev]);
+      }
+      setIsAddResourceModalOpen(false);
+      showFeedback("Document uploadé avec succès !");
+    } catch (err: any) {
+      setUploadError(err.message || "Une erreur est survenue lors de l'upload.");
+    } finally {
+      setIsUploadingResource(false);
+    }
+  };
 
   // Status & Feedback
   const [isPending, startTransition] = useTransition();
@@ -1019,9 +1053,15 @@ ${resources.map((r) => `<li><strong>${r.title}</strong> (${r.mime_type}) - ${r.s
               </button>
             </div>
 
+            {uploadError && (
+              <div className="bg-rose-50 border border-rose-200 text-rose-700 text-xs p-3 rounded-xl flex items-center space-x-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{uploadError}</span>
+              </div>
+            )}
+
             <form
-              action="/api/upload"
-              method="POST"
+              onSubmit={handleUploadSubmit}
               encType="multipart/form-data"
               className="space-y-4 text-xs"
             >
@@ -1098,11 +1138,24 @@ ${resources.map((r) => `<li><strong>${r.title}</strong> (${r.mime_type}) - ${r.s
                   size="sm"
                   variant="ghost"
                   onClick={() => setIsAddResourceModalOpen(false)}
+                  disabled={isUploadingResource}
                 >
                   Annuler
                 </Button>
-                <Button type="submit" size="sm" variant="primary">
-                  Uploader & Enregistrer
+                <Button
+                  type="submit"
+                  size="sm"
+                  variant="primary"
+                  disabled={isUploadingResource}
+                >
+                  {isUploadingResource ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
+                      <span>Upload en cours...</span>
+                    </>
+                  ) : (
+                    <span>Uploader & Enregistrer</span>
+                  )}
                 </Button>
               </div>
             </form>

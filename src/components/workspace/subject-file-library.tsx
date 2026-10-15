@@ -1028,8 +1028,8 @@ export function SubjectFileLibrary({
           itemName={resourceToDelete.title}
           itemType="resource"
           itemFormat={
-            resourceToDelete.storage_path.startsWith("http")
-              ? resourceToDelete.storage_path.includes("drive.google.com")
+            resourceToDelete.storage_path?.startsWith("http")
+              ? resourceToDelete.storage_path?.includes("drive.google.com")
                 ? "Google Drive"
                 : "Lien externe"
               : resourceToDelete.mime_type?.includes("pdf")

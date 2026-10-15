@@ -11,6 +11,7 @@ import {
   CheckCircle2,
   AlertCircle,
   Archive,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Semester, Subject, ResourceCategory } from "@/types/database";
@@ -366,9 +367,11 @@ export function AdminManager({
                       <button
                         type="button"
                         onClick={() => setSubjectToDelete(sub)}
-                        className="text-rose-600 hover:text-rose-800 text-xs font-medium transition-colors cursor-pointer"
+                        className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-semibold text-rose-600 hover:text-white hover:bg-rose-600 border border-rose-200 hover:border-rose-600 transition-colors cursor-pointer shadow-2xs"
+                        title={`Supprimer ${sub.name}`}
                       >
-                        Delete
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Supprimer</span>
                       </button>
                     </td>
                   </tr>
