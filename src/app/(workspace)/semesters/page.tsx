@@ -24,10 +24,10 @@ export default async function SemestersPage() {
           </p>
         </div>
 
-        <Link href="/admin/semesters">
+        <Link href="/admin">
           <Button size="sm" variant="outline" className="text-xs">
             <Plus className="w-3.5 h-3.5" />
-            <span>Manage Semesters</span>
+            <span>Gérer les semestres</span>
           </Button>
         </Link>
       </div>

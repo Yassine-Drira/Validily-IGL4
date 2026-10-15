@@ -16,8 +16,9 @@ import { Button } from "@/components/ui/button";
 import { Semester, Subject, ResourceCategory } from "@/types/database";
 import {
   createSubject,
+  updateSubject,
+  deleteSubject,
   createSemester,
-  archiveSubject,
 } from "@/lib/actions/admin-actions";
 
 interface AdminManagerProps {
@@ -64,14 +65,17 @@ export function AdminManager({
     setSubSlug(slug);
   };
 
+  const [errorMsg, setErrorMsg] = useState("");
+
   const handleCreateSubject = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!subName.trim() || !subSlug.trim()) return;
+    if (!subName.trim()) return;
 
     setIsSubmittingSub(true);
+    setErrorMsg("");
     try {
       const res = await createSubject({
-        semester_id: subSemesterId,
+        semester_id: subSemesterId || semesters[0]?.id,
         name: subName,
         slug: subSlug,
         description: subDescription,
@@ -79,29 +83,22 @@ export function AdminManager({
         sort_order: subjects.length + 1,
       });
 
-      const newSubject: Subject = res.subject || {
-        id: `sub-${Date.now()}`,
-        semester_id: subSemesterId,
-        name: subName,
-        slug: subSlug,
-        description: subDescription,
-        icon: subIcon,
-        sort_order: subjects.length + 1,
-        is_active: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        resource_count: 0,
-      };
+      if (res.error) {
+        setErrorMsg(res.error);
+        return;
+      }
 
-      setSubjects([...subjects, newSubject]);
-      setIsSubjectModalOpen(false);
-      setSubName("");
-      setSubSlug("");
-      setSubDescription("");
-      setFeedbackMsg(`Subject "${subName}" created successfully!`);
-      setTimeout(() => setFeedbackMsg(""), 4000);
-    } catch (err) {
-      console.error(err);
+      if (res.subject) {
+        setSubjects([...subjects, res.subject]);
+        setIsSubjectModalOpen(false);
+        setSubName("");
+        setSubSlug("");
+        setSubDescription("");
+        setFeedbackMsg(`Subject "${subName}" created and persisted successfully!`);
+        setTimeout(() => setFeedbackMsg(""), 4000);
+      }
+    } catch (err: any) {
+      setErrorMsg(err?.message || "Failed to create subject.");
     } finally {
       setIsSubmittingSub(false);
     }
@@ -112,46 +109,63 @@ export function AdminManager({
     if (!semName.trim() || !semYear.trim()) return;
 
     setIsSubmittingSem(true);
+    setErrorMsg("");
     try {
-      await createSemester({
+      const res = await createSemester({
         name: semName,
         academic_year: semYear,
         sort_order: semesters.length + 1,
       });
 
-      const newSem: Semester = {
-        id: `sem-${Date.now()}`,
-        name: semName,
-        academic_year: semYear,
-        sort_order: semesters.length + 1,
-        is_active: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        subject_count: 0,
-      };
+      if (res.error) {
+        setErrorMsg(res.error);
+        return;
+      }
 
-      setSemesters([...semesters, newSem]);
+      if (res.semester) {
+        setSemesters([...semesters, { ...res.semester, subject_count: 0 }]);
+      }
       setIsSemesterModalOpen(false);
       setSemName("");
       setFeedbackMsg(`Semester "${semName}" added to curriculum!`);
       setTimeout(() => setFeedbackMsg(""), 4000);
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      setErrorMsg(err?.message || "Failed to create semester.");
     } finally {
       setIsSubmittingSem(false);
+    }
+  };
+
+  const handleDelete = async (subjectId: string, subjectName: string) => {
+    if (!confirm(`Delete subject "${subjectName}" and all related resources? This action is permanent.`)) return;
+    try {
+      const res = await deleteSubject(subjectId);
+      if (res.error) {
+        alert(res.error);
+        return;
+      }
+      setSubjects(subjects.filter((s) => s.id !== subjectId));
+      setFeedbackMsg(`Subject "${subjectName}" permanently removed.`);
+      setTimeout(() => setFeedbackMsg(""), 4000);
+    } catch (err: any) {
+      alert(err?.message || "Failed to delete subject.");
     }
   };
 
   const handleArchive = async (subjectId: string, subjectName: string) => {
     if (!confirm(`Archive module "${subjectName}" from active listings?`)) return;
     try {
-      await archiveSubject(subjectId);
+      const res = await updateSubject(subjectId, { name: subjectName });
+      if (res.error) {
+        alert(res.error);
+        return;
+      }
       setSubjects(
         subjects.map((s) => (s.id === subjectId ? { ...s, is_active: false } : s))
       );
       setFeedbackMsg(`Subject "${subjectName}" archived.`);
       setTimeout(() => setFeedbackMsg(""), 4000);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
     }
   };
@@ -363,18 +377,14 @@ export function AdminManager({
                         {sub.is_active ? "Active" : "Archived"}
                       </span>
                     </td>
-                    <td className="py-2.5 px-3 text-right">
-                      {sub.is_active ? (
-                        <button
-                          type="button"
-                          onClick={() => handleArchive(sub.id, sub.name)}
-                          className="text-[#68748A] hover:text-rose-600 transition-colors cursor-pointer"
-                        >
-                          Archive
-                        </button>
-                      ) : (
-                        <span className="text-[#68748A]/40 italic">Archived</span>
-                      )}
+                    <td className="py-2.5 px-3 text-right space-x-2">
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(sub.id, sub.name)}
+                        className="text-rose-600 hover:text-rose-800 text-xs font-medium transition-colors cursor-pointer"
+                      >
+                        Delete
+                      </button>
                     </td>
                   </tr>
                 );
@@ -400,6 +410,13 @@ export function AdminManager({
                 <X className="w-4 h-4" />
               </button>
             </div>
+
+            {errorMsg && (
+              <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center space-x-2">
+                <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                <span>{errorMsg}</span>
+              </div>
+            )}
 
             <form onSubmit={handleCreateSubject} className="space-y-4">
               <div>

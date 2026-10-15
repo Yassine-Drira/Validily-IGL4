@@ -20,20 +20,35 @@ interface LibraryPageProps {
     action?: string;
     subjectId?: string;
     categoryId?: string;
+    category?: string;
     q?: string;
     uploaded?: string;
   }>;
 }
 
 export default async function LibraryPage({ searchParams }: LibraryPageProps) {
-  const { action, subjectId, categoryId, q, uploaded } = await searchParams;
-  const subjects = await getSubjects("sem-1");
+  const { action, subjectId, categoryId, category, q, uploaded } = await searchParams;
+  const subjects = await getSubjects();
   const categories = await getCategories();
-  
+
+  // Support both slug (category=exams) and ID (categoryId=uuid)
+  const effectiveCategoryParam = categoryId || category;
+  const matchedCategory = effectiveCategoryParam
+    ? categories.find(
+        (c) =>
+          c.id === effectiveCategoryParam ||
+          c.slug === effectiveCategoryParam ||
+          c.slug.includes(effectiveCategoryParam.replace("cat-", "")) ||
+          effectiveCategoryParam.includes(c.slug)
+      )
+    : null;
+
+  const targetCategoryId = matchedCategory ? matchedCategory.id : effectiveCategoryParam;
+
   // Dynamic PostgreSQL query with search and filters
   const resources = await getResources({
     subjectId: subjectId || undefined,
-    categoryId: categoryId || undefined,
+    categoryId: targetCategoryId || undefined,
     search: q?.trim() || undefined,
   });
 
@@ -104,37 +119,54 @@ export default async function LibraryPage({ searchParams }: LibraryPageProps) {
           <Link
             href="/library"
             className={`px-3 py-1 text-xs rounded-md transition-colors ${
-              !categoryId && !subjectId && !q
-                ? "bg-[#2855D9] text-white font-medium"
+              !effectiveCategoryParam && !subjectId && !q
+                ? "bg-[#2855D9] text-white font-medium shadow-2xs"
                 : "bg-white border border-[#E4E8F0] text-[#68748A] hover:text-[#182235]"
             }`}
           >
             All Resources
           </Link>
-          {categories.slice(0, 5).map((cat) => (
-            <Link
-              key={cat.id}
-              href={`/library?categoryId=${cat.id}${q ? `&q=${encodeURIComponent(q)}` : ""}`}
-              className={`px-3 py-1 text-xs rounded-md transition-colors ${
-                categoryId === cat.id
-                  ? "bg-[#2855D9] text-white font-medium"
-                  : "bg-white border border-[#E4E8F0] text-[#68748A] hover:text-[#182235]"
-              }`}
-            >
-              {cat.name}
-            </Link>
-          ))}
+          {categories.slice(0, 5).map((cat) => {
+            const isSelected =
+              matchedCategory?.id === cat.id ||
+              effectiveCategoryParam === cat.id ||
+              effectiveCategoryParam === cat.slug;
+            return (
+              <Link
+                key={cat.id}
+                href={`/library?category=${cat.slug}${q ? `&q=${encodeURIComponent(q)}` : ""}`}
+                className={`px-3 py-1 text-xs rounded-md transition-colors ${
+                  isSelected
+                    ? "bg-[#2855D9] text-white font-medium shadow-2xs"
+                    : "bg-white border border-[#E4E8F0] text-[#68748A] hover:text-[#182235]"
+                }`}
+              >
+                {cat.name}
+              </Link>
+            );
+          })}
         </div>
 
-        {/* Active Query Tag */}
-        {q && (
-          <div className="flex items-center space-x-2 text-xs text-[#182235] bg-[#EDF2FF] px-2.5 py-1 rounded border border-[#2855D9]/20 self-start sm:self-auto">
-            <span>Query: &ldquo;{q}&rdquo;</span>
-            <Link href="/library" className="text-[#2855D9] hover:text-[#111A2E]">
-              <X className="w-3.5 h-3.5" />
-            </Link>
-          </div>
-        )}
+        {/* Active Filter Tags */}
+        <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+          {matchedCategory && (
+            <div className="flex items-center space-x-1.5 text-xs text-[#2855D9] bg-[#EDF2FF] px-2.5 py-1 rounded border border-[#2855D9]/20">
+              <span className="font-medium">{matchedCategory.name}</span>
+              <Link href="/library" className="text-[#2855D9] hover:text-[#111A2E]" title="Clear category filter">
+                <X className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+          )}
+
+          {q && (
+            <div className="flex items-center space-x-1.5 text-xs text-[#182235] bg-[#EDF2FF] px-2.5 py-1 rounded border border-[#2855D9]/20">
+              <span>&ldquo;{q}&rdquo;</span>
+              <Link href={effectiveCategoryParam ? `/library?category=${effectiveCategoryParam}` : "/library"} className="text-[#2855D9] hover:text-[#111A2E]" title="Clear search query">
+                <X className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Resource Grid */}

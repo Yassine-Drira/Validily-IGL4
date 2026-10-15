@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
+import { isSupabaseConfigured } from "@/lib/supabase/server";
+import { getServiceSupabase, getEffectiveUserId } from "@/lib/supabase/admin";
 
 export async function POST(req: NextRequest) {
   try {
@@ -19,12 +20,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 2. MIME type & Extension Validation
-    const isPdfMime = file.type === "application/pdf";
-    const isPdfExt = file.name.toLowerCase().endsWith(".pdf");
-    if (!isPdfMime && !isPdfExt) {
+    // 2. MIME type & Extension Validation (PDF or HTML)
+    const isPdf = file.name.toLowerCase().endsWith(".pdf") || file.type === "application/pdf";
+    const isHtml = file.name.toLowerCase().endsWith(".html") || file.type === "text/html";
+    if (!isPdf && !isHtml) {
       return NextResponse.json(
-        { error: "Invalid file type. Only standard PDF documents (.pdf) are permitted." },
+        { error: "Invalid file type. Only PDF (.pdf) and HTML (.html) documents are permitted." },
         { status: 400 }
       );
     }
@@ -33,40 +34,30 @@ export async function POST(req: NextRequest) {
     const MAX_SIZE_BYTES = 50 * 1024 * 1024;
     if (file.size > MAX_SIZE_BYTES) {
       return NextResponse.json(
-        { error: `File size exceeds the 50MB free-tier upload limit (${(file.size / 1024 / 1024).toFixed(1)}MB).` },
+        { error: `File size exceeds the 50MB limit (${(file.size / 1024 / 1024).toFixed(1)}MB).` },
         { status: 400 }
       );
     }
 
-    // 4. Supabase Auth & Upload
     if (!isSupabaseConfigured()) {
-      // In offline/demo mode, redirect with success query
       return NextResponse.redirect(new URL("/library?uploaded=demo", req.url));
     }
 
-    const supabase = await createClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
+    const userId = await getEffectiveUserId();
+    const serviceSupabase = getServiceSupabase();
 
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: "Authentication required to upload resources." },
-        { status: 401 }
-      );
-    }
-
-    // 5. Generate secure unique storage path
+    // 4. Generate secure unique storage path
     const sanitizedFilename = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-    const uniqueStoragePath = `${user.id}/${Date.now()}-${sanitizedFilename}`;
+    const uniqueStoragePath = `${userId}/${Date.now()}-${sanitizedFilename}`;
 
     const fileBuffer = await file.arrayBuffer();
-    const { error: storageError } = await supabase.storage
+    const mimeType = isHtml ? "text/html" : "application/pdf";
+
+    const { error: storageError } = await serviceSupabase.storage
       .from("academic-resources")
       .upload(uniqueStoragePath, fileBuffer, {
-        contentType: "application/pdf",
-        upsert: false,
+        contentType: mimeType,
+        upsert: true,
       });
 
     if (storageError) {
@@ -77,39 +68,49 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 6. Insert database record
-    const visibility = submitShared ? "shared" : "private";
-    const publication_status = submitShared ? "pending_review" : "draft";
+    // 5. Insert database record
+    const visibility = submitShared ? "shared" : "public";
+    const publication_status = "published";
 
-    const { error: dbError } = await supabase.from("resources").insert({
-      subject_id: subjectId,
-      category_id: categoryId,
-      owner_id: user.id,
-      title: title.trim(),
-      storage_path: uniqueStoragePath,
-      original_filename: file.name,
-      mime_type: "application/pdf",
-      file_size_bytes: file.size,
-      instructor: instructor?.trim() || null,
-      visibility,
-      publication_status,
-    });
+    const { data: resource, error: dbError } = await serviceSupabase
+      .from("resources")
+      .insert({
+        subject_id: subjectId,
+        category_id: categoryId,
+        owner_id: userId,
+        title: title.trim(),
+        storage_path: uniqueStoragePath,
+        original_filename: file.name,
+        mime_type: mimeType,
+        file_size_bytes: file.size,
+        instructor: instructor?.trim() || null,
+        visibility,
+        publication_status,
+      })
+      .select("*, subject:subjects(slug)")
+      .single();
 
     if (dbError) {
       console.error("DB insert error, rolling back file:", dbError);
-      // Clean up orphaned storage object
-      await supabase.storage.from("academic-resources").remove([uniqueStoragePath]);
+      await serviceSupabase.storage
+        .from("academic-resources")
+        .remove([uniqueStoragePath]);
+
       return NextResponse.json(
-        { error: `Failed to register resource in database: ${dbError.message}` },
+        { error: `Database record creation failed: ${dbError.message}` },
         { status: 500 }
       );
     }
 
-    return NextResponse.redirect(new URL("/library?uploaded=success", req.url));
+    const redirectPath = resource?.subject?.slug
+      ? `/subjects/${resource.subject.slug}`
+      : `/library?uploaded=true`;
+
+    return NextResponse.redirect(new URL(redirectPath, req.url));
   } catch (err: any) {
-    console.error("Unhandled upload error:", err);
+    console.error("Upload route uncaught exception:", err);
     return NextResponse.json(
-      { error: err?.message || "Internal server error during upload." },
+      { error: "Internal server error during upload process." },
       { status: 500 }
     );
   }

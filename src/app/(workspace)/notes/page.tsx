@@ -14,7 +14,7 @@ interface NotesPageProps {
 export default async function NotesPage({ searchParams }: NotesPageProps) {
   const { action, subjectId } = await searchParams;
   const notes = await getNotes();
-  const subjects = await getSubjects("sem-1");
+  const subjects = await getSubjects();
 
   return (
     <div className="space-y-6">

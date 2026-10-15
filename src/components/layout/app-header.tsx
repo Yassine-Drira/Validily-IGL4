@@ -3,11 +3,13 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Search, UploadCloud, User } from "lucide-react";
+import { Search, UploadCloud, User, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useSidebar } from "./workspace-shell";
 
 export function AppHeader() {
   const router = useRouter();
+  const { toggleMobile } = useSidebar();
   const [searchQuery, setSearchQuery] = useState("");
 
   const handleSearch = (e: React.FormEvent) => {
@@ -18,9 +20,19 @@ export function AppHeader() {
   };
 
   return (
-    <header className="h-14 border-b border-[#E4E8F0] bg-white/95 backdrop-blur-xs px-6 flex items-center justify-between sticky top-0 z-30">
+    <header className="h-14 border-b border-[#E4E8F0] bg-white/95 backdrop-blur-xs px-4 sm:px-6 flex items-center justify-between sticky top-0 z-30 gap-3">
+      {/* Mobile Menu Button */}
+      <button
+        type="button"
+        onClick={toggleMobile}
+        className="md:hidden p-2 -ml-1 text-[#182235] hover:bg-[#F4F6FA] rounded-lg transition-colors cursor-pointer shrink-0"
+        aria-label="Open navigation sidebar"
+      >
+        <Menu className="w-5 h-5 text-[#182235]" />
+      </button>
+
       {/* Global Search Bar */}
-      <form onSubmit={handleSearch} className="relative w-full max-w-md">
+      <form onSubmit={handleSearch} className="relative flex-1 max-w-md">
         <Search className="w-4 h-4 text-[#68748A] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
         <input
           type="text"

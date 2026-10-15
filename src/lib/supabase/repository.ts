@@ -1,4 +1,5 @@
 import { createClient, isSupabaseConfigured } from "./server";
+import { getServiceSupabase } from "./admin";
 import {
   Semester,
   Subject,
@@ -10,9 +11,43 @@ import {
   Bookmark,
 } from "@/types/database";
 
-export async function getSemesters(): Promise<Semester[]> {
+async function getDbClient(): Promise<any> {
   try {
-    const supabase = await createClient();
+    return getServiceSupabase();
+  } catch {
+    return createClient();
+  }
+}
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// In-memory cache for ultra-fast navigation transitions (< 10ms)
+const repoMemoryCache = new Map<string, { data: any; expiry: number }>();
+
+function getFromCache<T>(key: string): T | null {
+  const item = repoMemoryCache.get(key);
+  if (!item) return null;
+  if (Date.now() > item.expiry) {
+    repoMemoryCache.delete(key);
+    return null;
+  }
+  return item.data as T;
+}
+
+function setToCache<T>(key: string, data: T, ttlMs: number = 30000): void {
+  repoMemoryCache.set(key, { data, expiry: Date.now() + ttlMs });
+}
+
+export function invalidateRepositoryCache(): void {
+  repoMemoryCache.clear();
+}
+
+export async function getSemesters(): Promise<Semester[]> {
+  const cached = getFromCache<Semester[]>("semesters_all");
+  if (cached) return cached;
+
+  try {
+    const supabase = await getDbClient();
     const { data, error } = await supabase
       .from("semesters")
       .select("*, subjects:subjects(count)")
@@ -23,50 +58,60 @@ export async function getSemesters(): Promise<Semester[]> {
       return [];
     }
 
-    return data.map((item) => ({
+    const result = data.map((item: any) => ({
       ...item,
       subject_count: item.subjects?.[0]?.count ?? 0,
     }));
+    setToCache("semesters_all", result, 30000);
+    return result;
   } catch (err) {
     console.error("Failed to query semesters from database:", err);
     return [];
   }
 }
 
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 export async function getSemesterById(idOrSlug: string): Promise<Semester | null> {
+  const cacheKey = `semester_${idOrSlug}`;
+  const cached = getFromCache<Semester>(cacheKey);
+  if (cached) return cached;
+
   try {
-    const supabase = await createClient();
+    const supabase = await getDbClient();
     let query = supabase.from("semesters").select("*, subjects:subjects(count)");
 
     if (UUID_REGEX.test(idOrSlug)) {
       query = query.eq("id", idOrSlug);
     } else if (idOrSlug === "sem-1" || idOrSlug.includes("1")) {
-      query = query.eq("id", "11111111-1111-1111-1111-111111111111");
+      query = query.or("id.eq.11111111-1111-1111-1111-111111111111,sort_order.eq.1,name.ilike.%1%");
     } else if (idOrSlug === "sem-2" || idOrSlug.includes("2")) {
-      query = query.eq("id", "22222222-2222-2222-2222-222222222222");
+      query = query.or("id.eq.22222222-2222-2222-2222-222222222222,sort_order.eq.2,name.ilike.%2%");
     } else {
       query = query.ilike("name", `%${idOrSlug}%`);
     }
 
-    const { data, error } = await query.maybeSingle();
+    const { data, error } = await query.order("sort_order", { ascending: true }).limit(1).maybeSingle();
     if (error || !data) {
       return null;
     }
 
-    return {
+    const result = {
       ...data,
       subject_count: data.subjects?.[0]?.count ?? 0,
     };
+    setToCache(cacheKey, result, 30000);
+    return result;
   } catch {
     return null;
   }
 }
 
 export async function getSubjects(semesterId?: string): Promise<Subject[]> {
+  const cacheKey = `subjects_${semesterId || "all"}`;
+  const cached = getFromCache<Subject[]>(cacheKey);
+  if (cached) return cached;
+
   try {
-    const supabase = await createClient();
+    const supabase = await getDbClient();
     let query = supabase
       .from("subjects")
       .select("*, semester:semesters(*), resources:resources(count)")
@@ -77,9 +122,13 @@ export async function getSubjects(semesterId?: string): Promise<Subject[]> {
       if (UUID_REGEX.test(semesterId)) {
         query = query.eq("semester_id", semesterId);
       } else if (semesterId === "sem-1" || semesterId.includes("1")) {
-        query = query.eq("semester_id", "11111111-1111-1111-1111-111111111111");
+        const s1 = await getSemesterById("sem-1");
+        const s1Id = s1?.id || "11111111-1111-1111-1111-111111111111";
+        query = query.eq("semester_id", s1Id);
       } else if (semesterId === "sem-2" || semesterId.includes("2")) {
-        query = query.eq("semester_id", "22222222-2222-2222-2222-222222222222");
+        const s2 = await getSemesterById("sem-2");
+        const s2Id = s2?.id || "22222222-2222-2222-2222-222222222222";
+        query = query.eq("semester_id", s2Id);
       }
     }
 
@@ -89,10 +138,12 @@ export async function getSubjects(semesterId?: string): Promise<Subject[]> {
       return [];
     }
 
-    return data.map((item) => ({
+    const result = data.map((item: any) => ({
       ...item,
       resource_count: item.resources?.[0]?.count ?? 0,
     }));
+    setToCache(cacheKey, result, 20000);
+    return result;
   } catch (err) {
     console.error("Failed to query subjects from database:", err);
     return [];
@@ -100,8 +151,12 @@ export async function getSubjects(semesterId?: string): Promise<Subject[]> {
 }
 
 export async function getSubjectBySlugOrId(idOrSlug: string): Promise<Subject | null> {
+  const cacheKey = `subject_single_${idOrSlug}`;
+  const cached = getFromCache<Subject>(cacheKey);
+  if (cached) return cached;
+
   try {
-    const supabase = await createClient();
+    const supabase = await getDbClient();
     let query = supabase
       .from("subjects")
       .select("*, semester:semesters(*), resources:resources(count)");
@@ -118,18 +173,23 @@ export async function getSubjectBySlugOrId(idOrSlug: string): Promise<Subject | 
       return null;
     }
 
-    return {
+    const result = {
       ...data,
       resource_count: data.resources?.[0]?.count ?? 0,
     };
+    setToCache(cacheKey, result, 20000);
+    return result;
   } catch {
     return null;
   }
 }
 
 export async function getCategories(): Promise<ResourceCategory[]> {
+  const cached = getFromCache<ResourceCategory[]>("categories_all");
+  if (cached) return cached;
+
   try {
-    const supabase = await createClient();
+    const supabase = await getDbClient();
     const { data, error } = await supabase
       .from("resource_categories")
       .select("*, resources:resources(count)")
@@ -141,10 +201,12 @@ export async function getCategories(): Promise<ResourceCategory[]> {
       return [];
     }
 
-    return data.map((item) => ({
+    const result = data.map((item: any) => ({
       ...item,
       resource_count: item.resources?.[0]?.count ?? 0,
     }));
+    setToCache("categories_all", result, 30000);
+    return result;
   } catch (err) {
     console.error("Failed to query categories from database:", err);
     return [];
@@ -158,7 +220,7 @@ export async function getResources(options?: {
   limit?: number;
 }): Promise<AcademicResource[]> {
   try {
-    const supabase = await createClient();
+    const supabase = await getDbClient();
     let query = supabase
       .from("resources")
       .select("*, subject:subjects(*), category:resource_categories(*)")
@@ -166,11 +228,42 @@ export async function getResources(options?: {
       .order("created_at", { ascending: false });
 
     if (options?.subjectId) {
-      query = query.eq("subject_id", options.subjectId);
+      if (UUID_REGEX.test(options.subjectId)) {
+        query = query.eq("subject_id", options.subjectId);
+      } else {
+        const subjects = await getSubjects();
+        const matched = subjects.find(
+          (s) => s.id === options.subjectId || s.slug === options.subjectId
+        );
+        if (matched) {
+          query = query.eq("subject_id", matched.id);
+        } else {
+          query = query.eq("subject_id", options.subjectId);
+        }
+      }
     }
+
     if (options?.categoryId) {
-      query = query.eq("category_id", options.categoryId);
+      if (UUID_REGEX.test(options.categoryId)) {
+        query = query.eq("category_id", options.categoryId);
+      } else {
+        const categories = await getCategories();
+        const cleanTarget = options.categoryId.replace("cat-", "").toLowerCase();
+        const matched = categories.find(
+          (c) =>
+            c.id === options.categoryId ||
+            c.slug === options.categoryId ||
+            c.slug.includes(cleanTarget) ||
+            cleanTarget.includes(c.slug)
+        );
+        if (matched) {
+          query = query.eq("category_id", matched.id);
+        } else {
+          query = query.eq("category_id", options.categoryId);
+        }
+      }
     }
+
     if (options?.search) {
       query = query.or(
         `title.ilike.%${options.search}%,description.ilike.%${options.search}%`
@@ -195,7 +288,7 @@ export async function getResources(options?: {
 
 export async function getResourceById(id: string): Promise<AcademicResource | null> {
   try {
-    const supabase = await createClient();
+    const supabase = await getDbClient();
     const { data, error } = await supabase
       .from("resources")
       .select("*, subject:subjects(*), category:resource_categories(*)")
@@ -214,7 +307,7 @@ export async function getResourceById(id: string): Promise<AcademicResource | nu
 
 export async function getNotes(userId?: string): Promise<Note[]> {
   try {
-    const supabase = await createClient();
+    const supabase = await getDbClient();
     let query = supabase
       .from("notes")
       .select("*, subject:subjects(*)")
@@ -238,7 +331,7 @@ export async function getNotes(userId?: string): Promise<Note[]> {
 
 export async function getQuizzes(subjectId?: string): Promise<Quiz[]> {
   try {
-    const supabase = await createClient();
+    const supabase = await getDbClient();
     let query = supabase
       .from("quizzes")
       .select("*, subject:subjects(*), questions:quiz_questions(count)")
@@ -254,7 +347,7 @@ export async function getQuizzes(subjectId?: string): Promise<Quiz[]> {
       return [];
     }
 
-    return data.map((item) => ({
+    return data.map((item: any) => ({
       ...item,
       question_count: item.questions?.[0]?.count ?? 0,
     }));
@@ -266,7 +359,7 @@ export async function getQuizzes(subjectId?: string): Promise<Quiz[]> {
 
 export async function getQuizWithQuestions(quizId: string) {
   try {
-    const supabase = await createClient();
+    const supabase = await getDbClient();
     const { data: quiz, error: quizErr } = await supabase
       .from("quizzes")
       .select("*, subject:subjects(*)")
@@ -294,9 +387,32 @@ export async function getQuizWithQuestions(quizId: string) {
   }
 }
 
+export async function getSubjectQuizzesWithQuestions(subjectId: string) {
+  try {
+    const supabase = await getDbClient();
+    const { data: quizzes, error } = await supabase
+      .from("quizzes")
+      .select("*, questions:quiz_questions(*, options:quiz_options(*))")
+      .eq("subject_id", subjectId)
+      .order("created_at", { ascending: false });
+
+    if (error || !quizzes) {
+      return [];
+    }
+
+    return quizzes.map((q: any) => ({
+      ...q,
+      question_count: q.questions?.length ?? 0,
+    }));
+  } catch (err) {
+    console.error("Failed to query subject quizzes:", err);
+    return [];
+  }
+}
+
 export async function getBookmarks(userId?: string): Promise<Bookmark[]> {
   try {
-    const supabase = await createClient();
+    const supabase = await getDbClient();
     let query = supabase
       .from("bookmarks")
       .select("*, resource:resources(*, subject:subjects(*), category:resource_categories(*))")
@@ -319,7 +435,7 @@ export async function getBookmarks(userId?: string): Promise<Bookmark[]> {
 
 export async function getDashboardMetrics() {
   try {
-    const supabase = await createClient();
+    const supabase = await getDbClient();
     const [
       { count: totalSemesters },
       { count: totalSubjects },
