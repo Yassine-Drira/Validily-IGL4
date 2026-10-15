@@ -25,6 +25,17 @@ function LoginForm() {
     setLoading(true);
 
     try {
+      // Flush any old accumulated sb-* chunk cookies before setting new session
+      if (typeof document !== "undefined") {
+        document.cookie.split(";").forEach((c) => {
+          const name = c.split("=")[0].trim();
+          if (name.startsWith("sb-")) {
+            document.cookie = `${name}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+            document.cookie = `${name}=; path=/; domain=${window.location.hostname}; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+          }
+        });
+      }
+
       const supabase = createClient();
       const { error } = await supabase.auth.signInWithPassword({
         email,

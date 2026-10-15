@@ -46,10 +46,18 @@ export function AppHeader() {
     try {
       const supabase = createClient();
       await supabase.auth.signOut();
+      if (typeof document !== "undefined") {
+        document.cookie.split(";").forEach((c) => {
+          const name = c.split("=")[0].trim();
+          if (name.startsWith("sb-")) {
+            document.cookie = `${name}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+            document.cookie = `${name}=; path=/; domain=${window.location.hostname}; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+          }
+        });
+      }
       setUser(null);
       setIsDropdownOpen(false);
-      router.push("/");
-      router.refresh();
+      window.location.href = "/";
     } catch {
       setUser(null);
     }
