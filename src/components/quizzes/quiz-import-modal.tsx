@@ -39,7 +39,7 @@ export function QuizImportModal({
   onQuizCreated,
   onLaunchHtmlDrill,
 }: QuizImportModalProps) {
-  const [activeMode, setActiveMode] = useState<"file" | "paste" | "sample">("file");
+  const [activeMode, setActiveMode] = useState<"file" | "paste">("file");
   const [rawText, setRawText] = useState("");
   const [titleOverride, setTitleOverride] = useState("");
   const [difficulty, setDifficulty] = useState<"beginner" | "intermediate" | "advanced">("intermediate");
@@ -83,44 +83,6 @@ export function QuizImportModal({
       setParseError("Erreur lors de la lecture du fichier.");
     };
     reader.readAsText(file);
-  };
-
-  const handleLoadSampleSar = async () => {
-    try {
-      // In development, SAR-revision.html is in workspace root or we can load a curated SAR review
-      const res = await fetch("/SAR-revision.html");
-      if (res.ok) {
-        const text = await res.text();
-        handleProcessInput(text, "SAR-revision.html");
-      } else {
-        // Fallback sample interactive HTML drill
-        const sampleHtml = `<!DOCTYPE html>
-<html lang="fr">
-<head>
-<meta charset="UTF-8">
-<title>SAR — Atelier Systèmes Répartis & RPC</title>
-<meta name="description" content="Atelier interactif complet : RMI, RPC, Kafka et Sockets">
-<style>
-  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #09090b; color: #fafafa; padding: 24px; line-height: 1.6; }
-  .card { background: #18181b; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 20px; margin-bottom: 16px; }
-  h1 { color: #8b5cf6; font-size: 22px; margin-bottom: 8px; }
-  .btn { background: #8b5cf6; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 600; margin-top: 12px; }
-  .btn:hover { background: #7c3aed; }
-</style>
-</head>
-<body>
-<div class="card">
-  <h1>SAR — Systèmes & Architectures Répartis</h1>
-  <p>Atelier interactif prêt pour révision intensive (Marshalling, Stub client/serveur, RMI).</p>
-  <button class="btn" onclick="alert('Atelier interactif exécuté avec succès !')">Tester l'atelier</button>
-</div>
-</body>
-</html>`;
-        handleProcessInput(sampleHtml, "SAR-revision.html");
-      }
-    } catch {
-      setParseError("Impossible de précharger l'exemple.");
-    }
   };
 
   const handleFinalImport = () => {
@@ -232,22 +194,6 @@ export function QuizImportModal({
             <Code2 className="w-3.5 h-3.5" />
             <span>Coller du Code Brut</span>
           </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              setActiveMode("sample");
-              handleLoadSampleSar();
-            }}
-            className={`pb-2.5 transition-colors cursor-pointer flex items-center space-x-1.5 ${
-              activeMode === "sample"
-                ? "border-b-2 border-[#2855D9] text-[#2855D9]"
-                : "text-[#68748A] hover:text-[#111A2E]"
-            }`}
-          >
-            <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-            <span>SAR-revision.html (Exemple)</span>
-          </button>
         </div>
 
         {/* Mode 1: File Upload */}
@@ -261,7 +207,7 @@ export function QuizImportModal({
                 Sélectionnez un fichier HTML interactif ou un export JSON
               </p>
               <p className="text-[11px] text-[#68748A] mt-1">
-                Fichiers acceptés : <span className="font-mono font-semibold">.html, .htm, .json</span> (SAR-revision.html, QCM ChatGPT...)
+                Fichiers acceptés : <span className="font-mono font-semibold">.html, .htm, .json</span> (Ateliers web interactifs, exports IA ou QCMs)
               </p>
             </div>
             <label className="inline-block">

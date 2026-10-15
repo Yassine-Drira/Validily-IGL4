@@ -35,17 +35,21 @@ test("HTML Import: Injects safe localStorage shim to prevent sandbox SecurityErr
   assert.ok(injected.includes("window.reportValidilyScore"));
 });
 
-test("HTML Import: Accurately identifies SAR-revision.html if present", () => {
-  const sarPath = path.resolve(process.cwd(), "SAR-revision.html");
-  if (fs.existsSync(sarPath)) {
-    const sarHtml = fs.readFileSync(sarPath, "utf-8");
-    const parsed = detectAndParseQuizImport(sarHtml, "SAR-revision.html");
+test("HTML Import: Detects generic interactive HTML format and injects storage shim", () => {
+  const genericHtml = `<!DOCTYPE html>
+<html>
+<head>
+  <title>Atelier Interactif — Algorithmique</title>
+  <meta name="description" content="Atelier de tests et révision.">
+</head>
+<body><script>localStorage.setItem('score', 10);</script></body>
+</html>`;
+  const parsed = detectAndParseQuizImport(genericHtml, "atelier.html");
 
-    assert.equal(parsed.format, "html");
-    assert.equal(parsed.title, "SAR — Révision Interactive");
-    assert.ok(parsed.htmlContent.includes("validily-sandbox-shim"));
-    assert.ok(parsed.description?.includes("RMI, REST, Kafka, RPC"));
-  }
+  assert.equal(parsed.format, "html");
+  assert.equal(parsed.title, "Atelier Interactif — Algorithmique");
+  assert.ok(parsed.htmlContent.includes("validily-sandbox-shim"));
+  assert.equal(parsed.description, "Atelier de tests et révision.");
 });
 
 test("JSON Import: Parses standard array of questions with letters, indexes, and explanations", () => {

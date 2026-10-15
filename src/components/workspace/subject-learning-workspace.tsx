@@ -643,7 +643,7 @@ ${resources.map((r) => `<li><strong>${r.title}</strong> (${r.mime_type}) - ${r.s
                 QCM et Ateliers de Révision pour {subject.name}
               </h2>
               <p className="text-xs text-[#68748A] mt-0.5">
-                Passez vos QCM ou importez directement vos ateliers HTML prêts (ex: SAR-revision.html) et fichiers JSON.
+                Passez vos QCM ou importez directement vos ateliers interactifs HTML prêts et fichiers JSON.
               </p>
             </div>
             <div className="flex items-center space-x-2">
