@@ -122,13 +122,9 @@ export async function getSubjects(semesterId?: string): Promise<Subject[]> {
       if (UUID_REGEX.test(semesterId)) {
         query = query.eq("semester_id", semesterId);
       } else if (semesterId === "sem-1" || semesterId.includes("1")) {
-        const s1 = await getSemesterById("sem-1");
-        const s1Id = s1?.id || "11111111-1111-1111-1111-111111111111";
-        query = query.eq("semester_id", s1Id);
+        query = query.eq("semester_id", "11111111-1111-1111-1111-111111111111");
       } else if (semesterId === "sem-2" || semesterId.includes("2")) {
-        const s2 = await getSemesterById("sem-2");
-        const s2Id = s2?.id || "22222222-2222-2222-2222-222222222222";
-        query = query.eq("semester_id", s2Id);
+        query = query.eq("semester_id", "22222222-2222-2222-2222-222222222222");
       }
     }
 
@@ -221,6 +217,10 @@ export async function getResources(options?: {
   userId?: string;
   includeAll?: boolean;
 }): Promise<AcademicResource[]> {
+  const cacheKey = `resources_${options?.subjectId || ""}_${options?.categoryId || ""}_${options?.search || ""}_${options?.limit || ""}_${options?.userId || "anon"}_${options?.includeAll || ""}`;
+  const cached = getFromCache<AcademicResource[]>(cacheKey);
+  if (cached) return cached;
+
   try {
     const supabase = await getDbClient();
     let query = supabase
@@ -292,6 +292,7 @@ export async function getResources(options?: {
       return [];
     }
 
+    setToCache(cacheKey, data, 20000);
     return data;
   } catch (err) {
     console.error("Failed to query resources from database:", err);
@@ -319,6 +320,10 @@ export async function getResourceById(id: string): Promise<AcademicResource | nu
 }
 
 export async function getNotes(userId?: string): Promise<Note[]> {
+  const cacheKey = `notes_${userId || "public"}`;
+  const cached = getFromCache<Note[]>(cacheKey);
+  if (cached) return cached;
+
   try {
     const supabase = await getDbClient();
     let query = supabase
@@ -337,7 +342,9 @@ export async function getNotes(userId?: string): Promise<Note[]> {
       return [];
     }
 
-    return data.filter((n: any) => !n.tags?.includes("system_folder_registry"));
+    const filtered = data.filter((n: any) => !n.tags?.includes("system_folder_registry"));
+    setToCache(cacheKey, filtered, 20000);
+    return filtered;
   } catch (err) {
     console.error("Failed to query notes from database:", err);
     return [];
@@ -345,6 +352,10 @@ export async function getNotes(userId?: string): Promise<Note[]> {
 }
 
 export async function getSubjectFolders(subjectId: string): Promise<import("@/types/database").SubjectFolder[]> {
+  const cacheKey = `folders_${subjectId}`;
+  const cached = getFromCache<import("@/types/database").SubjectFolder[]>(cacheKey);
+  if (cached) return cached;
+
   try {
     const supabase = await getDbClient();
     const { data, error } = await supabase
@@ -360,7 +371,9 @@ export async function getSubjectFolders(subjectId: string): Promise<import("@/ty
 
     try {
       const parsed = JSON.parse(data.content);
-      return Array.isArray(parsed) ? parsed : [];
+      const result = Array.isArray(parsed) ? parsed : [];
+      setToCache(cacheKey, result, 20000);
+      return result;
     } catch {
       return [];
     }
@@ -438,6 +451,10 @@ export async function getQuizWithQuestions(quizId: string) {
 }
 
 export async function getSubjectQuizzesWithQuestions(subjectId: string) {
+  const cacheKey = `subject_quizzes_${subjectId}`;
+  const cached = getFromCache<any[]>(cacheKey);
+  if (cached) return cached;
+
   try {
     const supabase = await getDbClient();
     const { data: quizzes, error } = await supabase
@@ -450,7 +467,7 @@ export async function getSubjectQuizzesWithQuestions(subjectId: string) {
       return [];
     }
 
-    return quizzes.map((q: any) => {
+    const result = quizzes.map((q: any) => {
       const htmlQuestion = q.questions?.find((qu: any) => qu.question_type === "interactive_html");
       const isHtml = Boolean(htmlQuestion);
       return {
@@ -460,6 +477,8 @@ export async function getSubjectQuizzesWithQuestions(subjectId: string) {
         question_count: isHtml ? "Atelier" : (q.questions?.length ?? 0),
       };
     });
+    setToCache(cacheKey, result, 20000);
+    return result;
   } catch (err) {
     console.error("Failed to query subject quizzes:", err);
     return [];
@@ -490,6 +509,9 @@ export async function getBookmarks(userId?: string): Promise<Bookmark[]> {
 }
 
 export async function getDashboardMetrics() {
+  const cached = getFromCache<any>("dashboard_metrics");
+  if (cached) return cached;
+
   try {
     const supabase = await getDbClient();
     const [
@@ -504,12 +526,14 @@ export async function getDashboardMetrics() {
       supabase.from("resource_categories").select("*", { count: "exact", head: true }),
     ]);
 
-    return {
+    const result = {
       totalSemesters: totalSemesters ?? 0,
       totalSubjects: totalSubjects ?? 0,
       totalResources: totalResources ?? 0,
       totalCategories: totalCategories ?? 0,
     };
+    setToCache("dashboard_metrics", result, 30000);
+    return result;
   } catch (err) {
     console.error("Failed to calculate dashboard metrics from database:", err);
     return {

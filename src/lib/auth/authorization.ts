@@ -9,6 +9,9 @@ export interface AuthenticatedActor {
 // In-memory test context for local adversarial tests
 let testUserOverride: AuthenticatedActor | null | undefined = undefined;
 
+// In-memory short-lived role cache to avoid hammering database on every click
+const roleMemoryCache = new Map<string, { role: AuthenticatedActor["role"]; expiry: number }>();
+
 /**
  * Configure test user identity for local unit/adversarial verification
  */
@@ -64,19 +67,27 @@ export async function getRequesterUser(): Promise<AuthenticatedActor | null> {
       return null;
     }
 
-    // Query role against trusted database state in public.profiles
-    const serviceSupabase = await getAdminClient();
-    if (!serviceSupabase) {
-      return { id: user.id, email: user.email, role: "student" };
+    // Query role against cached or trusted database state in public.profiles
+    const cachedRole = roleMemoryCache.get(user.id);
+    let role: AuthenticatedActor["role"] = "student";
+
+    if (cachedRole && Date.now() < cachedRole.expiry) {
+      role = cachedRole.role;
+    } else {
+      const serviceSupabase = await getAdminClient();
+      if (!serviceSupabase) {
+        return { id: user.id, email: user.email, role: "student" };
+      }
+
+      const { data: profile } = await serviceSupabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      role = (profile?.role as AuthenticatedActor["role"]) || "student";
+      roleMemoryCache.set(user.id, { role, expiry: Date.now() + 15000 });
     }
-
-    const { data: profile } = await serviceSupabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .maybeSingle();
-
-    let role = (profile?.role as AuthenticatedActor["role"]) || "student";
 
     // Verify if an assigned admin role is temporary and has expired
     if (role === "admin") {
