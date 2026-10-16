@@ -1,3 +1,2 @@
-// scripts/dev.mjs - Dev server launcher ensuring NODE_OPTIONS propagation to all Next.js/Turbopack child processes
-process.env.NODE_OPTIONS = `${process.env.NODE_OPTIONS || ""} --max-http-header-size=65536`.trim();
+// scripts/dev.mjs - Dev server launcher running under standard default Node.js header limits (16KB)
 import("../node_modules/next/dist/bin/next");

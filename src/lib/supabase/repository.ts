@@ -1,6 +1,4 @@
-import { createClient, isSupabaseConfigured } from "./server";
-import { getServiceSupabase } from "./admin";
-import {
+import type {
   Semester,
   Subject,
   ResourceCategory,
@@ -13,9 +11,15 @@ import {
 
 async function getDbClient(): Promise<any> {
   try {
-    return getServiceSupabase();
+    const adminMod = await import("./admin");
+    return adminMod.getServiceSupabase();
   } catch {
-    return createClient();
+    try {
+      const serverMod = await import("./server");
+      return serverMod.createClient();
+    } catch {
+      return null;
+    }
   }
 }
 
@@ -62,7 +66,7 @@ export async function getSemesters(): Promise<Semester[]> {
       ...item,
       subject_count: item.subjects?.[0]?.count ?? 0,
     }));
-    setToCache("semesters_all", result, 30000);
+    setToCache("semesters_all", result, 300000);
     return result;
   } catch (err) {
     console.error("Failed to query semesters from database:", err);
@@ -98,7 +102,7 @@ export async function getSemesterById(idOrSlug: string): Promise<Semester | null
       ...data,
       subject_count: data.subjects?.[0]?.count ?? 0,
     };
-    setToCache(cacheKey, result, 30000);
+    setToCache(cacheKey, result, 300000);
     return result;
   } catch {
     return null;
@@ -157,7 +161,7 @@ export async function getSubjects(semesterId?: string, userId?: string): Promise
       ...item,
       resource_count: countMap.get(item.id) ?? 0,
     }));
-    setToCache(cacheKey, result, 20000);
+    setToCache(cacheKey, result, 180000);
     return result;
   } catch (err) {
     console.error("Failed to query subjects from database:", err);
@@ -206,7 +210,7 @@ export async function getSubjectBySlugOrId(idOrSlug: string, userId?: string): P
       ...data,
       resource_count: resCount ?? 0,
     };
-    setToCache(cacheKey, result, 20000);
+    setToCache(cacheKey, result, 180000);
     return result;
   } catch {
     return null;
@@ -234,7 +238,7 @@ export async function getCategories(): Promise<ResourceCategory[]> {
       ...item,
       resource_count: item.resources?.[0]?.count ?? 0,
     }));
-    setToCache("categories_all", result, 30000);
+    setToCache("categories_all", result, 300000);
     return result;
   } catch (err) {
     console.error("Failed to query categories from database:", err);
@@ -352,8 +356,8 @@ export async function getResourceById(id: string): Promise<AcademicResource | nu
   }
 }
 
-export async function getNotes(userId?: string): Promise<Note[]> {
-  const cacheKey = `notes_${userId || "public"}`;
+export async function getNotes(userId?: string, subjectId?: string): Promise<Note[]> {
+  const cacheKey = `notes_${userId || "public"}_${subjectId || "all"}`;
   const cached = getFromCache<Note[]>(cacheKey);
   if (cached) return cached;
 
@@ -370,13 +374,17 @@ export async function getNotes(userId?: string): Promise<Note[]> {
       query = query.eq("visibility", "public");
     }
 
+    if (subjectId) {
+      query = query.eq("subject_id", subjectId);
+    }
+
     const { data, error } = await query;
     if (error || !data) {
       return [];
     }
 
     const filtered = data.filter((n: any) => !n.tags?.includes("system_folder_registry"));
-    setToCache(cacheKey, filtered, 20000);
+    setToCache(cacheKey, filtered, 60000);
     return filtered;
   } catch (err) {
     console.error("Failed to query notes from database:", err);
@@ -443,9 +451,10 @@ export async function getQuizzes(subjectId?: string): Promise<Quiz[]> {
   }
 }
 
-export async function getQuizWithQuestions(quizId: string) {
+export async function getQuizWithQuestions(quizId: string, requesterUserId?: string) {
   try {
     const supabase = await getDbClient();
+    if (!supabase) return null;
     const { data: quiz, error: quizErr } = await supabase
       .from("quizzes")
       .select("*, subject:subjects(*)")
@@ -454,6 +463,23 @@ export async function getQuizWithQuestions(quizId: string) {
 
     if (quizErr || !quiz) {
       return null;
+    }
+
+    // Parent-level permission check: Draft quizzes can only be viewed by owner or admin
+    if (quiz.publication_status === "draft") {
+      const isOwner = requesterUserId && quiz.owner_id === requesterUserId;
+      let isAdmin = false;
+      if (requesterUserId) {
+        try {
+          const authMod = await import("@/lib/auth/authorization");
+          isAdmin = await authMod.isUserAdmin(requesterUserId);
+        } catch {
+          isAdmin = false;
+        }
+      }
+      if (!isOwner && !isAdmin) {
+        return null;
+      }
     }
 
     const { data: questions, error: qErr } = await supabase
@@ -483,18 +509,28 @@ export async function getQuizWithQuestions(quizId: string) {
   }
 }
 
-export async function getSubjectQuizzesWithQuestions(subjectId: string) {
-  const cacheKey = `subject_quizzes_${subjectId}`;
+export async function getSubjectQuizzesWithQuestions(subjectId: string, requesterUserId?: string) {
+  const cacheKey = `subject_quizzes_${subjectId}_${requesterUserId || "anon"}`;
   const cached = getFromCache<any[]>(cacheKey);
   if (cached) return cached;
 
   try {
     const supabase = await getDbClient();
-    const { data: quizzes, error } = await supabase
+    if (!supabase) return [];
+    let query = supabase
       .from("quizzes")
       .select("*, questions:quiz_questions(*, options:quiz_options(*))")
       .eq("subject_id", subjectId)
       .order("created_at", { ascending: false });
+
+    // Strict parent-level protection: only show published quizzes, unless owned by requester
+    if (requesterUserId) {
+      query = query.or(`publication_status.eq.published,owner_id.eq.${requesterUserId}`);
+    } else {
+      query = query.eq("publication_status", "published");
+    }
+
+    const { data: quizzes, error } = await query;
 
     if (error || !quizzes) {
       return [];
@@ -519,16 +555,17 @@ export async function getSubjectQuizzesWithQuestions(subjectId: string) {
 }
 
 export async function getBookmarks(userId?: string): Promise<Bookmark[]> {
+  if (!userId) {
+    return [];
+  }
+
   try {
     const supabase = await getDbClient();
-    let query = supabase
+    const query = supabase
       .from("bookmarks")
       .select("*, resource:resources(*, subject:subjects(*), category:resource_categories(*))")
+      .eq("user_id", userId)
       .order("created_at", { ascending: false });
-
-    if (userId) {
-      query = query.eq("user_id", userId);
-    }
 
     const { data, error } = await query;
     if (error || !data) {
@@ -565,7 +602,7 @@ export async function getDashboardMetrics() {
       totalResources: totalResources ?? 0,
       totalCategories: totalCategories ?? 0,
     };
-    setToCache("dashboard_metrics", result, 30000);
+    setToCache("dashboard_metrics", result, 180000);
     return result;
   } catch (err) {
     console.error("Failed to calculate dashboard metrics from database:", err);

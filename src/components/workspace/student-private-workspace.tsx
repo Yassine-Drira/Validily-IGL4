@@ -242,12 +242,9 @@ export function StudentPrivateWorkspace({
       if (targetVisibility === "private") {
         setPrivateResources((prev) => [updatedItem, ...prev]);
         showFeedback(`"${title}" est maintenant privé (accessible uniquement par vous).`);
-      } else if (targetVisibility === "shared") {
-        setSharedResources((prev) => [updatedItem, ...prev]);
-        showFeedback(`"${title}" est partagé avec votre promotion.`);
       } else {
         setPublicResources((prev) => [updatedItem, ...prev]);
-        showFeedback(`"${title}" est désormais public pour toute l'université.`);
+        showFeedback(`"${title}" est désormais public et accessible dans la bibliothèque.`);
       }
     } else {
       showFeedback(res.error || "Impossible de modifier la visibilité.");
@@ -377,8 +374,8 @@ export function StudentPrivateWorkspace({
             <div className="text-lg font-bold font-mono text-[#111A2E] mt-0.5">{privateResources.length}</div>
           </div>
           <div className="bg-[#FAFBFD] border border-[#E4E8F0] rounded-xl p-3 text-center min-w-[75px]">
-            <div className="text-[10px] uppercase font-mono text-[#68748A]">Partagés</div>
-            <div className="text-lg font-bold font-mono text-[#2855D9] mt-0.5">{sharedResources.length}</div>
+            <div className="text-[10px] uppercase font-mono text-[#68748A]">Publics</div>
+            <div className="text-lg font-bold font-mono text-[#2855D9] mt-0.5">{publicResources.length + sharedResources.length}</div>
           </div>
           <div className="bg-[#FAFBFD] border border-[#E4E8F0] rounded-xl p-3 text-center min-w-[75px]">
             <div className="text-[10px] uppercase font-mono text-[#68748A]">Quiz</div>
@@ -417,24 +414,13 @@ export function StudentPrivateWorkspace({
 
         <button
           type="button"
-          onClick={() => setActiveTab("shared")}
-          className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1.5 whitespace-nowrap transition-all cursor-pointer ${
-            activeTab === "shared" ? "bg-[#2855D9] text-white shadow-2xs" : "text-[#68748A] hover:bg-[#F4F6FA]"
-          }`}
-        >
-          <Share2 className="w-3.5 h-3.5" />
-          <span>Partagés ({sharedResources.length})</span>
-        </button>
-
-        <button
-          type="button"
           onClick={() => setActiveTab("public")}
           className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1.5 whitespace-nowrap transition-all cursor-pointer ${
-            activeTab === "public" ? "bg-[#2855D9] text-white shadow-2xs" : "text-[#68748A] hover:bg-[#F4F6FA]"
+            activeTab === "public" || activeTab === "shared" ? "bg-[#2855D9] text-white shadow-2xs" : "text-[#68748A] hover:bg-[#F4F6FA]"
           }`}
         >
           <Globe className="w-3.5 h-3.5" />
-          <span>Contributions Publiques ({publicResources.length})</span>
+          <span>Documents Publics ({publicResources.length + sharedResources.length})</span>
         </button>
 
         <button
@@ -576,12 +562,12 @@ export function StudentPrivateWorkspace({
                   <div className="flex items-center space-x-2 shrink-0">
                     <button
                       type="button"
-                      onClick={() => promptVisibilityChange(res.id, res.title, "private", "shared")}
+                      onClick={() => promptVisibilityChange(res.id, res.title, "private", "public")}
                       className="px-2.5 py-1 rounded-lg border border-[#E4E8F0] bg-[#FAFAF7] text-xs text-[#182235] hover:bg-[#F4F6FA] flex items-center space-x-1"
-                      title="Partager avec la promotion"
+                      title="Rendre public dans la bibliothèque"
                     >
-                      <Share2 className="w-3 h-3 text-[#2855D9]" />
-                      <span>Partager</span>
+                      <Globe className="w-3 h-3 text-[#2855D9]" />
+                      <span>Rendre Public</span>
                     </button>
                     <Link href={`/resources/${res.id}`}>
                       <Button size="sm" variant="ghost" className="h-7 px-2 text-xs">
@@ -608,71 +594,19 @@ export function StudentPrivateWorkspace({
         </div>
       )}
 
-      {/* TAB 3: RESSOURCES PARTAGÉES */}
-      {activeTab === "shared" && (
+      {/* TAB 3: DOCUMENTS PUBLICS & PARTAGÉS */}
+      {(activeTab === "public" || activeTab === "shared") && (
         <div className="bg-white border border-[#E4E8F0] rounded-2xl p-6 shadow-xs space-y-4">
           <div>
-            <h3 className="font-bold text-sm text-[#111A2E]">Ressources Partagées avec la Promotion</h3>
+            <h3 className="font-bold text-sm text-[#111A2E]">Mes Documents Publics</h3>
             <p className="text-xs text-[#68748A]">
-              Documents collaboratifs accessibles aux étudiants inscrits en IGL4.
+              Vos documents indexés et accessibles à tous les étudiants dans la bibliothèque académique.
             </p>
           </div>
 
-          {sharedResources.length > 0 ? (
+          {[...publicResources, ...sharedResources].length > 0 ? (
             <div className="divide-y divide-[#F1F4F9]">
-              {sharedResources.map((res: any) => (
-                <div key={res.id} className="py-3 flex items-center justify-between gap-4">
-                  <div className="min-w-0">
-                    <h4 className="text-xs font-bold text-[#111A2E] truncate">{res.title}</h4>
-                    <div className="text-[11px] text-[#68748A] flex items-center space-x-2 mt-0.5">
-                      <span>{res.subject?.name || "Matière"}</span>
-                      <span>•</span>
-                      <span className="text-blue-700 font-mono text-[10px] font-semibold bg-blue-50 px-1.5 py-0.2 rounded border border-blue-100">
-                        Partagé Promo
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => promptVisibilityChange(res.id, res.title, "shared", "private")}
-                      className="px-2.5 py-1 rounded-lg border border-[#E4E8F0] bg-[#FAFAF7] text-xs text-[#182235] hover:bg-[#F4F6FA] flex items-center space-x-1"
-                      title="Révoquer le partage et repasser en privé"
-                    >
-                      <Lock className="w-3 h-3 text-amber-600" />
-                      <span>Rendre Privé</span>
-                    </button>
-                    <Link href={`/resources/${res.id}`}>
-                      <Button size="sm" variant="ghost" className="h-7 px-2 text-xs">
-                        <Eye className="w-3 h-3 mr-1" />
-                        <span>Voir</span>
-                      </Button>
-                    </Link>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="p-8 text-center text-xs text-[#68748A] border border-dashed border-[#E4E8F0] rounded-xl">
-              Aucun document partagé pour le moment.
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* TAB 4: CONTRIBUTIONS PUBLIQUES */}
-      {activeTab === "public" && (
-        <div className="bg-white border border-[#E4E8F0] rounded-2xl p-6 shadow-xs space-y-4">
-          <div>
-            <h3 className="font-bold text-sm text-[#111A2E]">Mes Contributions Publiques</h3>
-            <p className="text-xs text-[#68748A]">
-              Vos documents indexés et accessibles publiquement dans la bibliothèque générale.
-            </p>
-          </div>
-
-          {publicResources.length > 0 ? (
-            <div className="divide-y divide-[#F1F4F9]">
-              {publicResources.map((res: any) => (
+              {[...publicResources, ...sharedResources].map((res: any) => (
                 <div key={res.id} className="py-3 flex items-center justify-between gap-4">
                   <div className="min-w-0">
                     <h4 className="text-xs font-bold text-[#111A2E] truncate">{res.title}</h4>
@@ -687,8 +621,9 @@ export function StudentPrivateWorkspace({
                   <div className="flex items-center space-x-2 shrink-0">
                     <button
                       type="button"
-                      onClick={() => promptVisibilityChange(res.id, res.title, "public", "private")}
+                      onClick={() => promptVisibilityChange(res.id, res.title, res.visibility || "public", "private")}
                       className="px-2.5 py-1 rounded-lg border border-[#E4E8F0] bg-[#FAFAF7] text-xs text-[#182235] hover:bg-[#F4F6FA] flex items-center space-x-1"
+                      title="Rendre privé (accessible uniquement par vous)"
                     >
                       <Lock className="w-3 h-3 text-amber-600" />
                       <span>Rendre Privé</span>
@@ -699,6 +634,13 @@ export function StudentPrivateWorkspace({
                         <span>Voir</span>
                       </Button>
                     </Link>
+                    <button
+                      type="button"
+                      onClick={() => setItemToDelete({ id: res.id, title: res.title, type: "resource" })}
+                      className="p-1 rounded-lg text-[#68748A] hover:text-rose-600 hover:bg-rose-50"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                 </div>
               ))}
@@ -991,25 +933,35 @@ export function StudentPrivateWorkspace({
                 <AlertTriangle className="w-5 h-5" />
               </div>
               <h3 className="font-bold text-sm text-[#111A2E]">
-                Confirmer la modification de visibilité
+                {visibilityConfirmItem.targetVisibility === "public"
+                  ? "Rendre ce document public"
+                  : "Rendre ce document privé"}
               </h3>
             </div>
-            <p className="text-xs text-[#68748A] leading-relaxed">
-              Vous allez changer la visibilité de{" "}
-              <strong className="text-[#111A2E]">&quot;{visibilityConfirmItem.title}&quot;</strong> en{" "}
-              <strong className="text-[#2855D9] uppercase font-mono">{visibilityConfirmItem.targetVisibility}</strong>.
-              {visibilityConfirmItem.targetVisibility !== "private" && (
-                <span className="block mt-1.5 text-amber-800 bg-amber-50 p-2 rounded-lg border border-amber-200">
-                  ⚠️ Attention : Ce contenu sera accessible aux autres étudiants de la promotion.
-                </span>
+            <div className="text-xs text-[#68748A] leading-relaxed space-y-2">
+              <p>
+                Vous allez changer la visibilité de{" "}
+                <strong className="text-[#111A2E]">&quot;{visibilityConfirmItem.title}&quot;</strong> en{" "}
+                <strong className="text-[#2855D9] font-bold">
+                  {visibilityConfirmItem.targetVisibility === "public" ? "PUBLIC" : "PRIVÉ"}
+                </strong>.
+              </p>
+              {visibilityConfirmItem.targetVisibility === "public" ? (
+                <div className="text-amber-800 bg-amber-50 p-2.5 rounded-xl border border-amber-200">
+                  ⚠️ Attention : Ce document sera publié et accessible à tous les étudiants dans la bibliothèque académique.
+                </div>
+              ) : (
+                <div className="text-slate-700 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                  🔒 Ce document redeviendra strictement privé et ne sera plus visible que par vous seul dans votre espace.
+                </div>
               )}
-            </p>
+            </div>
             <div className="flex items-center justify-end space-x-2 pt-2">
               <Button size="sm" variant="ghost" onClick={() => setVisibilityConfirmItem(null)}>
                 Annuler
               </Button>
               <Button size="sm" variant="primary" onClick={executeVisibilityChange}>
-                Confirmer le changement
+                {visibilityConfirmItem.targetVisibility === "public" ? "Confirmer la publication" : "Confirmer le retrait"}
               </Button>
             </div>
           </div>

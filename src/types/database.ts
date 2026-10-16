@@ -175,3 +175,77 @@ export interface QuizAttemptAnswer {
   selected_option_id: string;
   is_correct: boolean;
 }
+
+export interface ResourceShare {
+  id: string;
+  resource_id: string;
+  grantor_id: string;
+  recipient_id: string;
+  permission: "viewer" | "editor";
+  created_at: string;
+}
+
+export type TreeSpecies = "cedar" | "oak" | "pine" | "willow" | "jacaranda" | "sakura";
+export type TreeStatus = "healthy" | "leafless";
+export type FocusSessionStatus =
+  | "in_progress"
+  | "completed"
+  | "interrupted"
+  | "cancelled"
+  | "expired_unverified";
+export type ForestVisibility = "private" | "members" | "public";
+
+export interface FocusSession {
+  id: string;
+  user_id: string;
+  subject_id: string | null;
+  session_label: string | null;
+  target_duration_seconds: number;
+  actual_duration_seconds: number;
+  status: FocusSessionStatus;
+  tree_species: TreeSpecies;
+  started_at: string;
+  completed_at: string | null;
+  interrupted_at: string | null;
+  interruption_reason: string | null;
+  idempotency_key: string | null;
+  created_at: string;
+  updated_at: string;
+  subject?: Subject | null;
+}
+
+export interface ForestEntry {
+  id: string;
+  session_id: string;
+  user_id: string;
+  tree_status: TreeStatus;
+  tree_species: TreeSpecies;
+  position_x: number;
+  position_y: number;
+  scale_factor: number;
+  earned_at: string;
+  created_at: string;
+  session?: FocusSession | null;
+}
+
+export interface ForestPreferences {
+  user_id: string;
+  visibility: ForestVisibility;
+  default_tree_species: TreeSpecies;
+  allow_classmate_cheers: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MemberForestSummary {
+  userId: string;
+  displayName: string;
+  avatarUrl: string | null;
+  healthyTreeCount: number;
+  leaflessTreeCount: number;
+  totalFocusedMinutes: number;
+  recentSpecies: TreeSpecies[];
+  lastFocusedAt: string | null;
+  visibility: ForestVisibility;
+}
+

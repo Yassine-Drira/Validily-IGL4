@@ -30,15 +30,13 @@ export default async function SubjectWorkspace({
     notFound();
   }
 
-  const [categories, resources, allNotes, quizzes, folders] = await Promise.all([
+  const [categories, resources, subjectNotes, quizzes, folders] = await Promise.all([
     getCategories(),
     getResources({ subjectId: subject.id, userId: requester?.id }),
-    getNotes(requester?.id),
-    getSubjectQuizzesWithQuestions(subject.id),
+    getNotes(requester?.id, subject.id),
+    getSubjectQuizzesWithQuestions(subject.id, requester?.id),
     getSubjectFolders(subject.id),
   ]);
-
-  const subjectNotes = allNotes.filter((n: any) => n.subject_id === subject.id);
 
   const semesterLabel =
     subject.semester?.name ||

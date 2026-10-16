@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { getQuizWithQuestions } from "@/lib/supabase/repository";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { QuizRunner, QuestionData } from "@/components/quizzes/quiz-runner";
+import { getRequesterUser } from "@/lib/auth/authorization";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +14,8 @@ interface QuizPageProps {
 
 export default async function QuizPage({ params }: QuizPageProps) {
   const { quizId } = await params;
-  const quizData = await getQuizWithQuestions(quizId);
+  const requester = await getRequesterUser();
+  const quizData = await getQuizWithQuestions(quizId, requester?.id);
 
   if (!quizData || !quizData.quiz) {
     notFound();

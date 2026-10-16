@@ -7,9 +7,10 @@ import {
   getBookmarks,
 } from "@/lib/supabase/repository";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
-import { getStudentQuizAttempts } from "@/lib/actions/quiz-actions";
+import { getStudentQuizAttempts, getStudentMistakes } from "@/lib/actions/quiz-actions";
 import { ResourceCard } from "@/components/academic/resource-card";
 import { InteractiveFlowSelector } from "@/components/academic/interactive-flow-selector";
+import { PersonalAnalyticsDashboard } from "@/components/workspace/personal-analytics-dashboard";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
@@ -33,6 +34,8 @@ import {
   Compass,
 } from "lucide-react";
 
+import { getRequesterUser } from "@/lib/auth/authorization";
+
 export const dynamic = "force-dynamic";
 
 function MountainSummitIllustration({ className = "w-10 h-10" }: { className?: string }) {
@@ -52,27 +55,24 @@ export default async function HomePage() {
   let currentUser: any = null;
   let userAttempts: any[] = [];
   let userBookmarksCount = 0;
+  let userMistakesCount = 0;
 
   try {
-    if (isSupabaseConfigured()) {
-      const supabase = await createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (user?.id) {
-        currentUser = {
-          id: user.id,
-          name: user.user_metadata?.display_name || user.email?.split("@")[0] || "Étudiant",
-          email: user.email,
-        };
-        const [attempts, bookmarks] = await Promise.all([
-          getStudentQuizAttempts(user.id),
-          getBookmarks(user.id),
-        ]);
-        userAttempts = attempts || [];
-        userBookmarksCount = bookmarks.length;
-      }
+    const user = await getRequesterUser();
+    if (user?.id) {
+      currentUser = {
+        id: user.id,
+        name: user.name || user.email?.split("@")[0] || "Étudiant",
+        email: user.email,
+      };
+      const [attempts, bookmarks, mistakes] = await Promise.all([
+        getStudentQuizAttempts(user.id),
+        getBookmarks(user.id),
+        getStudentMistakes(user.id),
+      ]);
+      userAttempts = attempts || [];
+      userBookmarksCount = bookmarks.length;
+      userMistakesCount = mistakes?.length || 0;
     }
   } catch (err) {
     console.error("HomePage user fetch error:", err);
@@ -132,13 +132,25 @@ export default async function HomePage() {
     (a) => a.score / (a.total_questions || 1) < 0.7
   );
 
-  const [metrics, s1Subjects, s2Subjects, recentResources, categories] = await Promise.all([
+  const [metrics, allSubjects, recentResources, categories] = await Promise.all([
     getDashboardMetrics(),
-    getSubjects("sem-1", currentUser?.id),
-    getSubjects("sem-2", currentUser?.id),
+    getSubjects(undefined, currentUser?.id),
     getResources({ limit: 4, userId: currentUser?.id }),
     getCategories(),
   ]);
+
+  const s1Subjects = allSubjects.filter(
+    (s) =>
+      s.semester_id === "11111111-1111-1111-1111-111111111111" ||
+      s.semester?.sort_order === 1 ||
+      s.semester?.name?.includes("1")
+  );
+  const s2Subjects = allSubjects.filter(
+    (s) =>
+      s.semester_id === "22222222-2222-2222-2222-222222222222" ||
+      s.semester?.sort_order === 2 ||
+      s.semester?.name?.includes("2")
+  );
 
   return (
     <div className="space-y-8">
@@ -177,160 +189,19 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* 2. REAL ACADEMIC PROGRESS & STUDY ACTIVITY DASHBOARD */}
-      {currentUser && userAttempts.length > 0 ? (
-        <section className="bg-white border border-[#E4E8F0] rounded-2xl p-5 shadow-xs space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-[#E4E8F0]">
-            <div className="flex items-center space-x-2">
-              <TrendingUp className="w-4 h-4 text-[#2855D9]" />
-              <h2 className="text-sm font-bold text-[#111A2E]">
-                Progression & Assiduité Récente
-              </h2>
-            </div>
-            <span className="text-[11px] text-[#68748A] font-mono">
-              Basé sur vos {userAttempts.length} entraînements enregistrés
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-            {/* 7-Day Visual Activity Graph */}
-            <div className="p-3.5 bg-[#FAFBFD] border border-[#E4E8F0] rounded-xl flex flex-col justify-between">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[11px] font-semibold text-[#68748A] uppercase tracking-wider">
-                  Activité (7 derniers jours)
-                </span>
-                <span className="text-xs font-bold text-[#2855D9] font-mono">
-                  {streak > 0 ? `🔥 Série : ${streak} j` : "0 j"}
-                </span>
-              </div>
-              <div className="grid grid-cols-7 gap-1.5 items-end h-16 pt-2">
-                {last7Days.map((day, idx) => {
-                  const hasActivity = day.count > 0;
-                  const heightPercent = hasActivity ? Math.min(100, Math.max(30, day.count * 35)) : 12;
-                  return (
-                    <div key={idx} className="flex flex-col items-center justify-end h-full group">
-                      <div
-                        style={{ height: `${heightPercent}%` }}
-                        className={cn(
-                          "w-full rounded-t transition-all",
-                          hasActivity
-                            ? "bg-[#2855D9] group-hover:bg-[#1E40AF]"
-                            : "bg-[#E4E8F0]"
-                        )}
-                        title={`${day.dayLabel} : ${day.count} quiz passé(s)`}
-                      />
-                      <span className="text-[10px] text-[#68748A] mt-1 font-mono">
-                        {day.dayLabel}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Performance Overview */}
-            <div className="p-3.5 bg-[#FAFBFD] border border-[#E4E8F0] rounded-xl flex flex-col justify-between h-full">
-              <span className="text-[11px] font-semibold text-[#68748A] uppercase tracking-wider">
-                Moyenne & Volume
-              </span>
-              <div className="flex items-center justify-around my-auto">
-                <div className="text-center">
-                  <div className="text-2xl font-bold font-mono text-[#111A2E]">
-                    {averageScore !== null ? `${averageScore}%` : "—"}
-                  </div>
-                  <div className="text-[10px] text-[#68748A] mt-0.5">Score moyen</div>
-                </div>
-                <div className="h-8 w-px bg-[#E4E8F0]" />
-                <div className="text-center">
-                  <div className="text-2xl font-bold font-mono text-[#2855D9]">
-                    {userAttempts.length}
-                  </div>
-                  <div className="text-[10px] text-[#68748A] mt-0.5">Quiz terminés</div>
-                </div>
-              </div>
-            </div>
-
-            {/* Recommendation Card */}
-            <div className="p-3.5 bg-gradient-to-br from-[#F0F5FF] to-white border border-[#D0E2FF] rounded-xl flex flex-col justify-between h-full">
-              <div>
-                <span className="text-[10px] font-mono font-bold text-[#2855D9] uppercase tracking-wider">
-                  Recommandation
-                </span>
-                {weakAttempt ? (
-                  <div>
-                    <h4 className="text-xs font-bold text-[#111A2E] mt-1 line-clamp-1">
-                      Consolider : {weakAttempt.quiz?.title || "Quiz"}
-                    </h4>
-                    <p className="text-[11px] text-[#68748A] mt-0.5">
-                      Score précédent : {weakAttempt.score}/{weakAttempt.total_questions}. Rejouez-le pour combler vos lacunes.
-                    </p>
-                  </div>
-                ) : recentAttempt ? (
-                  <div>
-                    <h4 className="text-xs font-bold text-[#111A2E] mt-1 line-clamp-1">
-                      Reprendre : {recentAttempt.quiz?.title || "Quiz"}
-                    </h4>
-                    <p className="text-[11px] text-[#68748A] mt-0.5">
-                      {recentAttempt.quiz?.subject?.name || "Matière"} • Score : {recentAttempt.score}/{recentAttempt.total_questions}
-                    </p>
-                  </div>
-                ) : (
-                  <div>
-                    <h4 className="text-xs font-bold text-[#111A2E] mt-1">
-                      Explorez un nouveau quiz
-                    </h4>
-                    <p className="text-[11px] text-[#68748A] mt-0.5">
-                      Testez vos acquis sur les modules de votre semestre en cours.
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              <div className="mt-2.5 flex items-center justify-end">
-                <Link
-                  href={
-                    weakAttempt
-                      ? `/quizzes/${weakAttempt.quiz_id}`
-                      : recentAttempt
-                      ? `/quizzes/${recentAttempt.quiz_id}`
-                      : "/quizzes"
-                  }
-                >
-                  <Button size="sm" variant="primary" className="text-xs shadow-xs py-1.5 h-auto">
-                    <span>{weakAttempt ? "Consolider" : "S'entraîner"}</span>
-                    <ArrowRight className="w-3 h-3 ml-1" />
-                  </Button>
-                </Link>
-              </div>
-            </div>
-          </div>
-        </section>
-      ) : (
-        /* Empty state for new or unregistered students */
-        <section className="bg-white border border-[#E4E8F0] rounded-2xl p-5 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-start space-x-3.5">
-            <div className="w-10 h-10 rounded-xl bg-[#EDF2FF] text-[#2855D9] flex items-center justify-center shrink-0">
-              <Sparkles className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="text-xs sm:text-sm font-bold text-[#111A2E]">
-                Démarrez vos révisions universitaires
-              </h3>
-              <p className="text-xs text-[#68748A] mt-0.5 max-w-xl">
-                Vos séries d'entraînement, temps de révision et graphiques de progression hebdomadaire s'afficheront ici automatiquement dès vos premiers QCM ou téléchargements.
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center space-x-2 shrink-0">
-            <Link href="/quizzes">
-              <Button size="sm" variant="primary" className="text-xs">
-                <span>Passer un premier test</span>
-                <ArrowRight className="w-3.5 h-3.5 ml-1" />
-              </Button>
-            </Link>
-          </div>
-        </section>
-      )}
+      {/* 2. PERSONAL ACADEMIC ANALYTICS & MOTIVATION DASHBOARD */}
+      <PersonalAnalyticsDashboard
+        user={currentUser}
+        userAttempts={userAttempts}
+        userBookmarksCount={userBookmarksCount}
+        mistakesCount={userMistakesCount}
+        streak={streak}
+        averageScore={averageScore}
+        last7Days={last7Days}
+        allSubjects={allSubjects}
+        weakAttempt={weakAttempt}
+        recentAttempt={recentAttempt}
+      />
 
       {/* 3. Core Feature Entry Points (What can I do here?) */}
       <section className="space-y-3">

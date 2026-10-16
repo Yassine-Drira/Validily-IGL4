@@ -17,6 +17,7 @@ import {
   User,
   X,
   ArrowRight,
+  Trees,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -33,6 +34,7 @@ const navItems = [
   { label: "Bibliothèque", href: "/library", icon: FolderArchive },
   { label: "Quiz & QCM", href: "/quizzes", icon: Sparkles },
   { label: "Fiches de révision", href: "/notes", icon: FileEdit },
+  { label: "Bosquet Focus", href: "/forest", icon: Trees },
   { label: "Favoris", href: "/bookmarks", icon: Bookmark },
   { label: "Mon Espace", href: "/my-space", icon: User },
   { label: "Paramètres", href: "/admin", icon: Settings },

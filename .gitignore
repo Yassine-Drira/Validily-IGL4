@@ -40,3 +40,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# dev bridge and local scratch
+.bridge/
+scripts/agent-bridge.mjs
+supabase/.temp/
+template-prompt-html-quiz.md
+

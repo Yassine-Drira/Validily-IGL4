@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
-import { getServiceSupabase, getEffectiveUserId } from "@/lib/supabase/admin";
+import { getServiceSupabase } from "@/lib/supabase/admin";
 import { Note } from "@/types/database";
 import { getRequesterUser, assertOwnershipOrAdmin } from "@/lib/auth/authorization";
 
@@ -45,7 +45,7 @@ export async function createNote(data: {
         title: data.title.trim(),
         content: data.content || "",
         tags: data.tags || [],
-        visibility: data.visibility || "public",
+        visibility: data.visibility || "private",
       })
       .select("*, subject:subjects(*)")
       .single();

@@ -7,15 +7,29 @@ import { Search, UploadCloud, User, Menu, LogOut, Bookmark, Sparkles } from "luc
 import { Button } from "@/components/ui/button";
 import { useSidebar } from "./workspace-shell";
 import { createClient } from "@/lib/supabase/client";
+import { flushAuthCookiesClient } from "@/lib/auth/cookie-utils";
+import { FocusHeaderWidget } from "@/components/focus/focus-header-widget";
 
-export function AppHeader() {
+export interface HeaderUser {
+  id: string;
+  name: string;
+  email?: string;
+  avatarUrl?: string | null;
+}
+
+export function AppHeader({ initialUser }: { initialUser?: HeaderUser | null }) {
   const router = useRouter();
   const { toggleMobile } = useSidebar();
   const [searchQuery, setSearchQuery] = useState("");
-  const [user, setUser] = useState<{ id: string; name: string; email?: string; avatarUrl?: string | null } | null>(null);
+  const [user, setUser] = useState<HeaderUser | null>(initialUser ?? null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   useEffect(() => {
+    if (initialUser !== undefined) {
+      setUser(initialUser);
+      return;
+    }
+
     try {
       const supabase = createClient();
       supabase.auth.getUser().then(async ({ data }: any) => {
@@ -41,7 +55,7 @@ export function AppHeader() {
     } catch {
       // Guest mode
     }
-  }, []);
+  }, [initialUser]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,15 +68,7 @@ export function AppHeader() {
     try {
       const supabase = createClient();
       await supabase.auth.signOut();
-      if (typeof document !== "undefined") {
-        document.cookie.split(";").forEach((c) => {
-          const name = c.split("=")[0].trim();
-          if (name.startsWith("sb-")) {
-            document.cookie = `${name}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
-            document.cookie = `${name}=; path=/; domain=${window.location.hostname}; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
-          }
-        });
-      }
+      flushAuthCookiesClient();
       setUser(null);
       setIsDropdownOpen(false);
       window.location.href = "/";
@@ -96,7 +102,10 @@ export function AppHeader() {
       </form>
 
       {/* Right controls */}
-      <div className="flex items-center space-x-3">
+      <div className="flex items-center space-x-2 sm:space-x-3">
+        {/* Persistent Focus / Pomodoro Timer & Soundscapes */}
+        <FocusHeaderWidget />
+
         {/* Upload Resource Button */}
         <Link href="/library?action=upload">
           <Button size="sm" variant="outline" className="text-xs">

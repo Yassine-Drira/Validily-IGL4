@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getResourceById } from "@/lib/supabase/repository";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { getRequesterUser } from "@/lib/auth/authorization";
+import { checkResourceAccess } from "@/lib/actions/sharing-actions";
 
 export async function GET(
   req: NextRequest,
@@ -14,12 +15,13 @@ export async function GET(
     return NextResponse.json({ error: "Resource not found" }, { status: 404 });
   }
 
-  // Strict Access Control: Private resources are only accessible by owner or admin
-  if (resource.visibility === "private") {
+  // Strict Access Control: Private resources are only accessible by owner or admin, and shared resources by authorized recipients
+  if (resource.visibility === "private" || resource.visibility === "shared") {
     const requester = await getRequesterUser();
-    if (!requester || (requester.id !== resource.owner_id && requester.role !== "admin")) {
+    const accessCheck = await checkResourceAccess(resource, requester?.id, "view");
+    if (!accessCheck.allowed) {
       return NextResponse.json(
-        { error: "Accès refusé. Cette ressource est privée." },
+        { error: accessCheck.reason || "Accès refusé pour télécharger cette ressource." },
         { status: 403 }
       );
     }

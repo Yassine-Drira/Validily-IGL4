@@ -1,7 +1,14 @@
+import { cache } from "react";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { findOrphanAuthCookies } from "@/lib/auth/cookie-utils";
 
-export async function createClient() {
+/**
+ * Creates or retrieves a request-scoped Supabase client for Server Components,
+ * Server Actions, and Route Handlers.
+ * Memoized with React cache() to avoid redundant client instantiations per request.
+ */
+export const createClient = cache(async function createClient() {
   let cookieStore: any = null;
   try {
     cookieStore = await cookies();
@@ -13,11 +20,23 @@ export async function createClient() {
   const setCookies = (cookiesToSet: any[]) => {
     if (!cookieStore) return;
     try {
+      // 1. Write the new/refreshed cookies
       cookiesToSet.forEach(({ name, value, options }: any) =>
-        cookieStore.set(name, value, options)
+        cookieStore.set(name, value, {
+          ...options,
+          sameSite: "lax",
+          path: "/",
+        })
       );
+
+      // 2. Proactively prune any orphaned higher-index chunk cookies
+      const allCookies = cookieStore.getAll();
+      const orphans = findOrphanAuthCookies(allCookies);
+      orphans.forEach((orphanName) => {
+        cookieStore.delete(orphanName);
+      });
     } catch {
-      // Ignored in server component rendering
+      // Ignored in read-only Server Component rendering (handled by middleware)
     }
   };
 
@@ -29,6 +48,7 @@ export async function createClient() {
       "https://placeholder-project.supabase.co",
       "placeholder-anon-key",
       {
+        cookieEncoding: "base64url",
         cookies: {
           getAll: getCookies,
           setAll: setCookies,
@@ -38,12 +58,13 @@ export async function createClient() {
   }
 
   return createServerClient(supabaseUrl, supabaseAnonKey, {
+    cookieEncoding: "base64url",
     cookies: {
       getAll: getCookies,
       setAll: setCookies,
     },
   });
-}
+});
 
 export function isSupabaseConfigured(): boolean {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;

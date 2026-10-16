@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
-import { getServiceSupabase, getEffectiveUserId } from "@/lib/supabase/admin";
+import { getServiceSupabase } from "@/lib/supabase/admin";
 import { RevisionStatus, AcademicResource } from "@/types/database";
 import { logAuditEvent } from "@/lib/audit/audit-logger";
 import { getRequesterUser, assertOwnershipOrAdmin } from "@/lib/auth/authorization";
@@ -49,8 +49,14 @@ export async function createResource(data: {
     const {
       data: { user: authUser },
     } = await supabase.auth.getUser();
-    const requester = await getRequesterUser();
-    const userId = requester?.id || authUser?.id || (await getEffectiveUserId());
+    const requester = authUser
+      ? { id: authUser.id, email: authUser.email, role: (authUser.app_metadata?.role as any) || "student" }
+      : await getRequesterUser();
+
+    if (!requester || !requester.id) {
+      return { error: "Authentification requise pour créer une ressource." };
+    }
+    const userId = requester.id;
     const serviceSupabase = getServiceSupabase();
 
     const storagePath = data.storage_path || data.external_url || `links/${Date.now()}`;
@@ -73,7 +79,7 @@ export async function createResource(data: {
         instructor: data.instructor || null,
         chapter: data.chapter || null,
         tags: data.tags || [],
-        visibility: "public",
+        visibility: (data as any).visibility || "private",
         publication_status: "published",
       })
       .select("*, subject:subjects(*), category:resource_categories(*)")
@@ -288,7 +294,12 @@ export async function toggleBookmark(resourceId: string) {
       return { success: true, bookmarked: true, isDemo: true };
     }
 
-    const userId = await getEffectiveUserId();
+    const requester = await getRequesterUser();
+    if (!requester || !requester.id) {
+      return { success: false, error: "Authentification requise pour modifier vos favoris." };
+    }
+
+    const userId = requester.id;
     const serviceSupabase = getServiceSupabase();
 
     const { data: existing } = await serviceSupabase
@@ -326,7 +337,12 @@ export async function updateRevisionStatus(
       return { success: true, status, isDemo: true };
     }
 
-    const userId = await getEffectiveUserId();
+    const requester = await getRequesterUser();
+    if (!requester || !requester.id) {
+      return { success: false, error: "Authentification requise pour enregistrer votre progression." };
+    }
+
+    const userId = requester.id;
     const serviceSupabase = getServiceSupabase();
     const now = new Date().toISOString();
 

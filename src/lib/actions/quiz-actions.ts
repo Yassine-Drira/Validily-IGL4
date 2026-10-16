@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
-import { getServiceSupabase, getEffectiveUserId } from "@/lib/supabase/admin";
+import { getServiceSupabase } from "@/lib/supabase/admin";
 import { Quiz } from "@/types/database";
 import { getRequesterUser, assertOwnershipOrAdmin } from "@/lib/auth/authorization";
 
@@ -55,13 +55,10 @@ export async function createQuiz(input: CreateQuizInput): Promise<{
     }
 
     const requester = await getRequesterUser();
-    let userId = requester?.id;
-    if (!userId) {
-      userId = await getEffectiveUserId();
-    }
-    if (!userId) {
+    if (!requester || !requester.id) {
       return { error: "Authentification requise pour créer un quiz." };
     }
+    const userId = requester.id;
 
     const serviceSupabase = getServiceSupabase();
 
@@ -309,17 +306,16 @@ export async function getStudentQuizAttempts(userId?: string) {
   try {
     if (!isSupabaseConfigured()) return [];
 
-    let targetUserId = userId;
-    if (!targetUserId) {
-      const supabase = await createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      targetUserId = user?.id;
+    const requester = await getRequesterUser();
+    if (!requester || !requester.id) return [];
+
+    const isSelf = !userId || userId === requester.id;
+    const isAdmin = requester.role === "admin";
+    if (!isSelf && !isAdmin) {
+      return []; // Deny unauthorized cross-account snooping
     }
 
-    if (!targetUserId) return [];
-
+    const targetUserId = userId || requester.id;
     const serviceSupabase = getServiceSupabase();
     const { data: attempts, error } = await serviceSupabase
       .from("quiz_attempts")
@@ -343,17 +339,16 @@ export async function getStudentMistakes(userId?: string) {
   try {
     if (!isSupabaseConfigured()) return [];
 
-    let targetUserId = userId;
-    if (!targetUserId) {
-      const supabase = await createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      targetUserId = user?.id;
+    const requester = await getRequesterUser();
+    if (!requester || !requester.id) return [];
+
+    const isSelf = !userId || userId === requester.id;
+    const isAdmin = requester.role === "admin";
+    if (!isSelf && !isAdmin) {
+      return []; // Deny unauthorized cross-account snooping
     }
 
-    if (!targetUserId) return [];
-
+    const targetUserId = userId || requester.id;
     const serviceSupabase = getServiceSupabase();
     // 1. Get user's recent attempts
     const { data: recentAttempts } = await serviceSupabase

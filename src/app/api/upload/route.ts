@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/supabase/server";
-import { getServiceSupabase, getEffectiveUserId } from "@/lib/supabase/admin";
+import { getServiceSupabase } from "@/lib/supabase/admin";
+import { getRequesterUser } from "@/lib/auth/authorization";
 import { invalidateRepositoryCache } from "@/lib/supabase/repository";
 
 export async function POST(req: NextRequest) {
@@ -51,7 +52,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.redirect(new URL("/library?uploaded=demo", req.url));
     }
 
-    const userId = await getEffectiveUserId();
+    const requester = await getRequesterUser();
+    if (!requester || !requester.id) {
+      return NextResponse.json(
+        { error: "Authentification requise pour téléverser un fichier." },
+        { status: 401 }
+      );
+    }
+
+    const userId = requester.id;
     const serviceSupabase = getServiceSupabase();
 
     // 4. Generate secure unique storage path
@@ -82,15 +91,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 5. Insert database record
-    let visibility: "public" | "shared" | "private" = "public";
-    if (visibilityParam === "private" || visibilityParam === "shared" || visibilityParam === "public") {
+    // 5. Insert database record (Default to private study material for data hygiene)
+    let visibility: "public" | "shared" | "private" = "private";
+    if (visibilityParam === "public" || visibilityParam === "shared" || visibilityParam === "private") {
       visibility = visibilityParam;
     } else if (submitShared) {
       visibility = "public";
-    } else if (formData.has("submitShared") && !submitShared) {
-      // In upload-dropzone, unchecked submitShared explicitly means "Keep as Personal Private Resource"
-      visibility = "private";
     }
     const publication_status = "published";
 

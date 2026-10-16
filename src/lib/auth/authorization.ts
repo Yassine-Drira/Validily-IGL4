@@ -1,16 +1,27 @@
+import { cache } from "react";
 import type { UserRole } from "@/types/database";
 
 export interface AuthenticatedActor {
   id: string;
   email?: string;
   role: "admin" | "student" | "visitor";
+  name?: string;
+  avatarUrl?: string | null;
 }
 
 // In-memory test context for local adversarial tests
 let testUserOverride: AuthenticatedActor | null | undefined = undefined;
 
-// In-memory short-lived role cache to avoid hammering database on every click
-const roleMemoryCache = new Map<string, { role: AuthenticatedActor["role"]; expiry: number }>();
+// In-memory short-lived profile/role cache to avoid hammering database on every click
+const profileMemoryCache = new Map<
+  string,
+  {
+    role: AuthenticatedActor["role"];
+    name?: string;
+    avatarUrl?: string | null;
+    expiry: number;
+  }
+>();
 
 /**
  * Configure test user identity for local unit/adversarial verification
@@ -43,9 +54,9 @@ async function getAdminClient() {
 
 /**
  * Derives requester identity from verified server-side Supabase authentication session.
- * Never trusts a client-supplied user ID.
+ * Never trusts a client-supplied user ID. Memoized per-request with React cache().
  */
-export async function getRequesterUser(): Promise<AuthenticatedActor | null> {
+export const getRequesterUser = cache(async function getRequesterUser(): Promise<AuthenticatedActor | null> {
   // If a test context is explicitly established, honor it for isolated local testing
   if (testUserOverride !== undefined) {
     return testUserOverride;
@@ -68,26 +79,34 @@ export async function getRequesterUser(): Promise<AuthenticatedActor | null> {
     }
 
     // Query role against cached or trusted database state in public.profiles
-    const cachedRole = roleMemoryCache.get(user.id);
+    const cachedProfile = profileMemoryCache.get(user.id);
     let role: AuthenticatedActor["role"] = "student";
+    let name: string =
+      user.user_metadata?.display_name || user.email?.split("@")[0] || "Étudiant";
+    let avatarUrl: string | null = user.user_metadata?.avatar_url || null;
 
     const serviceSupabase = await getAdminClient();
 
-    if (cachedRole && Date.now() < cachedRole.expiry) {
-      role = cachedRole.role;
+    if (cachedProfile && Date.now() < cachedProfile.expiry) {
+      role = cachedProfile.role;
+      name = cachedProfile.name || name;
+      avatarUrl = cachedProfile.avatarUrl !== undefined ? cachedProfile.avatarUrl : avatarUrl;
     } else {
       if (!serviceSupabase) {
-        return { id: user.id, email: user.email, role: "student" };
+        return { id: user.id, email: user.email, role: "student", name, avatarUrl };
       }
 
       const { data: profile } = await serviceSupabase
         .from("profiles")
-        .select("role")
+        .select("role, display_name, avatar_url")
         .eq("id", user.id)
         .maybeSingle();
 
       role = (profile?.role as AuthenticatedActor["role"]) || "student";
-      roleMemoryCache.set(user.id, { role, expiry: Date.now() + 15000 });
+      if (profile?.display_name) name = profile.display_name;
+      if (profile?.avatar_url) avatarUrl = profile.avatar_url;
+
+      profileMemoryCache.set(user.id, { role, name, avatarUrl, expiry: Date.now() + 15000 });
     }
 
     // Verify if an assigned admin role is temporary and has expired
@@ -95,6 +114,7 @@ export async function getRequesterUser(): Promise<AuthenticatedActor | null> {
       const expiresAt = user.user_metadata?.temporary_admin_expires_at;
       if (expiresAt && new Date(expiresAt).getTime() < Date.now()) {
         role = "student";
+        profileMemoryCache.set(user.id, { role: "student", name, avatarUrl, expiry: Date.now() + 15000 });
         // Auto-demote in persistent storage
         try {
           await serviceSupabase.from("profiles").update({ role: "student" }).eq("id", user.id);
@@ -111,23 +131,30 @@ export async function getRequesterUser(): Promise<AuthenticatedActor | null> {
       id: user.id,
       email: user.email,
       role,
+      name,
+      avatarUrl,
     };
   } catch (err) {
     console.error("Failed to authenticate requester session:", err);
     return null;
   }
-}
+});
 
 /**
  * Verifies administrative privileges against trusted database state, honoring grant expiration
  */
-export async function isUserAdmin(userId: string): Promise<boolean> {
+export const isUserAdmin = cache(async function isUserAdmin(userId: string): Promise<boolean> {
   if (testUserOverride !== undefined) {
     return testUserOverride !== null && testUserOverride.id === userId && testUserOverride.role === "admin";
   }
 
   if (!userId) {
     return false;
+  }
+
+  const cachedProfile = profileMemoryCache.get(userId);
+  if (cachedProfile && Date.now() < cachedProfile.expiry) {
+    return cachedProfile.role === "admin";
   }
 
   const serverMod = await getSupabaseServerModule();
@@ -167,7 +194,7 @@ export async function isUserAdmin(userId: string): Promise<boolean> {
   } catch {
     return false;
   }
-}
+});
 
 /**
  * Server-side gate asserting the caller possesses administrative rights
@@ -262,3 +289,100 @@ export function canMutateResourceWithGrant(
 
   return false;
 }
+
+export interface ResourceShare {
+  id: string;
+  resource_id: string;
+  grantor_id: string;
+  recipient_id: string;
+  permission: "viewer" | "editor";
+  created_at: string;
+  recipient_email?: string;
+  recipient_name?: string;
+}
+
+// In-memory registry for local testing and offline execution
+const mockSharesStore = new Map<string, ResourceShare[]>();
+
+export function _resetMockSharesStore(): void {
+  mockSharesStore.clear();
+}
+
+export function _injectMockShare(share: ResourceShare): void {
+  const list = mockSharesStore.get(share.resource_id) || [];
+  mockSharesStore.set(share.resource_id, [...list.filter((s) => s.recipient_id !== share.recipient_id), share]);
+}
+
+/**
+ * Check whether a user is authorized to access a given resource
+ */
+export async function checkResourceAccess(
+  resource: { id: string; owner_id: string; visibility: string; publication_status?: string },
+  userId?: string | null,
+  requiredPermission: "view" | "edit" = "view"
+): Promise<{ allowed: boolean; reason?: string }> {
+  // 1. Public resources are readable by everyone
+  if (resource.visibility === "public") {
+    if (requiredPermission === "view") {
+      return { allowed: true };
+    }
+  }
+
+  // 2. If unauthenticated and resource is not public, access is denied
+  if (!userId) {
+    return { allowed: false, reason: "Authentification requise pour accéder à cette ressource non publique." };
+  }
+
+  // 3. Owners have full read/write access
+  if (resource.owner_id === userId) {
+    return { allowed: true };
+  }
+
+  // 4. Admin override
+  const isAdmin = await isUserAdmin(userId);
+  if (isAdmin) {
+    return { allowed: true };
+  }
+
+  // 5. If private, only owner or admin can access
+  if (resource.visibility === "private") {
+    return { allowed: false, reason: "Ce document est privé et réservé à son propriétaire." };
+  }
+
+  // 6. If shared, check resource_shares table or test store
+  if (resource.visibility === "shared") {
+    const shares = mockSharesStore.get(resource.id) || [];
+    const grant = shares.find((s) => s.recipient_id === userId);
+    if (grant) {
+      if (requiredPermission === "edit" && grant.permission !== "editor") {
+        return { allowed: false, reason: "Ce partage vous accorde uniquement des droits de lecture." };
+      }
+      return { allowed: true };
+    }
+
+    const serviceSupabase = await getAdminClient();
+    if (serviceSupabase) {
+      const { data: share } = await serviceSupabase
+        .from("resource_shares")
+        .select("permission")
+        .eq("resource_id", resource.id)
+        .eq("recipient_id", userId)
+        .maybeSingle();
+
+      if (!share) {
+        return { allowed: false, reason: "Vous ne faites pas partie des destinataires de ce partage." };
+      }
+
+      if (requiredPermission === "edit" && share.permission !== "editor") {
+        return { allowed: false, reason: "Ce partage vous accorde uniquement des droits de lecture." };
+      }
+
+      return { allowed: true };
+    }
+
+    return { allowed: false, reason: "Vous ne faites pas partie des destinataires de ce partage." };
+  }
+
+  return { allowed: false, reason: "Accès refusé." };
+}
+

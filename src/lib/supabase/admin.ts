@@ -1,5 +1,4 @@
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
-import { createClient as createServerClient } from "./server";
 
 let serviceClientInstance: any = null;
 
@@ -29,11 +28,24 @@ export function getServiceSupabase(): any {
 }
 
 export const FALLBACK_SYSTEM_USER_ID = "8d18a271-32e9-4d4d-9809-94c3cc5ca540";
-let cachedSystemUserId: string | null = null;
 
-export async function getEffectiveUserId(): Promise<string> {
+async function getServerClient() {
   try {
-    const supabase = await createServerClient();
+    return await import("./server");
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Returns authenticated user ID from active session, or null if unauthenticated.
+ * NEVER falls back to querying arbitrary profiles to prevent guest account hijacking.
+ */
+export async function getEffectiveUserId(): Promise<string | null> {
+  try {
+    const serverMod = await getServerClient();
+    if (!serverMod) return null;
+    const supabase = await serverMod.createClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -42,36 +54,8 @@ export async function getEffectiveUserId(): Promise<string> {
       return user.id;
     }
   } catch {
-    // In guest/local mode
+    // Unauthenticated / guest session
   }
 
-  if (cachedSystemUserId) {
-    return cachedSystemUserId;
-  }
-
-  try {
-    const admin = getServiceSupabase();
-    // 1. Check existing profiles
-    const { data: profile } = await admin
-      .from("profiles")
-      .select("id")
-      .limit(1)
-      .maybeSingle();
-
-    if (profile?.id) {
-      cachedSystemUserId = profile.id;
-      return profile.id;
-    }
-
-    // 2. Check auth.users
-    const { data: userData } = await admin.auth.admin.listUsers({ page: 1, perPage: 1 });
-    if (userData?.users?.[0]?.id) {
-      cachedSystemUserId = userData.users[0].id;
-      return userData.users[0].id;
-    }
-  } catch {
-    // Fallback if admin query fails
-  }
-
-  return FALLBACK_SYSTEM_USER_ID;
+  return null;
 }

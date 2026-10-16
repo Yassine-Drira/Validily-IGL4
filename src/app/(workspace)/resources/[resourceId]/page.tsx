@@ -8,6 +8,7 @@ import { PdfViewer } from "@/components/pdf/pdf-viewer";
 import { ExternalLinkViewer } from "@/components/resources/external-link-viewer";
 import { ResourceActionsBar } from "@/components/resources/resource-actions-bar";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
+import { getCachedSignedUrl } from "@/lib/supabase/storage-cache";
 import { Button } from "@/components/ui/button";
 import {
   Calendar,
@@ -18,6 +19,7 @@ import {
 } from "lucide-react";
 
 import { getRequesterUser } from "@/lib/auth/authorization";
+import { checkResourceAccess } from "@/lib/actions/sharing-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -37,40 +39,42 @@ export default async function ResourceDetailPage({
     notFound();
   }
 
-  // Strict Access Control: Private resources are only visible to the owner or admin
-  if (resource.visibility === "private") {
+  // Strict Access Control: Private resources are only visible to the owner or admin, and shared resources to authorized recipients
+  if (resource.visibility === "private" || resource.visibility === "shared") {
     const requester = await getRequesterUser();
-    if (!requester) {
-      return (
-        <div className="max-w-md mx-auto my-16 bg-white border border-[#E4E8F0] rounded-2xl p-8 text-center shadow-xs space-y-4">
-          <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto border border-amber-200">
-            <Lock className="w-6 h-6" />
-          </div>
-          <div>
-            <h2 className="text-base font-bold text-[#111A2E]">
-              Document Privé — Connexion Requise
-            </h2>
-            <p className="text-xs text-[#68748A] mt-1.5 leading-relaxed">
-              Ce document a été configuré comme privé. Connectez-vous à votre compte étudiant pour y accéder si vous en êtes le propriétaire.
-            </p>
-          </div>
-          <div className="flex items-center justify-center space-x-2 pt-2">
-            <Link href={`/login?next=/resources/${resourceId}`}>
-              <Button size="sm" variant="primary" className="text-xs">
-                Se connecter
-              </Button>
-            </Link>
-            <Link href="/">
-              <Button size="sm" variant="outline" className="text-xs">
-                Retour à l&apos;accueil
-              </Button>
-            </Link>
-          </div>
-        </div>
-      );
-    }
+    const accessCheck = await checkResourceAccess(resource, requester?.id, "view");
 
-    if (requester.id !== resource.owner_id && requester.role !== "admin") {
+    if (!accessCheck.allowed) {
+      if (!requester) {
+        return (
+          <div className="max-w-md mx-auto my-16 bg-white border border-[#E4E8F0] rounded-2xl p-8 text-center shadow-xs space-y-4">
+            <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto border border-amber-200">
+              <Lock className="w-6 h-6" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-[#111A2E]">
+                Document Privé ou Partagé — Connexion Requise
+              </h2>
+              <p className="text-xs text-[#68748A] mt-1.5 leading-relaxed">
+                Ce document nécessite des autorisations d&apos;accès. Connectez-vous à votre compte étudiant pour y accéder si vous êtes le propriétaire ou un destinataire désigné.
+              </p>
+            </div>
+            <div className="flex items-center justify-center space-x-2 pt-2">
+              <Link href={`/login?next=/resources/${resourceId}`}>
+                <Button size="sm" variant="primary" className="text-xs">
+                  Se connecter
+                </Button>
+              </Link>
+              <Link href="/">
+                <Button size="sm" variant="outline" className="text-xs">
+                  Retour à l&apos;accueil
+                </Button>
+              </Link>
+            </div>
+          </div>
+        );
+      }
+
       return (
         <div className="max-w-md mx-auto my-16 bg-white border border-[#E4E8F0] rounded-2xl p-8 text-center shadow-xs space-y-4">
           <div className="w-14 h-14 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto border border-rose-200">
@@ -81,7 +85,7 @@ export default async function ResourceDetailPage({
               Accès Restreint
             </h2>
             <p className="text-xs text-[#68748A] mt-1.5 leading-relaxed">
-              Ce document est privé et appartient à un autre étudiant. Vous n&apos;avez pas les autorisations nécessaires pour le consulter.
+              {accessCheck.reason || "Vous n'avez pas les autorisations nécessaires pour consulter ce document."}
             </p>
           </div>
           <div className="flex items-center justify-center space-x-2 pt-2">
@@ -101,19 +105,12 @@ export default async function ResourceDetailPage({
     }
   }
 
-  // Generate signed viewing URL if Supabase is configured
+  // Generate cached signed viewing URL if Supabase is configured
   let viewUrl: string | undefined = undefined;
   if (isSupabaseConfigured() && resource.storage_path) {
-    try {
-      const supabase = await createClient();
-      const { data } = await supabase.storage
-        .from("academic-resources")
-        .createSignedUrl(resource.storage_path, 900); // 15 mins
-      if (data?.signedUrl) {
-        viewUrl = data.signedUrl;
-      }
-    } catch (err) {
-      console.error("Could not create signed view URL:", err);
+    const cachedUrl = await getCachedSignedUrl("academic-resources", resource.storage_path, 900);
+    if (cachedUrl) {
+      viewUrl = cachedUrl;
     }
   }
 

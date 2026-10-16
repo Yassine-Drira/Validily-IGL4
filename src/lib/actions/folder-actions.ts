@@ -2,9 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
-import { getServiceSupabase, getEffectiveUserId } from "@/lib/supabase/admin";
+import { getServiceSupabase } from "@/lib/supabase/admin";
 import { SubjectFolder } from "@/types/database";
 import { getRequesterUser, assertOwnershipOrAdmin } from "@/lib/auth/authorization";
+import { invalidateRepositoryCache } from "@/lib/supabase/repository";
 
 const FOLDER_REGISTRY_TAG = "system_folder_registry";
 
@@ -57,11 +58,13 @@ export async function getSubjectFolders(subjectId: string): Promise<SubjectFolde
  */
 async function saveSubjectFolders(
   subjectId: string,
-  folders: SubjectFolder[]
+  folders: SubjectFolder[],
+  actorUserId?: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const serviceSupabase = getServiceSupabase();
-    const userId = await getEffectiveUserId();
+    const requester = await getRequesterUser();
+    const userId = actorUserId || requester?.id;
 
     const { data: existing } = await serviceSupabase
       .from("notes")
@@ -83,6 +86,9 @@ async function saveSubjectFolders(
 
       if (error) return { success: false, error: error.message };
     } else {
+      if (!userId) {
+        return { success: false, error: "Authentification requise pour créer le registre de dossiers." };
+      }
       const { error } = await serviceSupabase.from("notes").insert({
         user_id: userId,
         subject_id: subjectId,
@@ -95,6 +101,7 @@ async function saveSubjectFolders(
       if (error) return { success: false, error: error.message };
     }
 
+    invalidateRepositoryCache();
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message || "Failed to save folders." };
