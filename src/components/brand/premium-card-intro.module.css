@@ -1,17 +1,20 @@
-/* VALIDILY-IGL4 — Premium Magical Card Intro Styles */
+/* VALIDILY-IGL4 — Premium 3D Card Flip Logo Reveal */
 
 .overlay {
   position: fixed;
   inset: 0;
-  z-index: 9999;
+  width: 100vw;
+  height: 100vh;
+  z-index: 99999;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(ellipse 85% 75% at 50% 45%, #05261c 0%, #021710 45%, #010a07 80%, #000402 100%);
+  background: radial-gradient(ellipse 90% 85% at 50% 38%, #0C1220 0%, #070B14 50%, #030509 100%);
   overflow: hidden;
   user-select: none;
   opacity: 1;
-  transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   will-change: opacity;
 }
 
@@ -20,34 +23,32 @@
   pointer-events: none;
 }
 
-/* Volumetric Atmospheric Overhead Light */
-.volumetricLight {
+/* Floor Stage Reflection Glow */
+.studioFloor {
   position: absolute;
-  top: 0;
+  bottom: 22%;
   left: 50%;
   transform: translateX(-50%);
-  width: 100%;
-  max-width: 900px;
-  height: 65vh;
-  background: radial-gradient(ellipse 60% 50% at 50% 0%, rgba(16, 185, 129, 0.16) 0%, rgba(212, 163, 70, 0.08) 35%, transparent 70%);
+  width: 480px;
+  height: 120px;
+  background: radial-gradient(ellipse 60% 40% at 50% 50%, rgba(245, 158, 11, 0.14) 0%, rgba(212, 163, 70, 0.03) 55%, transparent 75%);
   pointer-events: none;
-  filter: blur(20px);
 }
 
-/* Ambient Radial Emerald & Gold Aura behind Card */
+/* Atmospheric Ambient Gold Halo */
 .ambientHalo {
   position: absolute;
-  top: 50%;
+  top: 40%;
   left: 50%;
-  width: 480px;
-  height: 480px;
+  width: 420px;
+  height: 420px;
   transform: translate(-50%, -50%);
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(16, 185, 129, 0.22) 0%, rgba(212, 163, 70, 0.12) 40%, transparent 70%);
+  background: radial-gradient(circle, rgba(245, 158, 11, 0.16) 0%, rgba(212, 163, 70, 0.08) 45%, transparent 70%);
   filter: blur(35px);
   pointer-events: none;
   opacity: 0;
-  animation: haloPulse 2.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: haloPulse 2.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 @keyframes haloPulse {
@@ -55,382 +56,261 @@
     opacity: 0;
     transform: translate(-50%, -50%) scale(0.6);
   }
-  30% {
-    opacity: 0.4;
-    transform: translate(-50%, -50%) scale(0.9);
-  }
-  65% {
-    opacity: 0.9;
-    transform: translate(-50%, -50%) scale(1.15);
-  }
-  85% {
-    opacity: 0.7;
+  35% {
+    opacity: 0.85;
     transform: translate(-50%, -50%) scale(1.05);
+  }
+  80% {
+    opacity: 0.65;
+    transform: translate(-50%, -50%) scale(1);
   }
   100% {
     opacity: 0;
-    transform: translate(-50%, -50%) scale(1.2);
+    transform: translate(-50%, -50%) scale(1.15);
   }
 }
 
-/* 3D Stage Container */
+/* 3D Perspective Stage */
 .stage {
   perspective: 1200px;
   position: relative;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   z-index: 10;
 }
 
-/* Card 3D Flipper */
+/* 360-Degree 3D Card Flipper */
 .cardFlipper {
-  width: 240px;
-  height: 300px;
+  width: 180px;
+  height: 215px;
   position: relative;
+  border-radius: 32px;
+  background: #FFFFFF;
+  border: 2px solid #F59E0B;
+  box-shadow: 
+    0 0 30px rgba(245, 158, 11, 0.45),
+    0 0 70px rgba(212, 163, 70, 0.25),
+    inset 0 0 14px rgba(255, 255, 255, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   transform-style: preserve-3d;
-  animation: cardEmergence 2.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  will-change: transform, opacity;
+  will-change: transform;
+  animation: cardFlip360 1.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+  -webkit-box-reflect: below 10px linear-gradient(transparent 35%, rgba(0, 0, 0, 0.65) 100%);
 }
 
 @media (max-width: 640px) {
   .cardFlipper {
-    width: 200px;
-    height: 250px;
+    width: 155px;
+    height: 185px;
+    border-radius: 26px;
   }
 }
 
-@keyframes cardEmergence {
-  /* Phase A (0.0-0.4s): Hidden / barely visible */
+@keyframes cardFlip360 {
   0% {
+    transform: rotateY(-360deg) scale(0.88);
     opacity: 0;
-    transform: translateY(35px) scale(0.72) rotateY(-180deg) rotateZ(-4deg);
   }
   15% {
-    opacity: 0.2;
-    transform: translateY(30px) scale(0.75) rotateY(-160deg) rotateZ(-3deg);
-  }
-  /* Phase B (0.4-1.2s): Smooth 3D rotation acceleration & deceleration */
-  35% {
-    opacity: 0.9;
-    transform: translateY(-8px) scale(1.04) rotateY(-50deg) rotateZ(1deg);
-  }
-  48% {
     opacity: 1;
-    transform: translateY(0) scale(1.02) rotateY(5deg) rotateZ(0deg);
   }
-  /* Phase C (1.2-1.8s): Settle facing forward perfectly */
-  58% {
-    opacity: 1;
-    transform: translateY(0) scale(1) rotateY(0deg) rotateZ(0deg);
+  80% {
+    transform: rotateY(0deg) scale(1.02);
   }
-  75% {
-    opacity: 1;
-    transform: translateY(-2px) scale(1) rotateY(0deg) rotateZ(0deg);
-  }
-  /* Phase D & E (1.8-2.8s): Gentle micro-settle and exit */
-  88% {
-    opacity: 1;
-    transform: translateY(0) scale(0.98) rotateY(0deg) rotateZ(0deg);
+  90% {
+    transform: rotateY(-3deg) scale(1);
   }
   100% {
+    transform: rotateY(0deg) scale(1);
     opacity: 1;
-    transform: translateY(0) scale(1) rotateY(0deg) rotateZ(0deg);
   }
 }
 
-/* Shared Card Face Properties */
-.cardFace {
-  position: absolute;
-  inset: 0;
-  border-radius: 26px;
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
-  overflow: hidden;
-  box-shadow:
-    0 25px 60px -12px rgba(0, 0, 0, 0.85),
-    0 0 45px rgba(16, 185, 129, 0.2),
-    0 0 20px rgba(212, 163, 70, 0.15);
-}
-
-/* Front Face */
-.cardFront {
-  background: linear-gradient(155deg, #16243d 0%, #111A2E 50%, #0a1120 100%);
-  border: 1.5px solid rgba(212, 163, 70, 0.45);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px;
-  transform: rotateY(0deg);
-}
-
-/* Back Face */
-.cardBack {
-  background: linear-gradient(135deg, #041f17 0%, #062b1e 50%, #02120d 100%);
-  border: 1.5px solid rgba(212, 163, 70, 0.4);
-  transform: rotateY(180deg);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
-}
-
-/* Back face geometric guilloche lattice */
-.cardBackPattern {
-  position: absolute;
-  inset: 8px;
-  border-radius: 18px;
-  border: 1px solid rgba(212, 163, 70, 0.25);
-  background-image: 
-    repeating-linear-gradient(45deg, rgba(212, 163, 70, 0.05) 0, rgba(212, 163, 70, 0.05) 1px, transparent 0, transparent 12px),
-    repeating-linear-gradient(-45deg, rgba(212, 163, 70, 0.05) 0, rgba(212, 163, 70, 0.05) 1px, transparent 0, transparent 12px);
+/* The Dark Navy Badge Inside the White Card */
+.navyCard {
+  width: 95px;
+  height: 120px;
+  border-radius: 16px;
+  background: #0F172A;
+  transform: rotate(-6deg);
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-/* Inner Gold Inset Frame (Front) */
-.innerFrame {
-  position: absolute;
-  inset: 7px;
-  border-radius: 20px;
-  border: 1px solid rgba(212, 163, 70, 0.25);
-  pointer-events: none;
-}
-
-/* Corner Pips */
-.pipTopLeft {
-  position: absolute;
-  top: 12px;
-  left: 12px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  line-height: 1;
-}
-
-.pipBottomRight {
-  position: absolute;
-  bottom: 12px;
-  right: 12px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  line-height: 1;
-  transform: rotate(180deg);
-}
-
-.pipLetter {
-  font-family: var(--font-sans), sans-serif;
-  font-size: 13px;
-  font-weight: 800;
-  color: #D4A346;
-  letter-spacing: -0.05em;
-}
-
-.pipSuit {
-  font-size: 8px;
-  color: #D4A346;
-  margin-top: 1px;
-}
-
-/* Center Emblem Wrapper */
-.centerEmblem {
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.3);
   position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  margin-top: auto;
-  margin-bottom: auto;
 }
 
-/* Light Sweep across the Card Face in Phase C */
+@media (max-width: 640px) {
+  .navyCard {
+    width: 82px;
+    height: 104px;
+    border-radius: 14px;
+  }
+}
+
+/* Glossy Specular Light Sweep Across Card Face */
 .lightSweep {
   position: absolute;
-  inset: -100% -50%;
-  background: linear-gradient(
-    108deg,
-    transparent 35%,
-    rgba(255, 255, 255, 0.02) 42%,
-    rgba(251, 191, 36, 0.35) 48%,
-    rgba(255, 255, 255, 0.85) 51%,
-    rgba(251, 191, 36, 0.35) 54%,
-    transparent 62%
-  );
-  transform: translateX(-150%) rotate(12deg);
-  pointer-events: none;
-  animation: sweepAnimation 2.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-@keyframes sweepAnimation {
-  0%, 46% {
-    transform: translateX(-150%) rotate(12deg);
-    opacity: 0;
-  }
-  48% {
-    opacity: 1;
-  }
-  68% {
-    transform: translateX(150%) rotate(12deg);
-    opacity: 1;
-  }
-  75%, 100% {
-    transform: translateX(150%) rotate(12deg);
-    opacity: 0;
-  }
-}
-
-/* Edge Catchlight Flare */
-.edgeGlow {
-  position: absolute;
   inset: 0;
-  border-radius: 26px;
+  border-radius: inherit;
   pointer-events: none;
-  box-shadow: inset 0 0 15px rgba(251, 191, 36, 0.35);
-  opacity: 0;
-  animation: edgeGlowPulse 2.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  background: linear-gradient(
+    115deg,
+    transparent 0%,
+    transparent 35%,
+    rgba(255, 255, 255, 0.8) 48%,
+    rgba(254, 240, 138, 0.9) 52%,
+    rgba(255, 255, 255, 0.8) 56%,
+    transparent 68%,
+    transparent 100%
+  );
+  transform: translateX(-150%) skewX(-20deg);
+  animation: lightSweep 1.6s cubic-bezier(0.16, 1, 0.3, 1) 0.5s forwards;
 }
 
-@keyframes edgeGlowPulse {
-  0%, 48% {
+@keyframes lightSweep {
+  0% {
+    transform: translateX(-150%) skewX(-20deg);
     opacity: 0;
   }
-  56% {
-    opacity: 1;
-  }
-  75% {
-    opacity: 0.4;
+  30% {
+    opacity: 0.85;
   }
   100% {
+    transform: translateX(165%) skewX(-20deg);
     opacity: 0;
   }
 }
 
-/* Brand Wordmark under Emblem */
-.cardWordmark {
-  font-family: var(--font-sans), sans-serif;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.22em;
-  color: #D4A346;
-  text-transform: uppercase;
-  margin-top: 10px;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+/* Horizontal Amber Accent Line */
+.goldDivider {
+  width: 44px;
+  height: 3.5px;
+  background: #F59E0B;
+  border-radius: 9999px;
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.75);
+  margin: 2.2rem auto 0.85rem auto;
+  opacity: 0;
+  animation: dividerReveal 0.6s cubic-bezier(0.16, 1, 0.3, 1) 1.2s forwards;
 }
 
-.cardSubtitle {
-  font-family: var(--font-sans), sans-serif;
-  font-size: 8px;
-  font-weight: 600;
-  letter-spacing: 0.18em;
-  color: #8C9BB3;
-  text-transform: uppercase;
-  margin-top: 3px;
+@keyframes dividerReveal {
+  0% {
+    opacity: 0;
+    transform: scaleX(0);
+  }
+  100% {
+    opacity: 1;
+    transform: scaleX(1);
+  }
 }
 
-/* Sparse Floating Stardust Particles */
+/* Bold White Brand Wordmark */
+.brandWordmark {
+  color: #FFFFFF;
+  font-family: var(--font-sans, system-ui, -apple-system, sans-serif);
+  font-weight: 900;
+  font-size: 1.5rem;
+  line-height: 1.2;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  text-align: center;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.8), 0 0 20px rgba(245, 158, 11, 0.25);
+  opacity: 0;
+  animation: textReveal 0.7s cubic-bezier(0.16, 1, 0.3, 1) 1.3s forwards;
+}
+
+@keyframes textReveal {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+    letter-spacing: 0.32em;
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+    letter-spacing: 0.24em;
+  }
+}
+
+@media (max-width: 640px) {
+  .brandWordmark {
+    font-size: 1.25rem;
+    letter-spacing: 0.2em;
+  }
+}
+
+/* Sparse Atmospheric Particles */
 .particle {
   position: absolute;
   border-radius: 50%;
   pointer-events: none;
-  opacity: 0;
-  animation: particleFloat 2.6s ease-in-out forwards;
+  opacity: 0.35;
+  animation: particleGlow 2.5s ease-in-out infinite alternate;
 }
 
-@keyframes particleFloat {
+@keyframes particleGlow {
   0% {
-    opacity: 0;
-    transform: translateY(15px) scale(0.6);
-  }
-  25% {
-    opacity: 0.85;
-  }
-  70% {
-    opacity: 0.75;
-    transform: translateY(-20px) scale(1);
+    opacity: 0.2;
+    transform: translateY(0);
   }
   100% {
-    opacity: 0;
-    transform: translateY(-35px) scale(0.4);
+    opacity: 0.6;
+    transform: translateY(-8px);
   }
 }
 
-/* Skip Button */
+/* Skip Control Button */
 .skipButton {
   position: absolute;
-  top: 24px;
-  right: 24px;
-  z-index: 50;
+  top: 1.5rem;
+  right: 1.5rem;
+  z-index: 30;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 14px;
+  gap: 0.5rem;
+  padding: 0.45rem 0.9rem;
   border-radius: 9999px;
-  background: rgba(4, 18, 14, 0.65);
-  border: 1px solid rgba(16, 185, 129, 0.3);
-  color: rgba(167, 243, 208, 0.9);
-  font-size: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #E2E8F0;
+  font-size: 0.75rem;
   font-weight: 500;
-  letter-spacing: 0.02em;
-  backdrop-filter: blur(12px);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  backdrop-filter: blur(8px);
 }
 
 .skipButton:hover {
-  background: rgba(6, 28, 20, 0.85);
-  border-color: rgba(212, 163, 70, 0.6);
-  color: #ffffff;
-  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(245, 158, 11, 0.4);
+  color: #FFFFFF;
 }
 
-.skipButton:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px #D4A346, 0 0 12px rgba(212, 163, 70, 0.5);
-}
-
-.skipBadge {
-  font-size: 10px;
-  font-family: var(--font-mono), monospace;
-  padding: 1px 5px;
+.kbdBadge {
+  display: inline-block;
+  padding: 0.1rem 0.35rem;
+  font-size: 0.65rem;
+  font-family: monospace;
+  background: rgba(255, 255, 255, 0.12);
   border-radius: 4px;
-  background: rgba(16, 185, 129, 0.15);
-  border: 1px solid rgba(16, 185, 129, 0.25);
-  color: #A7F3D0;
+  color: #CBD5E1;
 }
 
-/* Accessibility: Prefers Reduced Motion */
+/* Prefers Reduced Motion Accessibility */
 @media (prefers-reduced-motion: reduce) {
-  .overlay {
-    transition: opacity 0.3s ease;
-  }
-  .cardFlipper {
-    animation: simpleFade 0.9s ease forwards !important;
-    transform: none !important;
-  }
-  .ambientHalo,
+  .cardFlipper,
   .lightSweep,
-  .edgeGlow,
+  .ambientHalo,
+  .goldDivider,
+  .brandWordmark,
   .particle {
     animation: none !important;
-    display: none !important;
-  }
-}
-
-@keyframes simpleFade {
-  0% {
-    opacity: 0;
-  }
-  40% {
-    opacity: 1;
-  }
-  80% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 1;
+    transform: none !important;
+    opacity: 1 !important;
   }
 }

@@ -29,8 +29,15 @@ export default async function WorkspaceLayout({
     : null;
 
   return (
-    <FocusProvider user={initialUser}>
-      <WorkspaceShell
+    <>
+      <script
+        id="validily-intro-holding-script"
+        dangerouslySetInnerHTML={{
+          __html: `(function(){try{var s=window.location.search;var p=new URLSearchParams(s).get('intro');var l=sessionStorage.getItem('validily_login_event')==='true';var c=document.cookie.indexOf('validily_intro_pending=1')!==-1;var r=p==='replay'||p==='true'||p==='hold';var pl=sessionStorage.getItem('validily_intro_played')==='true';var init=sessionStorage.getItem('validily_session_initialized');if(r||l||c||(!pl&&!init)){document.documentElement.classList.add('validily-intro-holding');}}catch(e){}})();`,
+        }}
+      />
+      <FocusProvider user={initialUser}>
+        <WorkspaceShell
         sidebar={<AppSidebar subjects={subjects} isAdmin={isAdmin} />}
         header={<AppHeader initialUser={initialUser} />}
       >
@@ -40,5 +47,6 @@ export default async function WorkspaceLayout({
       <PresenceAndAnalyticsTracker />
       <PremiumCardIntro user={initialUser} />
     </FocusProvider>
+  </>
   );
 }

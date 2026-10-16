@@ -58,7 +58,7 @@ export function WorkspaceShell({
         closeMobile: () => setIsMobileOpen(false),
       }}
     >
-      <div className="flex min-h-screen bg-[#F4F6FA] relative">
+      <div className="flex min-h-screen bg-[#F4F6FA] relative" data-workspace-shell="true">
         {sidebar}
         <div className="flex-1 flex flex-col min-w-0">
           {header}

@@ -59,3 +59,14 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #BAC5D7;
 }
+
+/* Intro Holding State: prevents any flash of workspace before intro */
+html.validily-intro-holding body {
+  background-color: #080C14 !important;
+  overflow: hidden !important;
+}
+
+html.validily-intro-holding [data-workspace-shell="true"] {
+  visibility: hidden !important;
+  opacity: 0 !important;
+}

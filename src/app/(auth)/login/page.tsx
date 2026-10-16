@@ -40,6 +40,7 @@ function LoginForm() {
       } else {
         try {
           sessionStorage.setItem("validily_login_event", "true");
+          document.cookie = "validily_intro_pending=1; path=/; max-age=15; SameSite=Lax";
         } catch {
           // LocalStorage fallback
         }
