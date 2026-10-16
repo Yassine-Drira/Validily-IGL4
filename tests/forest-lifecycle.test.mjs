@@ -64,6 +64,15 @@ test("Forest Lifecycle: Duration boundaries enforced (5 min to 180 min)", async 
   assert.ok(valid.session);
   assert.equal(valid.session.target_duration_seconds, 1500);
   assert.equal(valid.session.tree_species, "cedar");
+
+  // Validate jacaranda and sakura species
+  const jacarandaSession = await startFocusSession({ targetDurationSeconds: 1800, treeSpecies: "jacaranda" });
+  assert.equal(jacarandaSession.success, true);
+  assert.equal(jacarandaSession.session?.tree_species, "jacaranda");
+
+  const sakuraSession = await startFocusSession({ targetDurationSeconds: 2400, treeSpecies: "sakura" });
+  assert.equal(sakuraSession.success, true);
+  assert.equal(sakuraSession.session?.tree_species, "sakura");
 });
 
 test("Forest Lifecycle: Grace period cancellation (<= 120s) plants no tree", async () => {

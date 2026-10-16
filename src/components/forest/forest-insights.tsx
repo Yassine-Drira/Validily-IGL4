@@ -8,10 +8,15 @@ import { cn } from "@/lib/utils";
 
 interface ForestInsightsProps {
   entries: ForestEntry[];
+  isLoading?: boolean;
   className?: string;
 }
 
-export function ForestInsights({ entries = [], className = "" }: ForestInsightsProps) {
+export function ForestInsights({
+  entries = [],
+  isLoading = false,
+  className = "",
+}: ForestInsightsProps) {
   const stats = useMemo(() => {
     const healthy = entries.filter((e) => e.tree_status === "healthy");
     const leafless = entries.filter((e) => e.tree_status === "leafless");
@@ -70,6 +75,25 @@ export function ForestInsights({ entries = [], className = "" }: ForestInsightsP
       streak,
     };
   }, [entries]);
+
+  if (isLoading && entries.length === 0) {
+    return (
+      <div className={cn("grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4", className)}>
+        {[0, 1, 2, 3].map((i) => (
+          <div
+            key={i}
+            className="bg-white p-4 rounded-3xl border border-[#E4E8F0] shadow-2xs flex items-center space-x-3.5 animate-pulse"
+          >
+            <div className="w-11 h-11 rounded-2xl bg-[#F1F5F9] shrink-0" />
+            <div className="space-y-2 flex-1">
+              <div className="h-2.5 bg-[#F1F5F9] rounded-full w-24" />
+              <div className="h-5 bg-[#F1F5F9] rounded-lg w-16" />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className={cn("grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4", className)}>

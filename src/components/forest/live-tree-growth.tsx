@@ -50,7 +50,14 @@ export function LiveTreeGrowth({
     return "Germination naissante";
   }, [progressPercent, status]);
 
-  const availableSpecies: TreeSpecies[] = ["cedar", "oak", "pine", "willow"];
+  const availableSpecies: TreeSpecies[] = [
+    "cedar",
+    "oak",
+    "pine",
+    "willow",
+    "jacaranda",
+    "sakura",
+  ];
 
   return (
     <div
@@ -67,6 +74,10 @@ export function LiveTreeGrowth({
             ? "bg-slate-400"
             : isCelebrating
             ? "bg-amber-300 opacity-40 scale-125"
+            : species === "jacaranda"
+            ? "bg-indigo-400 opacity-30"
+            : species === "sakura"
+            ? "bg-pink-400 opacity-30"
             : "bg-emerald-400"
         )}
       />
@@ -151,37 +162,44 @@ export function LiveTreeGrowth({
             </span>
           </div>
 
-          <div className="grid grid-cols-4 gap-1.5">
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
             {availableSpecies.map((sp) => {
               const itemMeta = SPECIES_METADATA[sp];
               const isSelected = sp === species;
+              const shortName =
+                sp === "jacaranda"
+                  ? "Jacaranda"
+                  : sp === "sakura"
+                  ? "Sakura"
+                  : itemMeta.name.split(" ")[0];
+
               return (
                 <button
                   key={sp}
                   type="button"
                   onClick={() => onSelectSpecies?.(sp)}
                   className={cn(
-                    "p-1.5 rounded-xl border text-center transition-all cursor-pointer flex flex-col items-center justify-center",
+                    "p-2 rounded-2xl border text-center transition-all cursor-pointer flex flex-col items-center justify-center group",
                     isSelected
-                      ? "bg-white border-[#2855D9] shadow-xs ring-1 ring-[#2855D9]"
-                      : "bg-[#FAFAF7] border-[#E4E8F0] hover:bg-white text-[#68748A]"
+                      ? "bg-white border-[#2855D9] shadow-sm ring-2 ring-[#2855D9]/25 scale-[1.02]"
+                      : "bg-[#FAFAF7] border-[#E4E8F0] hover:bg-white text-[#68748A] hover:border-slate-300"
                   )}
-                  title={itemMeta.description}
+                  title={`${itemMeta.name} (${itemMeta.latinName})`}
                 >
                   <TreeSvg
                     species={sp}
                     status="healthy"
                     stage={4}
-                    size={36}
+                    size={38}
                     showMound={false}
                   />
                   <span
                     className={cn(
-                      "text-[10px] font-medium leading-tight mt-1 truncate max-w-full",
-                      isSelected ? "text-[#2855D9] font-bold" : "text-[#182235]"
+                      "text-[10px] sm:text-[11px] font-semibold leading-tight mt-1.5 truncate max-w-full",
+                      isSelected ? "text-[#2855D9]" : "text-[#182235]"
                     )}
                   >
-                    {itemMeta.name.split(" ")[0]}
+                    {shortName}
                   </span>
                 </button>
               );

@@ -19,6 +19,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Layers,
+  RefreshCw,
 } from "lucide-react";
 
 interface ForestCanvasProps {
@@ -26,6 +27,7 @@ interface ForestCanvasProps {
   readOnly?: boolean;
   className?: string;
   initialSeason?: SeasonTheme;
+  isLoading?: boolean;
 }
 
 const GRID_SIZE = 6;
@@ -89,6 +91,7 @@ export function ForestCanvas({
   readOnly = false,
   className = "",
   initialSeason = "summer",
+  isLoading = false,
 }: ForestCanvasProps) {
   const { setIsModalOpen } = useFocusTimer();
 
@@ -348,16 +351,27 @@ export function ForestCanvas({
       <div className="absolute top-4 left-4 z-20 flex flex-wrap items-center gap-2">
         {/* Tree Count Status Badge */}
         <div className="px-3.5 py-1.5 rounded-2xl bg-black/50 backdrop-blur-md border border-white/15 text-white text-xs font-semibold flex items-center space-x-2 shadow-lg">
-          <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-          <span>
-            {healthyCount} {healthyCount > 1 ? "arbres sains" : "arbre sain"}
-          </span>
-          <span className="text-white/40">•</span>
-          <span className="text-emerald-300 font-mono text-[11px]">
-            {entries.length > GROVE_CAPACITY
-              ? `Bosquet ${currentGrovePage + 1}/${totalGroves} (${activeGroveEntries.length} arbres)`
-              : `${activeGroveEntries.length}/36 parcelles`}
-          </span>
+          <span
+            className={cn(
+              "w-2.5 h-2.5 rounded-full",
+              isLoading ? "bg-amber-400 animate-ping" : "bg-emerald-400 animate-pulse"
+            )}
+          />
+          {isLoading ? (
+            <span className="text-white/80 font-normal">Synchronisation du bosquet...</span>
+          ) : (
+            <>
+              <span>
+                {healthyCount} {healthyCount > 1 ? "arbres sains" : "arbre sain"}
+              </span>
+              <span className="text-white/40">•</span>
+              <span className="text-emerald-300 font-mono text-[11px]">
+                {entries.length > GROVE_CAPACITY
+                  ? `Bosquet ${currentGrovePage + 1}/${totalGroves} (${activeGroveEntries.length} arbres)`
+                  : `${activeGroveEntries.length}/36 parcelles`}
+              </span>
+            </>
+          )}
         </div>
 
         {/* Season Selector Bar */}
@@ -813,8 +827,18 @@ export function ForestCanvas({
             })}
           </div>
 
-          {/* E. Empty State — Welcoming Focal Island with Seedling Altar */}
-          {entries.length === 0 && (
+          {/* E. Subtle Loading Overlay during Grove Fetch */}
+          {isLoading && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center pointer-events-none z-30">
+              <div className="px-5 py-3 rounded-2xl bg-black/60 backdrop-blur-xl border border-white/15 text-white flex items-center space-x-3 shadow-2xl animate-in fade-in duration-200">
+                <RefreshCw className="w-4 h-4 text-emerald-400 animate-spin" />
+                <span className="text-xs font-semibold text-white/90">Synchronisation de votre île...</span>
+              </div>
+            </div>
+          )}
+
+          {/* F. Empty State — Welcoming Focal Island with Seedling Altar */}
+          {!isLoading && entries.length === 0 && (
             <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center pointer-events-auto z-40">
               <div className="p-8 max-w-md bg-black/60 backdrop-blur-xl rounded-3xl border border-white/15 text-white shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-300">
                 <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-emerald-400/20 to-teal-500/20 border border-emerald-400/40 flex items-center justify-center mx-auto text-emerald-300 shadow-lg">

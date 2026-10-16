@@ -238,7 +238,7 @@ export default function ForestPage() {
       </div>
 
       {/* 2. Forest Insights Summary Cards */}
-      <ForestInsights entries={entries} />
+      <ForestInsights entries={entries} isLoading={isLoading} />
 
       {/* 3. Main View Switcher & Container */}
       <div className="space-y-3">
@@ -286,7 +286,7 @@ export default function ForestPage() {
 
         {/* Content View */}
         {viewMode === "canvas" ? (
-          <ForestCanvas entries={entries} />
+          <ForestCanvas entries={entries} isLoading={isLoading} />
         ) : (
           <ForestTimeline entries={entries} />
         )}
