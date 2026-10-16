@@ -288,7 +288,9 @@ export function ForestCanvas({
   }, [plottedEntries]);
 
   const healthyCount = entries.filter((e) => e.tree_status === "healthy").length;
+  const leaflessCount = entries.filter((e) => e.tree_status === "leafless").length;
   const activeHealthyCount = activeGroveEntries.filter((e) => e.tree_status === "healthy").length;
+  const activeLeaflessCount = activeGroveEntries.filter((e) => e.tree_status === "leafless").length;
 
   return (
     <div
@@ -354,16 +356,28 @@ export function ForestCanvas({
           <span
             className={cn(
               "w-2.5 h-2.5 rounded-full",
-              isLoading ? "bg-amber-400 animate-ping" : "bg-emerald-400 animate-pulse"
+              isLoading
+                ? "bg-amber-400 animate-ping"
+                : leaflessCount > 0 && healthyCount === 0
+                ? "bg-rose-400 animate-pulse"
+                : "bg-emerald-400 animate-pulse"
             )}
           />
           {isLoading ? (
             <span className="text-white/80 font-normal">Synchronisation du bosquet...</span>
           ) : (
             <>
-              <span>
+              <span className={healthyCount > 0 ? "text-emerald-300" : "text-white/80"}>
                 {healthyCount} {healthyCount > 1 ? "arbres sains" : "arbre sain"}
               </span>
+              {leaflessCount > 0 && (
+                <>
+                  <span className="text-white/40">•</span>
+                  <span className="text-rose-400 font-medium">
+                    {leaflessCount} {leaflessCount > 1 ? "arbres morts (pénalités)" : "arbre mort (pénalité)"}
+                  </span>
+                </>
+              )}
               <span className="text-white/40">•</span>
               <span className="text-emerald-300 font-mono text-[11px]">
                 {entries.length > GROVE_CAPACITY

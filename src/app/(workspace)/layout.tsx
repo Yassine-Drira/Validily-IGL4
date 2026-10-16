@@ -38,15 +38,16 @@ export default async function WorkspaceLayout({
       />
       <FocusProvider user={initialUser}>
         <WorkspaceShell
-        sidebar={<AppSidebar subjects={subjects} isAdmin={isAdmin} />}
-        header={<AppHeader initialUser={initialUser} />}
-      >
-        {children}
-      </WorkspaceShell>
-      <FocusHubModal />
-      <PresenceAndAnalyticsTracker />
-      <PremiumCardIntro user={initialUser} />
-    </FocusProvider>
-  </>
+          key="workspace-shell"
+          sidebar={<AppSidebar key="app-sidebar" subjects={subjects} isAdmin={isAdmin} />}
+          header={<AppHeader key="app-header" initialUser={initialUser} />}
+        >
+          {children}
+        </WorkspaceShell>
+        <FocusHubModal key="focus-hub-modal" />
+        <PresenceAndAnalyticsTracker key="presence-tracker" />
+        <PremiumCardIntro user={initialUser} />
+      </FocusProvider>
+    </>
   );
 }

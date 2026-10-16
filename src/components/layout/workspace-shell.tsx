@@ -59,10 +59,10 @@ export function WorkspaceShell({
       }}
     >
       <div className="flex min-h-screen bg-[#F4F6FA] relative" data-workspace-shell="true">
-        {sidebar}
+        <React.Fragment key="shell-sidebar">{sidebar}</React.Fragment>
         <div className="flex-1 flex flex-col min-w-0">
-          {header}
-          <main className="flex-1 p-4 sm:p-6 md:p-8 max-w-7xl w-full mx-auto">
+          <React.Fragment key="shell-header">{header}</React.Fragment>
+          <main key="shell-main" className="flex-1 p-4 sm:p-6 md:p-8 max-w-7xl w-full mx-auto">
             {children}
           </main>
         </div>
