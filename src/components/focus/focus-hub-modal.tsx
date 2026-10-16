@@ -241,9 +241,6 @@ export function FocusHubModal() {
     Math.max(0, ((currentDuration - timeLeft) / currentDuration) * 100)
   );
 
-  const elapsedSeconds = currentDuration - timeLeft;
-  const isPastGracePeriod = elapsedSeconds > 120;
-
   // Formatter for live real-time focused time
   const formatFocusedTime = (totalSec: number) => {
     if (totalSec <= 0) return "0 min";
@@ -466,7 +463,13 @@ export function FocusHubModal() {
               type="button"
               variant="outline"
               size="sm"
-              onClick={resetTimer}
+              onClick={() => {
+                if (isRunning && mode === "work") {
+                  setConfirmAbandon(true);
+                } else {
+                  resetTimer();
+                }
+              }}
               className="w-10 h-10 p-0 rounded-2xl text-[#68748A] hover:text-[#182235] hover:bg-[#F4F6FA] border-[#E4E8F0]"
               title="Réinitialiser le chronomètre"
             >
@@ -476,15 +479,28 @@ export function FocusHubModal() {
             <Button
               type="button"
               variant="primary"
-              onClick={toggleTimer}
+              onClick={() => {
+                if (isRunning && mode === "work") {
+                  setConfirmAbandon(true);
+                } else {
+                  toggleTimer();
+                }
+              }}
               className={cn(
                 "h-12 px-8 rounded-2xl text-sm font-bold flex items-center space-x-2.5 shadow-md transition-all cursor-pointer transform hover:-translate-y-0.5",
-                mode === "work"
+                isRunning && mode === "work"
+                  ? "bg-rose-600 hover:bg-rose-700 text-white shadow-rose-500/20"
+                  : mode === "work"
                   ? "bg-[#2855D9] hover:bg-[#1E40AF] text-white shadow-blue-500/20"
                   : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/20"
               )}
             >
-              {isRunning ? (
+              {isRunning && mode === "work" ? (
+                <>
+                  <AlertOctagon className="w-4 h-4 fill-current" />
+                  <span>Abandonner (Pénalité)</span>
+                </>
+              ) : isRunning ? (
                 <>
                   <Pause className="w-4 h-4 fill-current" />
                   <span>Mettre en Pause</span>
@@ -501,7 +517,13 @@ export function FocusHubModal() {
               type="button"
               variant="outline"
               size="sm"
-              onClick={skipSession}
+              onClick={() => {
+                if (isRunning && mode === "work") {
+                  setConfirmAbandon(true);
+                } else {
+                  skipSession();
+                }
+              }}
               className="w-10 h-10 p-0 rounded-2xl text-[#68748A] hover:text-[#182235] hover:bg-[#F4F6FA] border-[#E4E8F0]"
               title="Passer à la session suivante"
             >
@@ -509,45 +531,47 @@ export function FocusHubModal() {
             </Button>
           </div>
 
-          {/* Explicit Give Up / Abandon Action during Work Session */}
+          {/* Strict Anti-Bypass Abandon Confirmation Dialog */}
           {isRunning && mode === "work" && (
             <div className="mt-3 text-center">
-              {!confirmAbandon ? (
-                <button
-                  type="button"
-                  onClick={() => setConfirmAbandon(true)}
-                  className="text-[11px] text-rose-600 hover:text-rose-700 hover:underline flex items-center space-x-1 mx-auto cursor-pointer"
-                >
-                  <AlertOctagon className="w-3 h-3 text-rose-500" />
-                  <span>Abandonner la session en cours</span>
-                </button>
-              ) : (
-                <div className="bg-rose-50 border border-rose-200 rounded-2xl p-2.5 animate-in fade-in duration-150 text-left max-w-sm">
-                  <p className="text-[11px] text-rose-900 font-semibold mb-1">
-                    {isPastGracePeriod
-                      ? "Attention : plus de 2 min écoulées. Abandonner laissera un arbre défeuillé permanent dans votre bosquet."
-                      : "Période de grâce (≤ 2 min) : l'abandon annulera la session sans pénalité."}
-                  </p>
-                  <div className="flex items-center space-x-2 mt-2">
+              {confirmAbandon ? (
+                <div className="bg-rose-50 border border-rose-200 rounded-2xl p-3 animate-in fade-in duration-150 text-left max-w-sm mx-auto shadow-xs">
+                  <div className="flex items-start space-x-2.5">
+                    <AlertOctagon className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-xs text-rose-950 font-bold">
+                        Aucune pause autorisée en session de travail
+                      </p>
+                      <p className="text-[11px] text-rose-800 leading-snug mt-0.5">
+                        Si vous abandonnez maintenant, vous acceptez d&apos;avoir échoué : un arbre mort permanent sera planté dans votre bosquet comme pénalité indélébile.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2 mt-3 pt-2.5 border-t border-rose-200/70">
                     <button
                       type="button"
                       onClick={() => {
-                        giveUpSession("Abandon manuel");
+                        giveUpSession("Abandon volontaire de concentration");
                         setConfirmAbandon(false);
                       }}
-                      className="px-3 py-1 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-bold cursor-pointer transition-colors"
+                      className="px-3.5 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold cursor-pointer transition-all shadow-2xs"
                     >
-                      Confirmer l&apos;abandon
+                      Confirmer l&apos;abandon (Arbre mort)
                     </button>
                     <button
                       type="button"
                       onClick={() => setConfirmAbandon(false)}
-                      className="px-3 py-1 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 text-[11px] font-medium cursor-pointer transition-colors"
+                      className="px-3.5 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 text-xs font-semibold cursor-pointer transition-all"
                     >
                       Continuer à étudier
                     </button>
                   </div>
                 </div>
+              ) : (
+                <span className="text-[11px] font-medium text-[#68748A] flex items-center justify-center space-x-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <span>Session active : concentration continue sans pause</span>
+                </span>
               )}
             </div>
           )}

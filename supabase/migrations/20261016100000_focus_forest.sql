@@ -258,20 +258,7 @@ begin
 
   v_elapsed := extract(epoch from (v_now - v_session.started_at))::int;
 
-  -- Grace period rule: if abandoned within 120s, cancel without planting dead tree
-  if v_elapsed <= 120 then
-    update public.focus_sessions set
-      status = 'cancelled',
-      actual_duration_seconds = v_elapsed,
-      interrupted_at = v_now,
-      interruption_reason = coalesce(p_reason, 'Annulation précoce (Période de grâce 2 min)'),
-      updated_at = v_now
-    where id = p_session_id;
-
-    return jsonb_build_object('success', true, 'status', 'cancelled', 'tree', null);
-  end if;
-
-  -- Beyond 2 minutes: record interruption and plant leafless tree
+  -- Strict Anti-Bypass Rule: Abandoning an active work session immediately records failure and plants an indelible leafless dead tree
   select count(*) into v_count from public.forest_entries where user_id = auth.uid();
   v_angle := v_count * 2.3999632;
   v_radius := 18.0 * sqrt(v_count + 1);

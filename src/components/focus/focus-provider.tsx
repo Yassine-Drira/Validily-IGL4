@@ -255,9 +255,42 @@ export function FocusProvider({
     timeLeft,
   ]);
 
+  // Explicit session abandonment / give up action
+  const giveUpSession = useCallback(
+    async (reason?: string) => {
+      setIsRunning(false);
+      endTimeRef.current = null;
+      soundEngine.stop();
+
+      const sid = activeSessionIdRef.current;
+      if (sid && mode === "work") {
+        activeSessionIdRef.current = null;
+        setActiveSessionId(null);
+        await abandonFocusSession(sid, reason || "Abandon manuel par l'étudiant");
+      }
+
+      const dur =
+        mode === "work"
+          ? workDuration
+          : mode === "shortBreak"
+          ? shortBreakDuration
+          : longBreakDuration;
+      setTimeLeft(dur);
+    },
+    [mode, workDuration, shortBreakDuration, longBreakDuration]
+  );
+
   const toggleTimer = useCallback(() => {
     if (!user) {
       window.location.href = `/login?next=${encodeURIComponent(typeof window !== "undefined" ? window.location.pathname : "/forest")}`;
+      return;
+    }
+
+    // Anti-Bypass Rule: Concentration in work mode cannot be paused.
+    // The only pause permitted in the timer is after finishing it (during break mode).
+    // If the student pauses or stops during work mode, it admits failure and incurs an indelible dead tree penalty.
+    if (isRunning && mode === "work") {
+      giveUpSession("Session de travail interrompue / mise en pause");
       return;
     }
 
@@ -287,32 +320,7 @@ export function FocusProvider({
     } else {
       endTimeRef.current = null;
     }
-  }, [user, isRunning, timeLeft, soundscape, volume, mode, treeSpecies]);
-
-  // Explicit session abandonment / give up action
-  const giveUpSession = useCallback(
-    async (reason?: string) => {
-      setIsRunning(false);
-      endTimeRef.current = null;
-      soundEngine.stop();
-
-      const sid = activeSessionIdRef.current;
-      if (sid && mode === "work") {
-        activeSessionIdRef.current = null;
-        setActiveSessionId(null);
-        await abandonFocusSession(sid, reason || "Abandon manuel par l'étudiant");
-      }
-
-      const dur =
-        mode === "work"
-          ? workDuration
-          : mode === "shortBreak"
-          ? shortBreakDuration
-          : longBreakDuration;
-      setTimeLeft(dur);
-    },
-    [mode, workDuration, shortBreakDuration, longBreakDuration]
-  );
+  }, [user, isRunning, timeLeft, soundscape, volume, mode, treeSpecies, giveUpSession]);
 
   const resetTimer = useCallback(() => {
     // If currently running in work mode with an active session, delegate to giveUpSession

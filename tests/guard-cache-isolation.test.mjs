@@ -98,3 +98,69 @@ test("Guard & Cache Isolation Contract: Interactive action buttons redirect pass
   const communityContent = fs.readFileSync(communityPath, "utf-8");
   assert.ok(communityContent.includes("window.location.href = \"/login?next=/forest/community\""), "Community cheering must redirect visitors to login");
 });
+
+test("Anti-Bypass Focus Session & Dead Tree Integrity: No pause during work mode and un-bypassable penalty", (t) => {
+  // 1. FocusProvider anti-bypass
+  const focusProviderPath = path.join(rootDir, "src/components/focus/focus-provider.tsx");
+  const fpContent = fs.readFileSync(focusProviderPath, "utf-8");
+  assert.ok(
+    fpContent.includes("if (isRunning && mode === \"work\") {\n      giveUpSession(\"Session de travail interrompue / mise en pause\");"),
+    "FocusProvider toggleTimer must disallow pause during work mode and trigger giveUpSession"
+  );
+  assert.ok(
+    fpContent.includes("abandonFocusSession(sid, reason || \"Abandon manuel par l'étudiant\")"),
+    "giveUpSession must call abandonFocusSession on server"
+  );
+
+  // 2. FocusHubModal UI strictness
+  const hubModalPath = path.join(rootDir, "src/components/focus/focus-hub-modal.tsx");
+  const hubContent = fs.readFileSync(hubModalPath, "utf-8");
+  assert.ok(
+    hubContent.includes("isRunning && mode === \"work\" ? (\n                <>\n                  <AlertOctagon"),
+    "FocusHubModal must replace Pause button with Abandonner (Pénalité) during active work"
+  );
+  assert.ok(
+    hubContent.includes("Aucune pause autorisée en session de travail"),
+    "FocusHubModal must warn that pauses are forbidden during work mode"
+  );
+  assert.ok(
+    hubContent.includes("arbre mort permanent sera planté dans votre bosquet comme pénalité indélébile"),
+    "FocusHubModal must warn of indelible dead tree penalty"
+  );
+  assert.ok(
+    !hubContent.includes("isPastGracePeriod"),
+    "FocusHubModal must not contain grace period loophole"
+  );
+
+  // 3. FocusHeaderWidget
+  const headerWidgetPath = path.join(rootDir, "src/components/focus/focus-header-widget.tsx");
+  const headerWidgetContent = fs.readFileSync(headerWidgetPath, "utf-8");
+  assert.ok(
+    headerWidgetContent.includes("if (isRunning && !isBreak) {\n            setIsModalOpen(true);\n          } else {\n            toggleTimer();\n          }"),
+    "FocusHeaderWidget quick button must not pause during work session"
+  );
+
+  // 4. Server Action & SQL Migration Integrity
+  const forestActionsPath = path.join(rootDir, "src/lib/actions/forest-actions.ts");
+  const forestActionsContent = fs.readFileSync(forestActionsPath, "utf-8");
+  assert.ok(
+    forestActionsContent.includes("tree_status: \"leafless\""),
+    "abandonFocusSession must create a leafless dead tree"
+  );
+  assert.ok(
+    !forestActionsContent.includes("if (elapsedSeconds <= 120) {\n        return { success: true, status: \"cancelled\""),
+    "abandonFocusSession must not allow early cancellation bypass for real sessions"
+  );
+
+  const migrationPath = path.join(rootDir, "supabase/migrations/20261016100000_focus_forest.sql");
+  const migrationContent = fs.readFileSync(migrationPath, "utf-8");
+  assert.ok(
+    migrationContent.includes("tree_status,\n    tree_species,"),
+    "SQL migration must record leafless tree on abandon"
+  );
+  assert.ok(
+    migrationContent.includes("create policy \"Only admins can delete forest entries\""),
+    "SQL migration must prevent students from deleting dead trees"
+  );
+});
+

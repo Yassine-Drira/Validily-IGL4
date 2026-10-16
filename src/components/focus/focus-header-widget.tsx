@@ -23,12 +23,16 @@ export function FocusHeaderWidget() {
 
   return (
     <div className="flex items-center space-x-1.5 bg-[#F4F6FA] hover:bg-[#EEF2F6] border border-[#E4E8F0] rounded-xl p-1 transition-all">
-      {/* Quick Play/Pause Button */}
+      {/* Quick Play or Hub Trigger Button (No pause during work mode) */}
       <button
         type="button"
         onClick={(e) => {
           e.stopPropagation();
-          toggleTimer();
+          if (isRunning && !isBreak) {
+            setIsModalOpen(true);
+          } else {
+            toggleTimer();
+          }
         }}
         className={cn(
           "w-7 h-7 rounded-lg flex items-center justify-center transition-all cursor-pointer",
@@ -38,11 +42,27 @@ export function FocusHeaderWidget() {
               : "bg-[#2855D9] text-white shadow-xs"
             : "bg-white text-[#182235] hover:text-[#2855D9] shadow-2xs"
         )}
-        aria-label={isRunning ? "Mettre en pause le Pomodoro" : "Démarrer le Pomodoro"}
-        title={isRunning ? "Pause" : "Démarrer"}
+        aria-label={
+          isRunning
+            ? isBreak
+              ? "Mettre en pause la pause"
+              : "Session de concentration active - Ouvrir le Focus Hub"
+            : "Démarrer le Pomodoro"
+        }
+        title={
+          isRunning
+            ? isBreak
+              ? "Mettre en pause"
+              : "Session de travail active (Pas de pause autorisée) - Ouvrir Focus Hub"
+            : "Démarrer"
+        }
       >
         {isRunning ? (
-          <Pause className="w-3.5 h-3.5 fill-current" />
+          isBreak ? (
+            <Pause className="w-3.5 h-3.5 fill-current" />
+          ) : (
+            <Sparkles className="w-3.5 h-3.5 fill-current animate-pulse" />
+          )
         ) : (
           <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
         )}
