@@ -1,0 +1,436 @@
+/* VALIDILY-IGL4 — Premium Magical Card Intro Styles */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(ellipse 85% 75% at 50% 45%, #05261c 0%, #021710 45%, #010a07 80%, #000402 100%);
+  overflow: hidden;
+  user-select: none;
+  opacity: 1;
+  transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity;
+}
+
+.overlayExiting {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Volumetric Atmospheric Overhead Light */
+.volumetricLight {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 900px;
+  height: 65vh;
+  background: radial-gradient(ellipse 60% 50% at 50% 0%, rgba(16, 185, 129, 0.16) 0%, rgba(212, 163, 70, 0.08) 35%, transparent 70%);
+  pointer-events: none;
+  filter: blur(20px);
+}
+
+/* Ambient Radial Emerald & Gold Aura behind Card */
+.ambientHalo {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 480px;
+  height: 480px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(16, 185, 129, 0.22) 0%, rgba(212, 163, 70, 0.12) 40%, transparent 70%);
+  filter: blur(35px);
+  pointer-events: none;
+  opacity: 0;
+  animation: haloPulse 2.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes haloPulse {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.6);
+  }
+  30% {
+    opacity: 0.4;
+    transform: translate(-50%, -50%) scale(0.9);
+  }
+  65% {
+    opacity: 0.9;
+    transform: translate(-50%, -50%) scale(1.15);
+  }
+  85% {
+    opacity: 0.7;
+    transform: translate(-50%, -50%) scale(1.05);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.2);
+  }
+}
+
+/* 3D Stage Container */
+.stage {
+  perspective: 1200px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+/* Card 3D Flipper */
+.cardFlipper {
+  width: 240px;
+  height: 300px;
+  position: relative;
+  transform-style: preserve-3d;
+  animation: cardEmergence 2.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
+}
+
+@media (max-width: 640px) {
+  .cardFlipper {
+    width: 200px;
+    height: 250px;
+  }
+}
+
+@keyframes cardEmergence {
+  /* Phase A (0.0-0.4s): Hidden / barely visible */
+  0% {
+    opacity: 0;
+    transform: translateY(35px) scale(0.72) rotateY(-180deg) rotateZ(-4deg);
+  }
+  15% {
+    opacity: 0.2;
+    transform: translateY(30px) scale(0.75) rotateY(-160deg) rotateZ(-3deg);
+  }
+  /* Phase B (0.4-1.2s): Smooth 3D rotation acceleration & deceleration */
+  35% {
+    opacity: 0.9;
+    transform: translateY(-8px) scale(1.04) rotateY(-50deg) rotateZ(1deg);
+  }
+  48% {
+    opacity: 1;
+    transform: translateY(0) scale(1.02) rotateY(5deg) rotateZ(0deg);
+  }
+  /* Phase C (1.2-1.8s): Settle facing forward perfectly */
+  58% {
+    opacity: 1;
+    transform: translateY(0) scale(1) rotateY(0deg) rotateZ(0deg);
+  }
+  75% {
+    opacity: 1;
+    transform: translateY(-2px) scale(1) rotateY(0deg) rotateZ(0deg);
+  }
+  /* Phase D & E (1.8-2.8s): Gentle micro-settle and exit */
+  88% {
+    opacity: 1;
+    transform: translateY(0) scale(0.98) rotateY(0deg) rotateZ(0deg);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1) rotateY(0deg) rotateZ(0deg);
+  }
+}
+
+/* Shared Card Face Properties */
+.cardFace {
+  position: absolute;
+  inset: 0;
+  border-radius: 26px;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  overflow: hidden;
+  box-shadow:
+    0 25px 60px -12px rgba(0, 0, 0, 0.85),
+    0 0 45px rgba(16, 185, 129, 0.2),
+    0 0 20px rgba(212, 163, 70, 0.15);
+}
+
+/* Front Face */
+.cardFront {
+  background: linear-gradient(155deg, #16243d 0%, #111A2E 50%, #0a1120 100%);
+  border: 1.5px solid rgba(212, 163, 70, 0.45);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  transform: rotateY(0deg);
+}
+
+/* Back Face */
+.cardBack {
+  background: linear-gradient(135deg, #041f17 0%, #062b1e 50%, #02120d 100%);
+  border: 1.5px solid rgba(212, 163, 70, 0.4);
+  transform: rotateY(180deg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+/* Back face geometric guilloche lattice */
+.cardBackPattern {
+  position: absolute;
+  inset: 8px;
+  border-radius: 18px;
+  border: 1px solid rgba(212, 163, 70, 0.25);
+  background-image: 
+    repeating-linear-gradient(45deg, rgba(212, 163, 70, 0.05) 0, rgba(212, 163, 70, 0.05) 1px, transparent 0, transparent 12px),
+    repeating-linear-gradient(-45deg, rgba(212, 163, 70, 0.05) 0, rgba(212, 163, 70, 0.05) 1px, transparent 0, transparent 12px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Inner Gold Inset Frame (Front) */
+.innerFrame {
+  position: absolute;
+  inset: 7px;
+  border-radius: 20px;
+  border: 1px solid rgba(212, 163, 70, 0.25);
+  pointer-events: none;
+}
+
+/* Corner Pips */
+.pipTopLeft {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1;
+}
+
+.pipBottomRight {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1;
+  transform: rotate(180deg);
+}
+
+.pipLetter {
+  font-family: var(--font-sans), sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+  color: #D4A346;
+  letter-spacing: -0.05em;
+}
+
+.pipSuit {
+  font-size: 8px;
+  color: #D4A346;
+  margin-top: 1px;
+}
+
+/* Center Emblem Wrapper */
+.centerEmblem {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin-top: auto;
+  margin-bottom: auto;
+}
+
+/* Light Sweep across the Card Face in Phase C */
+.lightSweep {
+  position: absolute;
+  inset: -100% -50%;
+  background: linear-gradient(
+    108deg,
+    transparent 35%,
+    rgba(255, 255, 255, 0.02) 42%,
+    rgba(251, 191, 36, 0.35) 48%,
+    rgba(255, 255, 255, 0.85) 51%,
+    rgba(251, 191, 36, 0.35) 54%,
+    transparent 62%
+  );
+  transform: translateX(-150%) rotate(12deg);
+  pointer-events: none;
+  animation: sweepAnimation 2.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes sweepAnimation {
+  0%, 46% {
+    transform: translateX(-150%) rotate(12deg);
+    opacity: 0;
+  }
+  48% {
+    opacity: 1;
+  }
+  68% {
+    transform: translateX(150%) rotate(12deg);
+    opacity: 1;
+  }
+  75%, 100% {
+    transform: translateX(150%) rotate(12deg);
+    opacity: 0;
+  }
+}
+
+/* Edge Catchlight Flare */
+.edgeGlow {
+  position: absolute;
+  inset: 0;
+  border-radius: 26px;
+  pointer-events: none;
+  box-shadow: inset 0 0 15px rgba(251, 191, 36, 0.35);
+  opacity: 0;
+  animation: edgeGlowPulse 2.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes edgeGlowPulse {
+  0%, 48% {
+    opacity: 0;
+  }
+  56% {
+    opacity: 1;
+  }
+  75% {
+    opacity: 0.4;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Brand Wordmark under Emblem */
+.cardWordmark {
+  font-family: var(--font-sans), sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  color: #D4A346;
+  text-transform: uppercase;
+  margin-top: 10px;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+}
+
+.cardSubtitle {
+  font-family: var(--font-sans), sans-serif;
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  color: #8C9BB3;
+  text-transform: uppercase;
+  margin-top: 3px;
+}
+
+/* Sparse Floating Stardust Particles */
+.particle {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0;
+  animation: particleFloat 2.6s ease-in-out forwards;
+}
+
+@keyframes particleFloat {
+  0% {
+    opacity: 0;
+    transform: translateY(15px) scale(0.6);
+  }
+  25% {
+    opacity: 0.85;
+  }
+  70% {
+    opacity: 0.75;
+    transform: translateY(-20px) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-35px) scale(0.4);
+  }
+}
+
+/* Skip Button */
+.skipButton {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  z-index: 50;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 9999px;
+  background: rgba(4, 18, 14, 0.65);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: rgba(167, 243, 208, 0.9);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  backdrop-filter: blur(12px);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.skipButton:hover {
+  background: rgba(6, 28, 20, 0.85);
+  border-color: rgba(212, 163, 70, 0.6);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.skipButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px #D4A346, 0 0 12px rgba(212, 163, 70, 0.5);
+}
+
+.skipBadge {
+  font-size: 10px;
+  font-family: var(--font-mono), monospace;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  color: #A7F3D0;
+}
+
+/* Accessibility: Prefers Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  .overlay {
+    transition: opacity 0.3s ease;
+  }
+  .cardFlipper {
+    animation: simpleFade 0.9s ease forwards !important;
+    transform: none !important;
+  }
+  .ambientHalo,
+  .lightSweep,
+  .edgeGlow,
+  .particle {
+    animation: none !important;
+    display: none !important;
+  }
+}
+
+@keyframes simpleFade {
+  0% {
+    opacity: 0;
+  }
+  40% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+  }
+}

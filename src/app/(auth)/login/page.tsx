@@ -38,6 +38,11 @@ function LoginForm() {
       if (error) {
         setErrorMsg(error.message);
       } else {
+        try {
+          sessionStorage.setItem("validily_login_event", "true");
+        } catch {
+          // LocalStorage fallback
+        }
         window.location.href = nextUrl;
       }
     } catch (err: any) {

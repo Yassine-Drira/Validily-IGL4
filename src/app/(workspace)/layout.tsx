@@ -6,6 +6,7 @@ import { getRequesterUser } from "@/lib/auth/authorization";
 import { FocusProvider } from "@/components/focus/focus-provider";
 import { FocusHubModal } from "@/components/focus/focus-hub-modal";
 import { PresenceAndAnalyticsTracker } from "@/components/analytics/presence-tracker";
+import { PremiumCardIntro } from "@/components/brand/premium-card-intro";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +38,7 @@ export default async function WorkspaceLayout({
       </WorkspaceShell>
       <FocusHubModal />
       <PresenceAndAnalyticsTracker />
+      <PremiumCardIntro user={initialUser} />
     </FocusProvider>
   );
 }
