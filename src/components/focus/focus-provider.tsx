@@ -9,7 +9,8 @@ import React, {
   useCallback,
 } from "react";
 import { soundEngine, SoundscapeType } from "@/lib/audio/ambient-soundscapes";
-import { TreeSpecies } from "@/types/database";
+import { TreeSpecies, CustomAudioEntry, AudioCatalogEntry } from "@/types/database";
+import { YouTubeFocusPlayer } from "@/components/audio/youtube-focus-player";
 import {
   startFocusSession,
   completeFocusSession,
@@ -17,6 +18,7 @@ import {
 } from "@/lib/actions/forest-actions";
 
 export type TimerMode = "work" | "shortBreak" | "longBreak";
+export type AudioPlaybackType = "none" | "synth" | "custom" | "catalog";
 
 interface FocusContextType {
   mode: TimerMode;
@@ -28,6 +30,9 @@ interface FocusContextType {
   soundscape: SoundscapeType;
   volume: number;
   isSoundMuted: boolean;
+  activeAudioType: AudioPlaybackType;
+  activeCustomAudio: CustomAudioEntry | null;
+  activeCatalogAudio: AudioCatalogEntry | null;
   completedPomodoros: number;
   totalFocusSecondsToday: number;
   totalFocusMinutesToday: number;
@@ -40,6 +45,8 @@ interface FocusContextType {
   setMode: (mode: TimerMode) => void;
   setWorkDurationMinutes: (minutes: number) => void;
   setSoundscape: (soundscape: SoundscapeType) => void;
+  setActiveCustomAudio: (entry: CustomAudioEntry | null) => void;
+  setActiveCatalogAudio: (entry: AudioCatalogEntry | null) => void;
   setVolume: (volume: number) => void;
   toggleSoundMute: () => void;
   setIsModalOpen: (open: boolean) => void;
@@ -74,6 +81,11 @@ export function FocusProvider({
   const [completedPomodoros, setCompletedPomodoros] = useState<number>(0);
   const [totalFocusSecondsToday, setTotalFocusSecondsToday] = useState<number>(0);
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+
+  // Audio Customization & Catalog Additions
+  const [activeAudioType, setActiveAudioType] = useState<AudioPlaybackType>("none");
+  const [activeCustomAudio, setActiveCustomAudioState] = useState<CustomAudioEntry | null>(null);
+  const [activeCatalogAudio, setActiveCatalogAudioState] = useState<AudioCatalogEntry | null>(null);
 
   // Focus Forest Additions
   const [treeSpecies, setTreeSpeciesState] = useState<TreeSpecies>("cedar");
@@ -357,11 +369,56 @@ export function FocusProvider({
       setSoundscapeState(type);
       if (type === "none") {
         soundEngine.stop();
+        setActiveAudioType((prev) => (prev === "synth" ? "none" : prev));
       } else {
-        soundEngine.start(type, volume);
+        setActiveCustomAudioState(null);
+        setActiveCatalogAudioState(null);
+        setActiveAudioType("synth");
+        if (isRunning && !isSoundMuted) {
+          soundEngine.start(type, volume);
+        }
       }
     },
-    [volume]
+    [volume, isRunning, isSoundMuted]
+  );
+
+  const setActiveCustomAudio = useCallback(
+    (entry: CustomAudioEntry | null) => {
+      setActiveCustomAudioState(entry);
+      if (entry) {
+        setActiveCatalogAudioState(null);
+        setSoundscapeState("none");
+        soundEngine.stop();
+        setActiveAudioType("custom");
+      } else {
+        setActiveAudioType((prev) => (prev === "custom" ? "none" : prev));
+      }
+    },
+    []
+  );
+
+  const setActiveCatalogAudio = useCallback(
+    (entry: AudioCatalogEntry | null) => {
+      setActiveCatalogAudioState(entry);
+      if (entry) {
+        setActiveCustomAudioState(null);
+        if (entry.source_type === "synth") {
+          const synthKey = entry.source_key as SoundscapeType;
+          setSoundscapeState(synthKey);
+          setActiveAudioType("synth");
+          if (isRunning && !isSoundMuted) {
+            soundEngine.start(synthKey, volume);
+          }
+        } else {
+          setSoundscapeState("none");
+          soundEngine.stop();
+          setActiveAudioType("catalog");
+        }
+      } else {
+        setActiveAudioType((prev) => (prev === "catalog" ? "none" : prev));
+      }
+    },
+    [volume, isRunning, isSoundMuted]
   );
 
   const setVolume = useCallback((newVol: number) => {
@@ -376,6 +433,7 @@ export function FocusProvider({
 
     setIsRunning(false);
     endTimeRef.current = null;
+    soundEngine.stop();
     if (mode === "work") {
       setModeState("shortBreak");
       setTimeLeft(shortBreakDuration);
@@ -393,6 +451,16 @@ export function FocusProvider({
     });
   }, []);
 
+  const youtubeVideoId =
+    activeAudioType === "custom"
+      ? activeCustomAudio?.youtube_video_id || null
+      : activeAudioType === "catalog" && activeCatalogAudio?.source_type === "youtube"
+      ? activeCatalogAudio.youtube_video_id || null
+      : null;
+
+  const isYouTubePlaying =
+    isRunning && !isSoundMuted && (activeAudioType === "custom" || activeAudioType === "catalog");
+
   return (
     <FocusContext.Provider
       value={{
@@ -405,6 +473,9 @@ export function FocusProvider({
         soundscape,
         volume,
         isSoundMuted,
+        activeAudioType,
+        activeCustomAudio,
+        activeCatalogAudio,
         completedPomodoros,
         totalFocusSecondsToday,
         totalFocusMinutesToday,
@@ -417,6 +488,8 @@ export function FocusProvider({
         setMode,
         setWorkDurationMinutes,
         setSoundscape,
+        setActiveCustomAudio,
+        setActiveCatalogAudio,
         setVolume,
         toggleSoundMute,
         setIsModalOpen,
@@ -427,6 +500,21 @@ export function FocusProvider({
       }}
     >
       {children}
+
+      {/* Persistent Background YouTube Audio Stream */}
+      <YouTubeFocusPlayer
+        videoId={youtubeVideoId}
+        isPlaying={isYouTubePlaying}
+        volume={volume}
+        isMuted={isSoundMuted}
+        title={
+          activeAudioType === "custom"
+            ? activeCustomAudio?.title
+            : activeAudioType === "catalog"
+            ? activeCatalogAudio?.title
+            : undefined
+        }
+      />
     </FocusContext.Provider>
   );
 }
@@ -441,6 +529,9 @@ const FALLBACK_FOCUS_CONTEXT: FocusContextType = {
   soundscape: "none",
   volume: 0.5,
   isSoundMuted: false,
+  activeAudioType: "none",
+  activeCustomAudio: null,
+  activeCatalogAudio: null,
   completedPomodoros: 0,
   totalFocusSecondsToday: 0,
   totalFocusMinutesToday: 0,
@@ -453,6 +544,8 @@ const FALLBACK_FOCUS_CONTEXT: FocusContextType = {
   setMode: () => {},
   setWorkDurationMinutes: () => {},
   setSoundscape: () => {},
+  setActiveCustomAudio: () => {},
+  setActiveCatalogAudio: () => {},
   setVolume: () => {},
   toggleSoundMute: () => {},
   setIsModalOpen: () => {},

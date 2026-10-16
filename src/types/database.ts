@@ -250,3 +250,105 @@ export interface MemberForestSummary {
   visibility: ForestVisibility;
 }
 
+// -----------------------------------------------------------------------------
+// Audio Customization & VIP Entitlements
+// -----------------------------------------------------------------------------
+
+export interface CustomAudioEntry {
+  id: string;
+  user_id: string;
+  title: string;
+  youtube_url: string;
+  youtube_video_id: string;
+  source_type: "youtube";
+  created_at: string;
+  updated_at: string;
+}
+
+export type AudioCatalogCategory =
+  | "ambient"
+  | "binaural"
+  | "nature"
+  | "lofi"
+  | "classical"
+  | "focus";
+
+export type AudioSourceType = "synth" | "youtube";
+
+export interface AudioCatalogEntry {
+  id: string;
+  title: string;
+  description: string | null;
+  category: AudioCatalogCategory;
+  source_type: AudioSourceType;
+  source_key: string;
+  youtube_video_id: string | null;
+  is_published: boolean;
+  sort_order: number;
+  created_by?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface VipEntitlement {
+  id: string;
+  user_id: string;
+  starts_at: string;
+  expires_at: string;
+  granted_by: string;
+  reason: string | null;
+  status: "active" | "revoked" | "expired";
+  created_at: string;
+  updated_at: string;
+  user_display_name?: string;
+  user_email?: string;
+  granter_display_name?: string;
+}
+
+// -----------------------------------------------------------------------------
+// Live Presence & Website Analytics
+// -----------------------------------------------------------------------------
+
+export type DeviceCategory = "desktop" | "tablet" | "mobile" | "unknown";
+
+export interface UserPresence {
+  user_id: string;
+  display_name: string;
+  device_category: DeviceCategory;
+  current_route: string;
+  last_seen_at: string;
+}
+
+export type AnalyticsEventType =
+  | "page_view"
+  | "focus_session_start"
+  | "focus_session_complete"
+  | "quiz_attempt"
+  | "resource_view";
+
+export interface AnalyticsEvent {
+  id: string;
+  event_type: AnalyticsEventType;
+  page_route: string;
+  user_id?: string | null;
+  session_id: string;
+  device_category: DeviceCategory;
+  browser_family: string;
+  os_family: string;
+  created_at: string;
+}
+
+export interface AnalyticsOverview {
+  activeUsersEstimate: number;
+  activeSessionsCount: number;
+  uniqueVisitors24h: number;
+  uniqueVisitors7d: number;
+  uniqueVisitors30d: number;
+  totalPageViews: number;
+  pageViewsByDay: Array<{ date: string; views: number }>;
+  topPages: Array<{ route: string; count: number }>;
+  deviceDistribution: Record<DeviceCategory, number>;
+  browserDistribution: Record<string, number>;
+  osDistribution: Record<string, number>;
+}
+

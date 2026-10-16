@@ -33,13 +33,18 @@ export type AuditAction =
   | "SUBJECT_CREATE"
   | "SUBJECT_DELETE"
   | "USER_SIGN_IN"
-  | "USER_SIGN_OUT";
+  | "USER_SIGN_OUT"
+  | "VIP_GRANTED"
+  | "VIP_REVOKED"
+  | "AUDIO_CATALOG_CREATE"
+  | "AUDIO_CATALOG_UPDATE"
+  | "AUDIO_CATALOG_DELETE";
 
 export interface AuditEvent {
   actor_id: string; // user ID or "guest" or "system"
   action: AuditAction;
   target_id: string; // resource ID, quiz ID, etc.
-  target_type: "resource" | "folder" | "quiz" | "note" | "subject" | "auth";
+  target_type: "resource" | "folder" | "quiz" | "note" | "subject" | "auth" | "vip" | "audio";
   metadata?: Record<string, any>;
   ip_address?: string;
 }

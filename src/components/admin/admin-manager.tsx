@@ -26,9 +26,21 @@ import {
   Eye,
   Sliders,
   Sparkles,
+  Radio,
+  Crown,
+  BarChart3,
+  Volume2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Semester, Subject, ResourceCategory } from "@/types/database";
+import {
+  Semester,
+  Subject,
+  ResourceCategory,
+  AudioCatalogEntry,
+  VipEntitlement,
+  UserPresence,
+  AnalyticsOverview,
+} from "@/types/database";
 import {
   createSubject,
   updateSubject,
@@ -45,6 +57,10 @@ import {
   PRESET_ACCESSIBLE_COLORS,
   getSubjectVisual,
 } from "@/components/academic/subject-icon";
+import { AdminAudioCatalog } from "./admin-audio-catalog";
+import { AdminVipManager } from "./admin-vip-manager";
+import { AdminPresenceView } from "./admin-presence-view";
+import { AdminAnalyticsView } from "./admin-analytics-view";
 
 interface AdminManagerProps {
   initialSemesters: Semester[];
@@ -55,6 +71,11 @@ interface AdminManagerProps {
   isAdmin?: boolean;
   initialUsers?: ManagedUser[];
   initialAuditLogs?: any[];
+  initialCatalogEntries?: AudioCatalogEntry[];
+  initialVipEntitlements?: VipEntitlement[];
+  initialPresenceUsers?: Array<UserPresence & { isRecent: boolean; timeAgoSeconds: number }>;
+  initialTotalActiveUsers?: number;
+  initialAnalytics?: AnalyticsOverview | null;
 }
 
 export function AdminManager({
@@ -66,8 +87,15 @@ export function AdminManager({
   isAdmin = false,
   initialUsers = [],
   initialAuditLogs = [],
+  initialCatalogEntries = [],
+  initialVipEntitlements = [],
+  initialPresenceUsers = [],
+  initialTotalActiveUsers = 0,
+  initialAnalytics = null,
 }: AdminManagerProps) {
-  const [activeTab, setActiveTab] = useState<"curriculum" | "delegation" | "audit">("curriculum");
+  const [activeTab, setActiveTab] = useState<
+    "curriculum" | "delegation" | "vip" | "audio" | "presence" | "analytics" | "audit"
+  >("curriculum");
   const [semesters, setSemesters] = useState<Semester[]>(initialSemesters);
   const [subjects, setSubjects] = useState<Subject[]>(initialSubjects);
   const [categories, setCategories] = useState<ResourceCategory[]>(initialCategories);
@@ -421,44 +449,96 @@ export function AdminManager({
       </div>
 
       {/* Navigation Tabs */}
-      <div className="flex items-center space-x-1.5 border-b border-[#E4E8F0] pb-2">
+      <div className="flex items-center space-x-1.5 border-b border-[#E4E8F0] pb-2 overflow-x-auto">
         <button
           type="button"
           onClick={() => setActiveTab("curriculum")}
-          className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition-all cursor-pointer ${
+          className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition-all cursor-pointer shrink-0 ${
             activeTab === "curriculum"
               ? "bg-[#2855D9] text-white shadow-2xs"
               : "text-[#68748A] hover:bg-[#F4F6FA]"
           }`}
         >
           <BookOpen className="w-3.5 h-3.5" />
-          <span>Curriculum & Matières ({subjects.length})</span>
+          <span>Curriculum ({subjects.length})</span>
         </button>
 
         <button
           type="button"
           onClick={() => setActiveTab("delegation")}
-          className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition-all cursor-pointer ${
+          className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition-all cursor-pointer shrink-0 ${
             activeTab === "delegation"
               ? "bg-[#2855D9] text-white shadow-2xs"
               : "text-[#68748A] hover:bg-[#F4F6FA]"
           }`}
         >
           <Users className="w-3.5 h-3.5" />
-          <span>Rôles & Accès Temporaires ({users.length})</span>
+          <span>Délégation Admin ({users.length})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("audio")}
+          className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition-all cursor-pointer shrink-0 ${
+            activeTab === "audio"
+              ? "bg-[#2855D9] text-white shadow-2xs"
+              : "text-[#68748A] hover:bg-[#F4F6FA]"
+          }`}
+        >
+          <Radio className="w-3.5 h-3.5" />
+          <span>Catalogue Audio ({initialCatalogEntries.length})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("vip")}
+          className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition-all cursor-pointer shrink-0 ${
+            activeTab === "vip"
+              ? "bg-amber-600 text-white shadow-2xs"
+              : "text-[#68748A] hover:bg-[#F4F6FA]"
+          }`}
+        >
+          <Crown className="w-3.5 h-3.5" />
+          <span>Accès VIP ({initialVipEntitlements.filter((e) => e.status === "active").length})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("presence")}
+          className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition-all cursor-pointer shrink-0 ${
+            activeTab === "presence"
+              ? "bg-emerald-600 text-white shadow-2xs"
+              : "text-[#68748A] hover:bg-[#F4F6FA]"
+          }`}
+        >
+          <Activity className="w-3.5 h-3.5" />
+          <span>Présence Live ({initialTotalActiveUsers})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("analytics")}
+          className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition-all cursor-pointer shrink-0 ${
+            activeTab === "analytics"
+              ? "bg-[#2855D9] text-white shadow-2xs"
+              : "text-[#68748A] hover:bg-[#F4F6FA]"
+          }`}
+        >
+          <BarChart3 className="w-3.5 h-3.5" />
+          <span>Analytiques</span>
         </button>
 
         <button
           type="button"
           onClick={() => setActiveTab("audit")}
-          className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition-all cursor-pointer ${
+          className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition-all cursor-pointer shrink-0 ${
             activeTab === "audit"
               ? "bg-[#2855D9] text-white shadow-2xs"
               : "text-[#68748A] hover:bg-[#F4F6FA]"
           }`}
         >
-          <Activity className="w-3.5 h-3.5" />
-          <span>Surveillance & Journal d&apos;Audit</span>
+          <ShieldAlert className="w-3.5 h-3.5" />
+          <span>Journal d&apos;Audit</span>
         </button>
       </div>
 
@@ -737,6 +817,36 @@ export function AdminManager({
             </table>
           </div>
         </div>
+      )}
+
+      {/* TAB 4: SHARED AUDIO CATALOG */}
+      {activeTab === "audio" && (
+        <AdminAudioCatalog
+          initialEntries={initialCatalogEntries}
+          onNotify={(msg, isErr) => (isErr ? setErrorMsg(msg) : setFeedbackMsg(msg))}
+        />
+      )}
+
+      {/* TAB 5: VIP ENTITLEMENTS */}
+      {activeTab === "vip" && (
+        <AdminVipManager
+          initialEntitlements={initialVipEntitlements}
+          managedUsers={users}
+          onNotify={(msg, isErr) => (isErr ? setErrorMsg(msg) : setFeedbackMsg(msg))}
+        />
+      )}
+
+      {/* TAB 6: LIVE USER PRESENCE */}
+      {activeTab === "presence" && (
+        <AdminPresenceView
+          initialUsers={initialPresenceUsers}
+          initialTotalActive={initialTotalActiveUsers}
+        />
+      )}
+
+      {/* TAB 7: SITE ANALYTICS */}
+      {activeTab === "analytics" && (
+        <AdminAnalyticsView initialOverview={initialAnalytics} />
       )}
 
       {/* MODAL: CREATE OR EDIT SUBJECT WITH ICON & COLOR PICKER */}

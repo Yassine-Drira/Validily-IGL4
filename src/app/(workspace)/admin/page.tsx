@@ -12,6 +12,10 @@ import { getRequesterUser, isUserAdmin } from "@/lib/auth/authorization";
 
 import { listManagedUsers } from "@/lib/actions/admin-actions";
 import { getRecentAuditLogs } from "@/lib/audit/audit-logger";
+import { listAllCatalogEntries } from "@/lib/actions/audio-catalog-actions";
+import { listVipEntitlements } from "@/lib/actions/vip-actions";
+import { getLivePresenceList } from "@/lib/actions/presence-actions";
+import { getAnalyticsOverview } from "@/lib/actions/analytics-actions";
 
 import { ShieldAlert, Lock } from "lucide-react";
 
@@ -28,11 +32,28 @@ export default async function AdminPage() {
     redirect("/login?next=/admin");
   }
 
-  const semesters = await getSemesters();
-  const subjects = await getSubjects();
-  const categories = await getCategories();
-  const resources = await getResources();
-  const usersRes = await listManagedUsers();
+  const [
+    semesters,
+    subjects,
+    categories,
+    resources,
+    usersRes,
+    catalogRes,
+    vipRes,
+    presenceRes,
+    analyticsRes,
+  ] = await Promise.all([
+    getSemesters(),
+    getSubjects(),
+    getCategories(),
+    getResources(),
+    listManagedUsers(),
+    listAllCatalogEntries(),
+    listVipEntitlements(),
+    getLivePresenceList(),
+    getAnalyticsOverview("7d"),
+  ]);
+
   const auditLogs = getRecentAuditLogs(50);
 
   return (
@@ -48,6 +69,11 @@ export default async function AdminPage() {
         isAdmin={isAdmin}
         initialUsers={usersRes.users || []}
         initialAuditLogs={auditLogs}
+        initialCatalogEntries={catalogRes.entries || []}
+        initialVipEntitlements={vipRes.entitlements || []}
+        initialPresenceUsers={presenceRes.users || []}
+        initialTotalActiveUsers={presenceRes.totalActive || 0}
+        initialAnalytics={analyticsRes.overview || null}
       />
     </div>
   );

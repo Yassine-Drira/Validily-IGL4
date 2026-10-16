@@ -5,6 +5,7 @@ import { getSubjects } from "@/lib/supabase/repository";
 import { getRequesterUser } from "@/lib/auth/authorization";
 import { FocusProvider } from "@/components/focus/focus-provider";
 import { FocusHubModal } from "@/components/focus/focus-hub-modal";
+import { PresenceAndAnalyticsTracker } from "@/components/analytics/presence-tracker";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +36,7 @@ export default async function WorkspaceLayout({
         {children}
       </WorkspaceShell>
       <FocusHubModal />
+      <PresenceAndAnalyticsTracker />
     </FocusProvider>
   );
 }
