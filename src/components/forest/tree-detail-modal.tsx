@@ -2,16 +2,17 @@
 
 import React from "react";
 import { ForestEntry } from "@/types/database";
-import { TreeSvg, SPECIES_METADATA } from "./tree-models";
-import { X, Calendar, Clock, BookOpen, AlertTriangle, CheckCircle2, ShieldCheck } from "lucide-react";
+import { TreeSvg, SPECIES_METADATA, SeasonTheme } from "./tree-models";
+import { X, Calendar, Clock, BookOpen, AlertTriangle, CheckCircle2, ShieldCheck, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface TreeDetailModalProps {
   entry: ForestEntry | null;
+  season?: SeasonTheme;
   onClose: () => void;
 }
 
-export function TreeDetailModal({ entry, onClose }: TreeDetailModalProps) {
+export function TreeDetailModal({ entry, season = "summer", onClose }: TreeDetailModalProps) {
   if (!entry) return null;
 
   const isDead = entry.tree_status === "leafless";
@@ -32,9 +33,11 @@ export function TreeDetailModal({ entry, onClose }: TreeDetailModalProps) {
     ? Math.round(entry.session.target_duration_seconds / 60)
     : 25;
 
+  const seasonalTrait = meta.seasonalTraits?.[season] || meta.description;
+
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in duration-150"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-150"
       onClick={onClose}
     >
       <div
@@ -51,7 +54,7 @@ export function TreeDetailModal({ entry, onClose }: TreeDetailModalProps) {
           <X className="w-5 h-5" />
         </button>
 
-        {/* Tree Visual Highlight */}
+        {/* Tree Visual Highlight with Active Seasonal Presentation */}
         <div className="flex flex-col items-center justify-center pt-2">
           <div
             className={cn(
@@ -62,8 +65,9 @@ export function TreeDetailModal({ entry, onClose }: TreeDetailModalProps) {
             <TreeSvg
               species={entry.tree_species}
               status={entry.tree_status}
-              stage={4}
+              stage={entry.growth_stage ?? 4}
               size={96}
+              season={season}
             />
           </div>
 
@@ -71,8 +75,15 @@ export function TreeDetailModal({ entry, onClose }: TreeDetailModalProps) {
             {isDead ? "Arbre Défeuillé" : meta.name}
           </h3>
           <p className="text-xs text-[#68748A] italic">
-            {isDead ? "Session interrompue" : meta.latinName}
+            {isDead ? "Session interrompue (> 2m)" : meta.latinName}
           </p>
+
+          {!isDead && (
+            <div className="mt-2 text-[11px] text-[#047857] bg-emerald-50 px-2.5 py-1 rounded-xl border border-emerald-100 flex items-center space-x-1.5 text-center">
+              <Sparkles className="w-3 h-3 text-emerald-600 shrink-0" />
+              <span>{seasonalTrait}</span>
+            </div>
+          )}
         </div>
 
         {/* Session Stats Grid */}
@@ -90,7 +101,7 @@ export function TreeDetailModal({ entry, onClose }: TreeDetailModalProps) {
           <div className="flex items-center justify-between">
             <span className="text-[#68748A] flex items-center space-x-1.5">
               <Clock className="w-3.5 h-3.5" />
-              <span>Durée vérifiée</span>
+              <span>Durée certifiée</span>
             </span>
             <span className="font-mono font-bold text-[#2855D9]">
               {durationMinutes} minutes
@@ -118,21 +129,9 @@ export function TreeDetailModal({ entry, onClose }: TreeDetailModalProps) {
             </span>
           </div>
 
-          {entry.session?.subject?.name && (
-            <div className="flex items-center justify-between pt-1 border-t border-[#E4E8F0]">
-              <span className="text-[#68748A] flex items-center space-x-1.5">
-                <BookOpen className="w-3.5 h-3.5" />
-                <span>Matière</span>
-              </span>
-              <span className="font-semibold text-[#182235]">
-                {entry.session.subject.name}
-              </span>
-            </div>
-          )}
-
           {entry.session?.session_label && (
             <div className="pt-1 border-t border-[#E4E8F0]">
-              <span className="text-[#68748A] block mb-0.5">Note privée :</span>
+              <span className="text-[#68748A] block mb-0.5">Note de session :</span>
               <p className="font-medium text-[#182235] italic text-[11px]">
                 &quot;{entry.session.session_label}&quot;
               </p>

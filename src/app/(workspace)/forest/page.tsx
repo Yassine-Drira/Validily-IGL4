@@ -14,13 +14,11 @@ import {
   Compass,
   Play,
   ListFilter,
-  Eye,
-  Shield,
   Lock,
   Globe,
-  Settings2,
   RefreshCw,
   Sparkles,
+  Shield,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -82,7 +80,7 @@ export default function ForestPage() {
       <div className="max-w-4xl mx-auto py-10 px-4 animate-in fade-in duration-300">
         <div className="bg-white rounded-3xl border border-[#E4E8F0] p-8 sm:p-12 shadow-sm text-center relative overflow-hidden">
           <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-emerald-500 via-teal-500 to-[#2855D9]" />
-          
+
           <div className="w-16 h-16 rounded-3xl bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center mx-auto mb-6 shadow-sm">
             <Lock className="w-8 h-8 text-emerald-600" />
           </div>
@@ -99,7 +97,6 @@ export default function ForestPage() {
             Pour garantir l&apos;intégrité académique, le suivi anti-triche des sessions Pomodoro et la synchronisation de votre clairière avec la promotion IGL4, l&apos;authentification est requise.
           </p>
 
-          {/* Benefits Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-left mb-10 max-w-2xl mx-auto">
             <div className="p-4 rounded-2xl bg-[#F8FAFC] border border-[#E2E8F0] flex items-start space-x-3.5">
               <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 mt-0.5">
@@ -150,7 +147,6 @@ export default function ForestPage() {
             </div>
           </div>
 
-          {/* Action CTAs */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
             <Link
               href="/login?next=/forest"
@@ -172,7 +168,7 @@ export default function ForestPage() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-12 animate-in fade-in duration-300">
-      {/* Page Header */}
+      {/* 1. Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#E4E8F0] pb-5">
         <div>
           <div className="flex items-center space-x-2.5">
@@ -185,11 +181,11 @@ export default function ForestPage() {
                   Bosquet Focus
                 </h1>
                 <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  Pomodoro Forest
+                  Diorama Isométrique
                 </span>
               </div>
               <p className="text-xs text-[#68748A] mt-0.5">
-                Chaque session accomplie sans interruption enrichit votre forêt personnelle d&apos;un arbre pérenne.
+                Chaque session Pomodoro accomplie sans interruption enrichit votre île d&apos;un arbre pérenne.
               </p>
             </div>
           </div>
@@ -241,10 +237,10 @@ export default function ForestPage() {
         </div>
       </div>
 
-      {/* Forest Insights Summary Cards */}
+      {/* 2. Forest Insights Summary Cards */}
       <ForestInsights entries={entries} />
 
-      {/* Main View Switcher & Container */}
+      {/* 3. Main View Switcher & Container */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-1 bg-[#F4F6FA] p-1 rounded-2xl border border-[#E4E8F0]">
@@ -259,7 +255,7 @@ export default function ForestPage() {
               )}
             >
               <Trees className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Clairière Végétale</span>
+              <span>Diorama 2.5D</span>
             </button>
             <button
               type="button"
@@ -296,102 +292,102 @@ export default function ForestPage() {
         )}
       </div>
 
-      {/* Privacy Configuration Modal */}
+      {/* 4. Privacy Configuration Modal */}
       {showPrivacyModal && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in duration-150"
           onClick={() => setShowPrivacyModal(false)}
         >
           <div
-            className="bg-white border border-[#E4E8F0] rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4"
+            className="bg-white border border-[#E4E8F0] rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-5 animate-in zoom-in-95 duration-150"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 rounded-2xl bg-blue-50 text-[#2855D9] flex items-center justify-center border border-blue-200">
-                <Shield className="w-5 h-5" />
+              <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100">
+                <Shield className="w-5 h-5 text-emerald-600" />
               </div>
               <div>
                 <h3 className="text-base font-bold text-[#111A2E]">
-                  Visibilité de votre Bosquet
+                  Confidentialité du Bosquet Focus
                 </h3>
                 <p className="text-xs text-[#68748A]">
-                  Contrôlez qui peut contempler votre forêt d&apos;étude.
+                  Choisissez qui peut contempler votre île et vos arbres.
                 </p>
               </div>
             </div>
 
-            <div className="space-y-2 pt-2">
-              {[
-                {
-                  id: "members",
-                  title: "Membres IGL4 (Recommandé)",
-                  desc: "Visible uniquement par vos camarades connectés et authentifiés.",
-                  icon: Users,
-                },
-                {
-                  id: "private",
-                  title: "Privé (Strict)",
-                  desc: "Votre forêt n'apparaît pas dans la galerie de la promotion.",
-                  icon: Lock,
-                },
-                {
-                  id: "public",
-                  title: "Public",
-                  desc: "Accessible publiquement via votre lien de profil académique.",
-                  icon: Globe,
-                },
-              ].map((opt) => {
-                const Icon = opt.icon;
-                const isSelected = selectedVisibility === opt.id;
-                return (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    onClick={() => handleSaveVisibility(opt.id as ForestVisibility)}
-                    disabled={isSavingPref}
-                    className={cn(
-                      "w-full p-3.5 rounded-2xl border text-left transition-all cursor-pointer flex items-start space-x-3",
-                      isSelected
-                        ? "bg-blue-50/60 border-[#2855D9] ring-1 ring-[#2855D9]"
-                        : "bg-[#FAFAF7] border-[#E4E8F0] hover:bg-white"
-                    )}
-                  >
-                    <div
-                      className={cn(
-                        "w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5",
-                        isSelected
-                          ? "bg-[#2855D9] text-white"
-                          : "bg-white text-[#68748A] border border-[#E4E8F0]"
-                      )}
-                    >
-                      <Icon className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <span className="text-xs font-bold text-[#111A2E] block">
-                        {opt.title}
-                      </span>
-                      <span className="text-[11px] text-[#68748A] leading-tight block mt-0.5">
-                        {opt.desc}
-                      </span>
-                    </div>
-                  </button>
-                );
-              })}
+            <div className="space-y-2.5">
+              <button
+                type="button"
+                onClick={() => handleSaveVisibility("members")}
+                className={cn(
+                  "w-full p-3.5 rounded-2xl border text-left flex items-start space-x-3 transition-all cursor-pointer",
+                  selectedVisibility === "members"
+                    ? "border-[#2855D9] bg-blue-50/40 text-[#111A2E] ring-1 ring-[#2855D9]"
+                    : "border-[#E4E8F0] hover:bg-[#F8FAFC]"
+                )}
+              >
+                <Users className="w-5 h-5 text-emerald-600 mt-0.5 shrink-0" />
+                <div>
+                  <div className="text-xs font-bold text-[#111A2E]">
+                    Promotion IGL4 uniquement (Recommandé)
+                  </div>
+                  <div className="text-[11px] text-[#64748B] mt-0.5">
+                    Visible exclusivement par vos camarades authentifiés sur la plateforme.
+                  </div>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleSaveVisibility("public")}
+                className={cn(
+                  "w-full p-3.5 rounded-2xl border text-left flex items-start space-x-3 transition-all cursor-pointer",
+                  selectedVisibility === "public"
+                    ? "border-[#2855D9] bg-blue-50/40 text-[#111A2E] ring-1 ring-[#2855D9]"
+                    : "border-[#E4E8F0] hover:bg-[#F8FAFC]"
+                )}
+              >
+                <Globe className="w-5 h-5 text-blue-600 mt-0.5 shrink-0" />
+                <div>
+                  <div className="text-xs font-bold text-[#111A2E]">
+                    Public (Tous les visiteurs)
+                  </div>
+                  <div className="text-[11px] text-[#64748B] mt-0.5">
+                    Accessible publiquement dans la galerie des bosquets.
+                  </div>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleSaveVisibility("private")}
+                className={cn(
+                  "w-full p-3.5 rounded-2xl border text-left flex items-start space-x-3 transition-all cursor-pointer",
+                  selectedVisibility === "private"
+                    ? "border-[#2855D9] bg-blue-50/40 text-[#111A2E] ring-1 ring-[#2855D9]"
+                    : "border-[#E4E8F0] hover:bg-[#F8FAFC]"
+                )}
+              >
+                <Lock className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
+                <div>
+                  <div className="text-xs font-bold text-[#111A2E]">
+                    Strictement Privé (Moi seul)
+                  </div>
+                  <div className="text-[11px] text-[#64748B] mt-0.5">
+                    Votre île n&apos;apparaîtra dans aucune galerie ou recherche publique.
+                  </div>
+                </div>
+              </button>
             </div>
 
-            <div className="bg-[#F8FAFC] p-3 rounded-2xl border border-[#E4E8F0] text-[11px] text-[#68748A] space-y-1">
-              <p className="font-semibold text-[#182235]">Règles de confidentialité strictes :</p>
-              <p>• Vos notes privées, étiquettes et emails ne sont jamais divulgués.</p>
-              <p>• Seuls le nombre d&apos;arbres et le temps cumulé sont partagés.</p>
-            </div>
-
-            <div className="flex items-center justify-end space-x-2 pt-2">
+            <div className="flex justify-end pt-2">
               <button
                 type="button"
                 onClick={() => setShowPrivacyModal(false)}
-                className="px-4 py-2 rounded-xl text-xs font-medium text-[#68748A] hover:bg-[#F4F6FA] transition-colors cursor-pointer"
+                className="px-4 py-2 rounded-xl text-xs font-semibold bg-[#F4F6FA] hover:bg-[#E4E8F0] text-[#182235] transition-colors cursor-pointer"
               >
-                Fermer
+                Annuler
               </button>
             </div>
           </div>

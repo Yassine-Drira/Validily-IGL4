@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState, useRef, useMemo, useCallback } from "react";
-import { ForestEntry, TreeSpecies } from "@/types/database";
-import { TreeSvg, SPECIES_METADATA } from "./tree-models";
+import React, { useState, useRef, useMemo, useCallback, useEffect } from "react";
+import { ForestEntry } from "@/types/database";
+import { TreeSvg, SPECIES_METADATA, SeasonTheme } from "./tree-models";
 import { TreeDetailModal } from "./tree-detail-modal";
 import { useFocusTimer } from "@/components/focus/focus-provider";
 import { cn } from "@/lib/utils";
@@ -12,44 +12,45 @@ import {
   Maximize2,
   Sprout,
   Play,
-  Sparkles,
   Sun,
   Flame,
   Snowflake,
   Flower2,
-  Compass,
+  ChevronLeft,
+  ChevronRight,
+  Layers,
 } from "lucide-react";
-
-type BiomeTheme = "summer" | "autumn" | "winter" | "spring";
 
 interface ForestCanvasProps {
   entries: ForestEntry[];
   readOnly?: boolean;
   className?: string;
+  initialSeason?: SeasonTheme;
 }
 
 const GRID_SIZE = 6;
-const TILE_WIDTH = 92;
-const TILE_HEIGHT = 46;
+const TILE_WIDTH = 96;
+const TILE_HEIGHT = 48;
+const GROVE_CAPACITY = 36;
 
-// Deterministic natural outward spiral for isometric plots
+// Deterministic natural outward spiral for isometric plots (36 unique, non-overlapping coordinates)
 const ISOMETRIC_PLOTS: Array<{ col: number; row: number }> = [
-  // Center Ring
-  { col: 2, row: 2 }, // 0
-  { col: 1, row: 1 }, // 1
-  { col: 3, row: 2 }, // 2
-  { col: 1, row: 3 }, // 3
-  { col: 3, row: 3 }, // 4
-  // Mid Ring
-  { col: 2, row: 1 }, // 5
-  { col: 1, row: 2 }, // 6
-  { col: 2, row: 3 }, // 7
-  { col: 3, row: 1 }, // 8
-  { col: 0, row: 2 }, // 9
-  { col: 2, row: 0 }, // 10
-  { col: 4, row: 2 }, // 11
-  { col: 2, row: 4 }, // 12
-  // Outer Ring
+  // 1. Center Ring (Balanced focal foundation)
+  { col: 2, row: 2 }, // 0: True Center
+  { col: 1, row: 1 }, // 1: Northwest inner
+  { col: 3, row: 2 }, // 2: East inner
+  { col: 1, row: 3 }, // 3: Southwest inner
+  { col: 3, row: 3 }, // 4: Southeast inner
+  // 2. Mid Ring
+  { col: 2, row: 1 }, // 5: North mid
+  { col: 1, row: 2 }, // 6: West mid
+  { col: 2, row: 3 }, // 7: South mid
+  { col: 3, row: 1 }, // 8: Northeast mid
+  { col: 0, row: 2 }, // 9: Far West mid
+  { col: 2, row: 0 }, // 10: Far North mid
+  { col: 4, row: 2 }, // 11: Far East mid
+  { col: 2, row: 4 }, // 12: Far South mid
+  // 3. Outer Ring
   { col: 0, row: 1 }, // 13
   { col: 1, row: 0 }, // 14
   { col: 3, row: 0 }, // 15
@@ -58,12 +59,12 @@ const ISOMETRIC_PLOTS: Array<{ col: number; row: number }> = [
   { col: 3, row: 4 }, // 18
   { col: 1, row: 4 }, // 19
   { col: 0, row: 3 }, // 20
-  // Corners
-  { col: 0, row: 0 }, // 21
-  { col: 4, row: 0 }, // 22
-  { col: 4, row: 4 }, // 23
-  { col: 0, row: 4 }, // 24
-  // Perimeter Edge Plots
+  // 4. Diagonal Corners
+  { col: 0, row: 0 }, // 21: Top tip
+  { col: 4, row: 0 }, // 22: East corner
+  { col: 4, row: 4 }, // 23: Bottom corner
+  { col: 0, row: 4 }, // 24: West corner
+  // 5. Perimeter Flanks (Edge plots for dense forests)
   { col: 5, row: 2 }, // 25
   { col: 2, row: 5 }, // 26
   { col: 5, row: 3 }, // 27
@@ -74,42 +75,83 @@ const ISOMETRIC_PLOTS: Array<{ col: number; row: number }> = [
   { col: 0, row: 5 }, // 32
   { col: 5, row: 4 }, // 33
   { col: 4, row: 5 }, // 34
-  { col: 5, row: 5 }, // 35
+  { col: 5, row: 5 }, // 35: Right flank tip
 ];
+
+// Camera boundary constraints
+const MIN_ZOOM = 0.85;
+const MAX_ZOOM = 1.6;
+const MAX_PAN_X = 140;
+const MAX_PAN_Y = 90;
 
 export function ForestCanvas({
   entries = [],
   readOnly = false,
   className = "",
+  initialSeason = "summer",
 }: ForestCanvasProps) {
   const { setIsModalOpen } = useFocusTimer();
 
-  const [biome, setBiome] = useState<BiomeTheme>("summer");
+  // Authoritative presentation season state
+  const [season, setSeason] = useState<SeasonTheme>(initialSeason);
   const [selectedEntry, setSelectedEntry] = useState<ForestEntry | null>(null);
   const [hoveredEntry, setHoveredEntry] = useState<ForestEntry | null>(null);
 
-  // Pan & Zoom
+  // Multi-Grove Pagination (36 trees per grove island)
+  const [currentGrovePage, setCurrentGrovePage] = useState<number>(0);
+  const totalGroves = Math.max(1, Math.ceil(entries.length / GROVE_CAPACITY));
+
+  // Ensure current grove page is valid when entries change
+  useEffect(() => {
+    if (currentGrovePage >= totalGroves) {
+      setCurrentGrovePage(Math.max(0, totalGroves - 1));
+    }
+  }, [totalGroves, currentGrovePage]);
+
+  // Entries allocated to the active grove island
+  const activeGroveEntries = useMemo(() => {
+    const start = currentGrovePage * GROVE_CAPACITY;
+    return entries.slice(start, start + GROVE_CAPACITY);
+  }, [entries, currentGrovePage]);
+
+  // Constrained Pan & Zoom State
   const [zoom, setZoom] = useState<number>(1);
   const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState<boolean>(false);
-  const dragStartRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const dragStartRef = useRef<{ clientX: number; clientY: number; startPanX: number; startPanY: number }>({
+    clientX: 0,
+    clientY: 0,
+    startPanX: 0,
+    startPanY: 0,
+  });
+  const hasMovedRef = useRef<boolean>(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (e.button !== 0) return;
     setIsDragging(true);
+    hasMovedRef.current = false;
     dragStartRef.current = {
-      x: e.clientX - pan.x,
-      y: e.clientY - pan.y,
+      clientX: e.clientX,
+      clientY: e.clientY,
+      startPanX: pan.x,
+      startPanY: pan.y,
     };
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!isDragging) return;
-    setPan({
-      x: e.clientX - dragStartRef.current.x,
-      y: e.clientY - dragStartRef.current.y,
-    });
+    const dx = e.clientX - dragStartRef.current.clientX;
+    const dy = e.clientY - dragStartRef.current.clientY;
+
+    if (Math.hypot(dx, dy) > 4) {
+      hasMovedRef.current = true;
+    }
+
+    // Clamp pan movement to strict scene bounds
+    const newX = Math.min(MAX_PAN_X, Math.max(-MAX_PAN_X, dragStartRef.current.startPanX + dx));
+    const newY = Math.min(MAX_PAN_Y, Math.max(-MAX_PAN_Y, dragStartRef.current.startPanY + dy));
+    setPan({ x: newX, y: newY });
   };
 
   const handleMouseUp = () => {
@@ -119,15 +161,15 @@ export function ForestCanvas({
   const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault();
     const factor = e.deltaY < 0 ? 1.08 : 0.92;
-    setZoom((prev) => Math.min(2.4, Math.max(0.65, prev * factor)));
+    setZoom((prev) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, prev * factor)));
   };
 
   const zoomIn = useCallback(() => {
-    setZoom((prev) => Math.min(2.4, prev * 1.2));
+    setZoom((prev) => Math.min(MAX_ZOOM, Number((prev * 1.15).toFixed(2))));
   }, []);
 
   const zoomOut = useCallback(() => {
-    setZoom((prev) => Math.max(0.65, prev / 1.2));
+    setZoom((prev) => Math.max(MIN_ZOOM, Number((prev / 1.15).toFixed(2))));
   }, []);
 
   const resetView = useCallback(() => {
@@ -135,13 +177,13 @@ export function ForestCanvas({
     setPan({ x: 0, y: 0 });
   }, []);
 
-  // Biome Colors and Visual Profiles
+  // Biome Themes with High Contrast and Rich Seasonal Palettes
   const biomeTheme = useMemo(() => {
-    switch (biome) {
+    switch (season) {
       case "autumn":
         return {
-          bgGradient: "from-[#1C120C] via-[#2A180E] to-[#140C07]",
-          ambientGlow: "rgba(245, 158, 11, 0.12)",
+          bgGradient: "from-[#1F140D] via-[#2F1B0F] to-[#170E08]",
+          ambientGlow: "rgba(245, 158, 11, 0.16)",
           tileTopA: "#D97706",
           tileTopB: "#B45309",
           cliffLeft: "#451A03",
@@ -153,9 +195,9 @@ export function ForestCanvas({
         };
       case "winter":
         return {
-          bgGradient: "from-[#0F172A] via-[#1E293B] to-[#0B0F19]",
-          ambientGlow: "rgba(56, 189, 248, 0.12)",
-          tileTopA: "#F1F5F9",
+          bgGradient: "from-[#0F172A] via-[#1E293B] to-[#0A0F1D]",
+          ambientGlow: "rgba(56, 189, 248, 0.14)",
+          tileTopA: "#F8FAFC",
           tileTopB: "#E2E8F0",
           cliffLeft: "#334155",
           cliffRight: "#475569",
@@ -166,8 +208,8 @@ export function ForestCanvas({
         };
       case "spring":
         return {
-          bgGradient: "from-[#11241C] via-[#16382B] to-[#0A1A14]",
-          ambientGlow: "rgba(244, 114, 182, 0.14)",
+          bgGradient: "from-[#0E241B] via-[#143B2C] to-[#091B13]",
+          ambientGlow: "rgba(244, 114, 182, 0.16)",
           tileTopA: "#34D399",
           tileTopB: "#10B981",
           cliffLeft: "#27272A",
@@ -180,8 +222,8 @@ export function ForestCanvas({
       case "summer":
       default:
         return {
-          bgGradient: "from-[#082218] via-[#0D3828] to-[#061811]",
-          ambientGlow: "rgba(34, 197, 94, 0.14)",
+          bgGradient: "from-[#072418] via-[#0B3927] to-[#051A11]",
+          ambientGlow: "rgba(34, 197, 94, 0.15)",
           tileTopA: "#22C55E",
           tileTopB: "#16A34A",
           cliffLeft: "#3D2415",
@@ -192,18 +234,19 @@ export function ForestCanvas({
           name: "Clairière d'Émeraude",
         };
     }
-  }, [biome]);
+  }, [season]);
 
   // Center coordinate of diorama in base canvas units (1000 x 700)
   const originX = 500;
   const originY = 220;
 
-  // Map each entry to an isometric plot
+  // Map each active grove entry to a unique deterministic isometric plot
   const plottedEntries = useMemo(() => {
-    return entries.map((entry, index) => {
-      const plot = ISOMETRIC_PLOTS[index % ISOMETRIC_PLOTS.length];
+    return activeGroveEntries.map((entry, index) => {
+      const plot = ISOMETRIC_PLOTS[index];
       const isoX = originX + (plot.col - plot.row) * (TILE_WIDTH / 2);
       const isoY = originY + (plot.col + plot.row) * (TILE_HEIGHT / 2);
+      // Mathematical isometric depth: back rows rendered before front rows
       const depth = (plot.col + plot.row) * 100 + (plot.col - plot.row);
 
       return {
@@ -214,7 +257,7 @@ export function ForestCanvas({
         depth,
       };
     });
-  }, [entries, originX, originY]);
+  }, [activeGroveEntries, originX, originY]);
 
   // Occupied plots set for decorating unused tiles
   const occupiedKeys = useMemo(() => {
@@ -236,12 +279,13 @@ export function ForestCanvas({
     return tiles.sort((a, b) => a.depth - b.depth);
   }, [originX, originY, occupiedKeys]);
 
-  // Combined scene elements (tiles and trees) sorted for true depth rendering
+  // Combined scene elements sorted for true depth rendering
   const sortedSceneTrees = useMemo(() => {
     return [...plottedEntries].sort((a, b) => a.depth - b.depth);
   }, [plottedEntries]);
 
   const healthyCount = entries.filter((e) => e.tree_status === "healthy").length;
+  const activeHealthyCount = activeGroveEntries.filter((e) => e.tree_status === "healthy").length;
 
   return (
     <div
@@ -267,22 +311,20 @@ export function ForestCanvas({
         viewBox="0 0 1000 700"
       >
         <defs>
-          {/* Volumetric Sunbeams */}
           <linearGradient id="godRay1" x1="0%" y1="0%" x2="70%" y2="100%">
-            <stop offset="0%" stopColor="#FEF08A" stopOpacity="0.18" />
-            <stop offset="60%" stopColor="#FEF9C3" stopOpacity="0.05" />
+            <stop offset="0%" stopColor="#FEF08A" stopOpacity="0.16" />
+            <stop offset="60%" stopColor="#FEF9C3" stopOpacity="0.04" />
             <stop offset="100%" stopColor="#FEF9C3" stopOpacity="0" />
           </linearGradient>
 
           <linearGradient id="godRay2" x1="20%" y1="0%" x2="80%" y2="100%">
-            <stop offset="0%" stopColor="#67E8F9" stopOpacity="0.15" />
+            <stop offset="0%" stopColor="#67E8F9" stopOpacity="0.14" />
             <stop offset="70%" stopColor="#A5F3FC" stopOpacity="0.03" />
             <stop offset="100%" stopColor="#A5F3FC" stopOpacity="0" />
           </linearGradient>
 
-          {/* Central Atmospheric Glow */}
           <radialGradient id="centerAtmosphere" cx="50%" cy="40%" r="55%">
-            <stop offset="0%" stopColor={biomeTheme.particleColor} stopOpacity="0.15" />
+            <stop offset="0%" stopColor={biomeTheme.particleColor} stopOpacity="0.16" />
             <stop offset="65%" stopColor={biomeTheme.particleColor} stopOpacity="0.03" />
             <stop offset="100%" stopColor="#000000" stopOpacity="0" />
           </radialGradient>
@@ -290,46 +332,52 @@ export function ForestCanvas({
 
         <rect width="1000" height="700" fill="url(#centerAtmosphere)" />
 
-        {/* Ethereal light beam shafts */}
         <polygon points="80,0 240,0 520,700 360,700" fill="url(#godRay1)" />
         <polygon points="280,0 420,0 780,700 640,700" fill="url(#godRay2)" />
         <polygon points="460,0 560,0 940,700 840,700" fill="url(#godRay1)" opacity="0.6" />
 
-        {/* Subtle Ambient Floating Spores / Pollen */}
+        {/* Ambient floating spores */}
         <circle cx="220" cy="180" r="2" fill={biomeTheme.particleColor} opacity="0.6" />
         <circle cx="340" cy="280" r="1.5" fill="#FFFFFF" opacity="0.7" />
         <circle cx="720" cy="210" r="2.2" fill={biomeTheme.particleColor} opacity="0.5" />
         <circle cx="810" cy="340" r="1.8" fill="#FFFFFF" opacity="0.6" />
         <circle cx="480" cy="140" r="2.5" fill={biomeTheme.particleColor} opacity="0.7" />
-        <circle cx="620" cy="420" r="1.5" fill="#FFFFFF" opacity="0.5" />
       </svg>
 
-      {/* 2. Top Navigation Bar: Biome Selector & Grove Counter */}
+      {/* 2. Top Navigation Bar: Season Selector & Tree Counters */}
       <div className="absolute top-4 left-4 z-20 flex flex-wrap items-center gap-2">
-        {/* Healthy Tree Pill */}
-        <div className="px-3.5 py-1.5 rounded-2xl bg-black/40 backdrop-blur-md border border-white/10 text-white text-xs font-semibold flex items-center space-x-2 shadow-lg">
+        {/* Tree Count Status Badge */}
+        <div className="px-3.5 py-1.5 rounded-2xl bg-black/50 backdrop-blur-md border border-white/15 text-white text-xs font-semibold flex items-center space-x-2 shadow-lg">
           <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
           <span>
             {healthyCount} {healthyCount > 1 ? "arbres sains" : "arbre sain"}
           </span>
           <span className="text-white/40">•</span>
           <span className="text-emerald-300 font-mono text-[11px]">
-            Île Isométrique
+            {entries.length > GROVE_CAPACITY
+              ? `Bosquet ${currentGrovePage + 1}/${totalGroves} (${activeGroveEntries.length} arbres)`
+              : `${activeGroveEntries.length}/36 parcelles`}
           </span>
         </div>
 
-        {/* Biome Theme Switcher */}
-        <div className="flex items-center space-x-1 p-1 rounded-2xl bg-black/40 backdrop-blur-md border border-white/10 text-xs">
+        {/* Season Selector Bar */}
+        <div
+          className="flex items-center space-x-1 p-1 rounded-2xl bg-black/50 backdrop-blur-md border border-white/15 text-xs shadow-lg"
+          role="radiogroup"
+          aria-label="Sélection de la saison de présentation"
+        >
           <button
             type="button"
-            onClick={() => setBiome("summer")}
+            role="radio"
+            aria-checked={season === "summer"}
+            onClick={() => setSeason("summer")}
             className={cn(
               "px-2.5 py-1 rounded-xl transition-all cursor-pointer flex items-center space-x-1",
-              biome === "summer"
+              season === "summer"
                 ? "bg-emerald-500 text-white font-bold shadow-xs"
                 : "text-white/70 hover:text-white"
             )}
-            title="Biome Estival Émeraude"
+            title="Saison Estivale (Clairière Émeraude)"
           >
             <Sun className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Été</span>
@@ -337,14 +385,16 @@ export function ForestCanvas({
 
           <button
             type="button"
-            onClick={() => setBiome("autumn")}
+            role="radio"
+            aria-checked={season === "autumn"}
+            onClick={() => setSeason("autumn")}
             className={cn(
               "px-2.5 py-1 rounded-xl transition-all cursor-pointer flex items-center space-x-1",
-              biome === "autumn"
+              season === "autumn"
                 ? "bg-amber-500 text-white font-bold shadow-xs"
                 : "text-white/70 hover:text-white"
             )}
-            title="Biome Verger Doré d'Automne"
+            title="Saison Automnale (Verger Flamboyant)"
           >
             <Flame className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Automne</span>
@@ -352,14 +402,16 @@ export function ForestCanvas({
 
           <button
             type="button"
-            onClick={() => setBiome("winter")}
+            role="radio"
+            aria-checked={season === "winter"}
+            onClick={() => setSeason("winter")}
             className={cn(
               "px-2.5 py-1 rounded-xl transition-all cursor-pointer flex items-center space-x-1",
-              biome === "winter"
+              season === "winter"
                 ? "bg-sky-500 text-white font-bold shadow-xs"
                 : "text-white/70 hover:text-white"
             )}
-            title="Biome Givre Hivernal"
+            title="Saison Hivernale (Givre et Neige)"
           >
             <Snowflake className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Hiver</span>
@@ -367,14 +419,16 @@ export function ForestCanvas({
 
           <button
             type="button"
-            onClick={() => setBiome("spring")}
+            role="radio"
+            aria-checked={season === "spring"}
+            onClick={() => setSeason("spring")}
             className={cn(
               "px-2.5 py-1 rounded-xl transition-all cursor-pointer flex items-center space-x-1",
-              biome === "spring"
+              season === "spring"
                 ? "bg-pink-500 text-white font-bold shadow-xs"
                 : "text-white/70 hover:text-white"
             )}
-            title="Biome Cerisiers en Fleur"
+            title="Saison Printanière (Cerisiers & Fleurs)"
           >
             <Flower2 className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Printemps</span>
@@ -382,12 +436,18 @@ export function ForestCanvas({
         </div>
       </div>
 
-      {/* 3. Top-Right Zoom & Pan Controls */}
-      <div className="absolute top-4 right-4 z-20 flex items-center space-x-1.5 p-1 rounded-2xl bg-black/40 backdrop-blur-md border border-white/10 text-white shadow-lg">
+      {/* 3. Top-Right Constrained Camera Controls */}
+      <div className="absolute top-4 right-4 z-20 flex items-center space-x-1.5 p-1 rounded-2xl bg-black/50 backdrop-blur-md border border-white/15 text-white shadow-lg">
         <button
           type="button"
           onClick={zoomIn}
-          className="p-2 text-white/75 hover:text-white hover:bg-white/10 rounded-xl transition-colors cursor-pointer"
+          disabled={zoom >= MAX_ZOOM}
+          className={cn(
+            "p-2 rounded-xl transition-colors cursor-pointer",
+            zoom >= MAX_ZOOM
+              ? "opacity-40 cursor-not-allowed text-white/50"
+              : "text-white/80 hover:text-white hover:bg-white/15"
+          )}
           title="Zoom avant (+)"
           aria-label="Zoom avant"
         >
@@ -396,7 +456,13 @@ export function ForestCanvas({
         <button
           type="button"
           onClick={zoomOut}
-          className="p-2 text-white/75 hover:text-white hover:bg-white/10 rounded-xl transition-colors cursor-pointer"
+          disabled={zoom <= MIN_ZOOM}
+          className={cn(
+            "p-2 rounded-xl transition-colors cursor-pointer",
+            zoom <= MIN_ZOOM
+              ? "opacity-40 cursor-not-allowed text-white/50"
+              : "text-white/80 hover:text-white hover:bg-white/15"
+          )}
           title="Zoom arrière (-)"
           aria-label="Zoom arrière"
         >
@@ -405,17 +471,64 @@ export function ForestCanvas({
         <button
           type="button"
           onClick={resetView}
-          className="p-2 text-white/75 hover:text-white hover:bg-white/10 rounded-xl transition-colors cursor-pointer"
-          title="Recentrer la vue"
+          className="p-2 text-white/80 hover:text-white hover:bg-white/15 rounded-xl transition-colors cursor-pointer"
+          title="Recentrer l'île (100%)"
           aria-label="Recentrer la vue"
         >
           <Maximize2 className="w-4 h-4" />
         </button>
       </div>
 
-      {/* 4. Interactive Diorama Stage with Pan & Zoom Transform */}
+      {/* 4. Bottom Multi-Grove Pagination (When trees exceed single island capacity of 36) */}
+      {totalGroves > 1 && (
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex items-center space-x-2 px-3 py-1.5 rounded-2xl bg-black/60 backdrop-blur-md border border-white/20 text-white shadow-2xl animate-in fade-in slide-in-from-bottom-2">
+          <button
+            type="button"
+            disabled={currentGrovePage === 0}
+            onClick={() => setCurrentGrovePage((prev) => Math.max(0, prev - 1))}
+            className={cn(
+              "p-1.5 rounded-xl transition-colors",
+              currentGrovePage === 0
+                ? "opacity-30 cursor-not-allowed"
+                : "hover:bg-white/15 cursor-pointer text-white"
+            )}
+            title="Bosquet précédent"
+            aria-label="Bosquet précédent"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+
+          <div className="flex items-center space-x-1.5 px-2 text-xs font-semibold">
+            <Layers className="w-3.5 h-3.5 text-emerald-400" />
+            <span>
+              Bosquet {currentGrovePage + 1} / {totalGroves}
+            </span>
+            <span className="text-white/50 text-[11px]">
+              ({activeGroveEntries.length} arbres)
+            </span>
+          </div>
+
+          <button
+            type="button"
+            disabled={currentGrovePage >= totalGroves - 1}
+            onClick={() => setCurrentGrovePage((prev) => Math.min(totalGroves - 1, prev + 1))}
+            className={cn(
+              "p-1.5 rounded-xl transition-colors",
+              currentGrovePage >= totalGroves - 1
+                ? "opacity-30 cursor-not-allowed"
+                : "hover:bg-white/15 cursor-pointer text-white"
+            )}
+            title="Bosquet suivant"
+            aria-label="Bosquet suivant"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* 5. Interactive Diorama Stage with Clamped Pan & Zoom Transform */}
       <div
-        className="absolute inset-0 transition-transform duration-75 origin-center flex items-center justify-center"
+        className="absolute inset-0 transition-transform duration-75 origin-center flex items-center justify-center pointer-events-none"
         style={{
           transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
         }}
@@ -428,21 +541,21 @@ export function ForestCanvas({
           >
             <defs>
               <filter id="shadowBlur" x="-30%" y="-30%" width="160%" height="160%">
-                <feGaussianBlur stdDeviation="24" />
+                <feGaussianBlur stdDeviation="26" />
               </filter>
             </defs>
             <ellipse
               cx={originX}
               cy={originY + GRID_SIZE * TILE_HEIGHT + 130}
-              rx="340"
-              ry="80"
+              rx="350"
+              ry="82"
               fill="#000000"
               opacity="0.55"
               filter="url(#shadowBlur)"
             />
           </svg>
 
-          {/* B. Subterranean Island Cliff Faces (3D Carved Earth Foundation) */}
+          {/* B. Subterranean 3D Cliff Faces (Geological Strata & Roots) */}
           <svg
             className="absolute inset-0 w-full h-full pointer-events-none"
             viewBox="0 0 1000 700"
@@ -466,13 +579,14 @@ export function ForestCanvas({
               </linearGradient>
             </defs>
 
-            {/* Left Subterranean Cliff Polygon */}
             {(() => {
               const leftTipX = originX - GRID_SIZE * (TILE_WIDTH / 2);
               const leftTipY = originY + (GRID_SIZE * TILE_HEIGHT) / 2;
               const bottomCornerX = originX;
               const bottomCornerY = originY + GRID_SIZE * TILE_HEIGHT;
-              const cliffDepth = 78;
+              const rightTipX = originX + GRID_SIZE * (TILE_WIDTH / 2);
+              const rightTipY = originY + (GRID_SIZE * TILE_HEIGHT) / 2;
+              const cliffDepth = 80;
 
               return (
                 <g className="island-cliffs">
@@ -488,25 +602,19 @@ export function ForestCanvas({
                   />
 
                   {/* Right Cliff Face */}
-                  {(() => {
-                    const rightTipX = originX + GRID_SIZE * (TILE_WIDTH / 2);
-                    const rightTipY = originY + (GRID_SIZE * TILE_HEIGHT) / 2;
-                    return (
-                      <polygon
-                        points={`
-                          ${bottomCornerX},${bottomCornerY}
-                          ${rightTipX},${rightTipY}
-                          ${rightTipX},${rightTipY + cliffDepth - 10}
-                          ${bottomCornerX},${bottomCornerY + cliffDepth}
-                        `}
-                        fill="url(#cliffRightGrad)"
-                      />
-                    );
-                  })()}
+                  <polygon
+                    points={`
+                      ${bottomCornerX},${bottomCornerY}
+                      ${rightTipX},${rightTipY}
+                      ${rightTipX},${rightTipY + cliffDepth - 10}
+                      ${bottomCornerX},${bottomCornerY + cliffDepth}
+                    `}
+                    fill="url(#cliffRightGrad)"
+                  />
 
                   {/* Geological Strata Bands on Cliff */}
                   <path
-                    d={`M ${leftTipX + 20} ${leftTipY + 22} Q ${bottomCornerX} ${bottomCornerY + 16} ${originX + GRID_SIZE * (TILE_WIDTH / 2) - 20} ${leftTipY + 22}`}
+                    d={`M ${leftTipX + 20} ${leftTipY + 22} Q ${bottomCornerX} ${bottomCornerY + 16} ${rightTipX - 20} ${leftTipY + 22}`}
                     stroke="#1E130B"
                     strokeWidth="3.5"
                     strokeDasharray="18,6,30,8"
@@ -514,7 +622,7 @@ export function ForestCanvas({
                     fill="none"
                   />
                   <path
-                    d={`M ${leftTipX + 40} ${leftTipY + 45} Q ${bottomCornerX} ${bottomCornerY + 40} ${originX + GRID_SIZE * (TILE_WIDTH / 2) - 40} ${leftTipY + 45}`}
+                    d={`M ${leftTipX + 40} ${leftTipY + 45} Q ${bottomCornerX} ${bottomCornerY + 40} ${rightTipX - 40} ${leftTipY + 45}`}
                     stroke="#140C07"
                     strokeWidth="4"
                     strokeDasharray="24,10,40,6"
@@ -522,13 +630,13 @@ export function ForestCanvas({
                     fill="none"
                   />
 
-                  {/* Overhanging scalloped grass rim */}
+                  {/* Overhanging scalloped rim */}
                   <path
                     d={`
                       M ${leftTipX} ${leftTipY}
                       L ${bottomCornerX} ${bottomCornerY}
-                      L ${originX + GRID_SIZE * (TILE_WIDTH / 2)} ${leftTipY}
-                      L ${originX + GRID_SIZE * (TILE_WIDTH / 2)} ${leftTipY + 6}
+                      L ${rightTipX} ${rightTipY}
+                      L ${rightTipX} ${rightTipY + 6}
                       L ${bottomCornerX} ${bottomCornerY + 6}
                       L ${leftTipX} ${leftTipY + 6}
                       Z
@@ -554,7 +662,6 @@ export function ForestCanvas({
 
                 return (
                   <g key={`tile-${tile.col}-${tile.row}`}>
-                    {/* Isometric Rhombus */}
                     <polygon
                       points={`
                         ${tile.x},${tile.y - halfH}
@@ -567,44 +674,39 @@ export function ForestCanvas({
                       strokeWidth="0.8"
                     />
 
-                    {/* Unoccupied Tile Decorations (Flowers, wild grass, stones) */}
+                    {/* Unoccupied Tile Seasonal Micro-Decorations */}
                     {!tile.isOccupied && (
                       <g className="tile-nature-decor" opacity="0.85">
-                        {/* Biome-specific ground micro-details */}
-                        {biome === "summer" && isEven && (
+                        {season === "summer" && isEven && (
                           <>
-                            {/* Tiny chamomile / daisy dots */}
                             <circle cx={tile.x - 6} cy={tile.y - 2} r="1.8" fill="#FEF08A" />
                             <circle cx={tile.x - 6} cy={tile.y - 2} r="0.9" fill="#CA8A04" />
                             <circle cx={tile.x + 8} cy={tile.y + 3} r="1.5" fill="#FFFFFF" />
                           </>
                         )}
 
-                        {biome === "autumn" && (
+                        {season === "autumn" && (
                           <>
-                            {/* Fallen maple leaf */}
-                            <ellipse cx={tile.x - 4} cy={tile.y} rx="2.5" ry="1.2" fill="#EF4444" opacity="0.85" />
-                            <ellipse cx={tile.x + 6} cy={tile.y - 2} rx="2" ry="1.2" fill="#F97316" opacity="0.9" />
+                            <ellipse cx={tile.x - 4} cy={tile.y} rx="2.8" ry="1.4" fill="#EF4444" opacity="0.85" />
+                            <ellipse cx={tile.x + 6} cy={tile.y - 2} rx="2.4" ry="1.2" fill="#F97316" opacity="0.9" />
                           </>
                         )}
 
-                        {biome === "winter" && (
+                        {season === "winter" && (
                           <>
-                            {/* Frost sparkle */}
-                            <circle cx={tile.x} cy={tile.y} r="1.5" fill="#38BDF8" opacity="0.6" />
+                            <circle cx={tile.x} cy={tile.y} r="1.6" fill="#38BDF8" opacity="0.6" />
                             <line x1={tile.x - 4} y1={tile.y} x2={tile.x + 4} y2={tile.y} stroke="#BAE6FD" strokeWidth="0.8" opacity="0.5" />
                           </>
                         )}
 
-                        {biome === "spring" && (
+                        {season === "spring" && (
                           <>
-                            {/* Pink sakura petals scattered */}
-                            <ellipse cx={tile.x - 5} cy={tile.y - 1} rx="2.2" ry="1.3" fill="#F472B6" opacity="0.8" />
-                            <ellipse cx={tile.x + 4} cy={tile.y + 2} rx="2" ry="1.1" fill="#FBCFE8" opacity="0.9" />
+                            <ellipse cx={tile.x - 5} cy={tile.y - 1} rx="2.5" ry="1.3" fill="#F472B6" opacity="0.8" />
+                            <ellipse cx={tile.x + 4} cy={tile.y + 2} rx="2.2" ry="1.2" fill="#FBCFE8" opacity="0.9" />
                           </>
                         )}
 
-                        {/* Smooth river stones on select tiles */}
+                        {/* Polished stones on select edge tiles */}
                         {(tile.col === 0 && tile.row === 3) || (tile.col === 4 && tile.row === 1) ? (
                           <>
                             <ellipse cx={tile.x + 2} cy={tile.y + 1} rx="3.5" ry="2" fill="#64748B" opacity="0.75" />
@@ -619,7 +721,7 @@ export function ForestCanvas({
             </g>
           </svg>
 
-          {/* D. Interactive Planted Trees Layer (Rendered with Isometric Depth) */}
+          {/* D. Interactive Planted Trees Layer (Strict Depth-Sorted Rendering) */}
           <div className="absolute inset-0 pointer-events-auto">
             {sortedSceneTrees.map(({ entry, isoX, isoY, depth }) => {
               const isSelected = selectedEntry?.id === entry.id;
@@ -638,12 +740,14 @@ export function ForestCanvas({
                   className="absolute transform -translate-x-1/2 -translate-y-full transition-all duration-200 cursor-pointer focus:outline-hidden"
                   style={{
                     left: `${isoX}px`,
-                    top: `${isoY + 12}px`, // Place tree base directly on tile surface
+                    top: `${isoY + 14}px`, // Tree base perfectly aligned on tile surface
                     zIndex: depth,
                   }}
                   onClick={(e) => {
                     e.stopPropagation();
-                    setSelectedEntry(entry);
+                    if (!hasMovedRef.current) {
+                      setSelectedEntry(entry);
+                    }
                   }}
                   onMouseEnter={() => setHoveredEntry(entry)}
                   onMouseLeave={() => setHoveredEntry(null)}
@@ -660,22 +764,23 @@ export function ForestCanvas({
                   <div
                     className={cn(
                       "relative group transition-all duration-300",
-                      (isSelected || isHovered) && "-translate-y-3 scale-110"
+                      (isSelected || isHovered) && "-translate-y-2 scale-108"
                     )}
                   >
                     {/* Glowing Golden Isometric Plot Ring on Hover/Select */}
                     {(isSelected || isHovered) && (
-                      <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-20 h-9 rounded-full border-2 border-amber-300/90 bg-amber-400/20 shadow-[0_0_20px_rgba(251,191,36,0.6)] animate-pulse pointer-events-none" />
+                      <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-16 h-7 rounded-full border-2 border-amber-300 bg-amber-400/20 shadow-[0_0_16px_rgba(251,191,36,0.6)] animate-pulse pointer-events-none" />
                     )}
 
-                    {/* Master Botanical Tree Sprite */}
+                    {/* Master Botanical Tree Sprite with Synchronized Seasonal Hues */}
                     <TreeSvg
                       species={entry.tree_species}
                       status={entry.tree_status}
-                      size={120}
-                      stage={4}
+                      size={88}
+                      stage={entry.growth_stage ?? 4}
                       showMound={true}
                       highlighted={isSelected || isHovered}
+                      season={season}
                     />
 
                     {/* Floating Hover Information Card */}
@@ -689,7 +794,7 @@ export function ForestCanvas({
                         />
                         <div className="text-left">
                           <div className="text-[11px] font-bold text-white flex items-center space-x-1">
-                            <span>{meta.name}</span>
+                            <span>{entry.tree_status === "healthy" ? meta.name : "Arbre Défeuillé"}</span>
                             <span className="text-amber-300 font-mono text-[10px]">
                               • {durationMin} min
                             </span>
@@ -742,9 +847,10 @@ export function ForestCanvas({
         </div>
       </div>
 
-      {/* 5. Selected Tree Detail Modal */}
+      {/* 6. Selected Tree Detail Modal with Season Pass-through */}
       <TreeDetailModal
         entry={selectedEntry}
+        season={season}
         onClose={() => setSelectedEntry(null)}
       />
     </div>

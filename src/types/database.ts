@@ -223,6 +223,7 @@ export interface ForestEntry {
   position_x: number;
   position_y: number;
   scale_factor: number;
+  growth_stage?: number;
   earned_at: string;
   created_at: string;
   session?: FocusSession | null;

@@ -427,160 +427,8 @@ export async function abandonFocusSession(
   }
 }
 
-function getStarterGroveTrees(userId: string): ForestEntry[] {
-  const now = Date.now();
-  return [
-    {
-      id: "starter-cedar-1",
-      session_id: "starter-session-1",
-      user_id: userId,
-      tree_status: "healthy",
-      tree_species: "cedar",
-      position_x: 0,
-      position_y: 15,
-      scale_factor: 1.1,
-      earned_at: new Date(now - 3600000 * 2).toISOString(),
-      created_at: new Date(now - 3600000 * 2).toISOString(),
-      session: {
-        id: "starter-session-1",
-        user_id: userId,
-        subject_id: null,
-        session_label: "Architecture & Microprocesseurs IGL4",
-        target_duration_seconds: 2700,
-        actual_duration_seconds: 2700,
-        status: "completed",
-        tree_species: "cedar",
-        started_at: new Date(now - 3600000 * 3).toISOString(),
-        completed_at: new Date(now - 3600000 * 2).toISOString(),
-        interrupted_at: null,
-        interruption_reason: null,
-        idempotency_key: "starter-key-1",
-        created_at: new Date(now - 3600000 * 3).toISOString(),
-        updated_at: new Date(now - 3600000 * 2).toISOString(),
-        subject: { id: "sub-1", name: "Architecture des Systèmes" } as any,
-      },
-    },
-    {
-      id: "starter-oak-2",
-      session_id: "starter-session-2",
-      user_id: userId,
-      tree_status: "healthy",
-      tree_species: "oak",
-      position_x: -48,
-      position_y: 35,
-      scale_factor: 1.15,
-      earned_at: new Date(now - 86400000).toISOString(),
-      created_at: new Date(now - 86400000).toISOString(),
-      session: {
-        id: "starter-session-2",
-        user_id: userId,
-        subject_id: null,
-        session_label: "Graphes & Algorithmes de Dijkstra",
-        target_duration_seconds: 3600,
-        actual_duration_seconds: 3600,
-        status: "completed",
-        tree_species: "oak",
-        started_at: new Date(now - 86400000 - 3600000).toISOString(),
-        completed_at: new Date(now - 86400000).toISOString(),
-        interrupted_at: null,
-        interruption_reason: null,
-        idempotency_key: "starter-key-2",
-        created_at: new Date(now - 86400000 - 3600000).toISOString(),
-        updated_at: new Date(now - 86400000).toISOString(),
-        subject: { id: "sub-2", name: "Algorithmique Avancée" } as any,
-      },
-    },
-    {
-      id: "starter-pine-3",
-      session_id: "starter-session-3",
-      user_id: userId,
-      tree_status: "healthy",
-      tree_species: "pine",
-      position_x: 52,
-      position_y: -25,
-      scale_factor: 0.95,
-      earned_at: new Date(now - 86400000 * 2).toISOString(),
-      created_at: new Date(now - 86400000 * 2).toISOString(),
-      session: {
-        id: "starter-session-3",
-        user_id: userId,
-        subject_id: null,
-        session_label: "Routage Dynamique OSPF & BGP",
-        target_duration_seconds: 1500,
-        actual_duration_seconds: 1500,
-        status: "completed",
-        tree_species: "pine",
-        started_at: new Date(now - 86400000 * 2 - 1500000).toISOString(),
-        completed_at: new Date(now - 86400000 * 2).toISOString(),
-        interrupted_at: null,
-        interruption_reason: null,
-        idempotency_key: "starter-key-3",
-        created_at: new Date(now - 86400000 * 2 - 1500000).toISOString(),
-        updated_at: new Date(now - 86400000 * 2).toISOString(),
-        subject: { id: "sub-3", name: "Réseaux & Télécommunications" } as any,
-      },
-    },
-    {
-      id: "starter-willow-4",
-      session_id: "starter-session-4",
-      user_id: userId,
-      tree_status: "healthy",
-      tree_species: "willow",
-      position_x: -62,
-      position_y: -45,
-      scale_factor: 0.9,
-      earned_at: new Date(now - 86400000 * 3).toISOString(),
-      created_at: new Date(now - 86400000 * 3).toISOString(),
-      session: {
-        id: "starter-session-4",
-        user_id: userId,
-        subject_id: null,
-        session_label: "Protocoles d'Authentification & SSL",
-        target_duration_seconds: 1800,
-        actual_duration_seconds: 1800,
-        status: "completed",
-        tree_species: "willow",
-        started_at: new Date(now - 86400000 * 3 - 1800000).toISOString(),
-        completed_at: new Date(now - 86400000 * 3).toISOString(),
-        interrupted_at: null,
-        interruption_reason: null,
-        idempotency_key: "starter-key-4",
-        created_at: new Date(now - 86400000 * 3 - 1800000).toISOString(),
-        updated_at: new Date(now - 86400000 * 3).toISOString(),
-        subject: { id: "sub-4", name: "Sécurité & Cryptographie" } as any,
-      },
-    },
-    {
-      id: "starter-cedar-5",
-      session_id: "starter-session-5",
-      user_id: userId,
-      tree_status: "healthy",
-      tree_species: "cedar",
-      position_x: 42,
-      position_y: 50,
-      scale_factor: 1.2,
-      earned_at: new Date(now - 86400000 * 4).toISOString(),
-      created_at: new Date(now - 86400000 * 4).toISOString(),
-      session: {
-        id: "starter-session-5",
-        user_id: userId,
-        subject_id: null,
-        session_label: "Optimisation de Requêtes SQL & Index",
-        target_duration_seconds: 1500,
-        actual_duration_seconds: 1500,
-        status: "completed",
-        tree_species: "cedar",
-        started_at: new Date(now - 86400000 * 4 - 1500000).toISOString(),
-        completed_at: new Date(now - 86400000 * 4).toISOString(),
-        interrupted_at: null,
-        interruption_reason: null,
-        idempotency_key: "starter-key-5",
-        created_at: new Date(now - 86400000 * 4 - 1500000).toISOString(),
-        updated_at: new Date(now - 86400000 * 2).toISOString(),
-        subject: { id: "sub-5", name: "Bases de Données" } as any,
-      },
-    },
-  ];
+function getStarterGroveTrees(_userId: string): ForestEntry[] {
+  return [];
 }
 
 /**
@@ -617,35 +465,64 @@ export async function getMyForest(targetUserId?: string): Promise<{
       };
     }
 
+    const isSelf = !targetUserId || targetUserId === requester?.id;
+
     if (!configured) {
-      const starterTrees = getStarterGroveTrees(effectiveUserId);
       return {
-        authenticated: true,
-        trees: starterTrees,
+        authenticated: !!requester?.id,
+        trees: [],
         preferences: { ...DEFAULT_PREFERENCES, user_id: effectiveUserId },
         stats: {
-          healthyCount: starterTrees.length,
+          healthyCount: 0,
           leaflessCount: 0,
-          totalFocusedMinutes: 185,
-          currentStreak: 3,
+          totalFocusedMinutes: 0,
+          currentStreak: 0,
         },
       };
     }
 
     const serviceSupabase = await getAdminClient();
     if (!serviceSupabase) {
-      const starterTrees = getStarterGroveTrees(effectiveUserId);
       return {
-        authenticated: true,
-        trees: starterTrees,
+        authenticated: !!requester?.id,
+        trees: [],
         preferences: { ...DEFAULT_PREFERENCES, user_id: effectiveUserId },
         stats: {
-          healthyCount: starterTrees.length,
+          healthyCount: 0,
           leaflessCount: 0,
-          totalFocusedMinutes: 185,
-          currentStreak: 3,
+          totalFocusedMinutes: 0,
+          currentStreak: 0,
         },
       };
+    }
+
+    // Strict privacy access gate when inspecting another user's forest
+    if (!isSelf) {
+      const { data: targetPref } = await serviceSupabase
+        .from("forest_preferences")
+        .select("visibility")
+        .eq("user_id", effectiveUserId)
+        .maybeSingle();
+
+      const visibility = targetPref?.visibility || "members";
+
+      if (visibility === "private") {
+        return {
+          authenticated: !!requester?.id,
+          trees: [],
+          preferences: { ...DEFAULT_PREFERENCES, user_id: effectiveUserId, visibility: "private" },
+          stats: { healthyCount: 0, leaflessCount: 0, totalFocusedMinutes: 0, currentStreak: 0 },
+        };
+      }
+
+      if (visibility === "members" && !requester?.id) {
+        return {
+          authenticated: false,
+          trees: [],
+          preferences: { ...DEFAULT_PREFERENCES, user_id: effectiveUserId, visibility: "members" },
+          stats: { healthyCount: 0, leaflessCount: 0, totalFocusedMinutes: 0, currentStreak: 0 },
+        };
+      }
     }
 
     const [treesRes, prefsRes, sessionsRes] = await Promise.all([
@@ -668,9 +545,8 @@ export async function getMyForest(targetUserId?: string): Promise<{
     ]);
 
     let trees: ForestEntry[] = treesRes.data || [];
-    if (trees.length === 0) {
-      trees = getStarterGroveTrees(effectiveUserId);
-    }
+    // No fake trees injected for empty forests
+    // trees remains []
     const preferences: ForestPreferences = prefsRes.data || {
       ...DEFAULT_PREFERENCES,
       user_id: effectiveUserId,
@@ -743,63 +619,7 @@ export async function getMyForest(targetUserId?: string): Promise<{
 }
 
 function getStarterCohortMembers(): MemberForestSummary[] {
-  return [
-    {
-      userId: "12b54e6a-f1e0-4bee-b520-b4e479da3044",
-      displayName: "Yassine Drira",
-      avatarUrl: null,
-      healthyTreeCount: 18,
-      leaflessTreeCount: 1,
-      totalFocusedMinutes: 450,
-      recentSpecies: ["cedar", "oak", "pine"],
-      lastFocusedAt: new Date(Date.now() - 3600000 * 2).toISOString(),
-      visibility: "members",
-    },
-    {
-      userId: "748c73f0-e306-41a4-8556-4ac1d1ec556e",
-      displayName: "Amen",
-      avatarUrl: null,
-      healthyTreeCount: 14,
-      leaflessTreeCount: 0,
-      totalFocusedMinutes: 350,
-      recentSpecies: ["oak", "willow", "cedar"],
-      lastFocusedAt: new Date(Date.now() - 3600000 * 5).toISOString(),
-      visibility: "members",
-    },
-    {
-      userId: "2537d0cd-2632-409a-bc6a-bf1a44984081",
-      displayName: "test001",
-      avatarUrl: null,
-      healthyTreeCount: 9,
-      leaflessTreeCount: 2,
-      totalFocusedMinutes: 225,
-      recentSpecies: ["pine", "cedar"],
-      lastFocusedAt: new Date(Date.now() - 86400000).toISOString(),
-      visibility: "members",
-    },
-    {
-      userId: "cohort-sarah-m",
-      displayName: "Sarah Mansour",
-      avatarUrl: null,
-      healthyTreeCount: 12,
-      leaflessTreeCount: 1,
-      totalFocusedMinutes: 300,
-      recentSpecies: ["jacaranda", "cedar", "willow"],
-      lastFocusedAt: new Date(Date.now() - 3600000 * 8).toISOString(),
-      visibility: "members",
-    },
-    {
-      userId: "cohort-kais-b",
-      displayName: "Kais Ben Amor",
-      avatarUrl: null,
-      healthyTreeCount: 8,
-      leaflessTreeCount: 0,
-      totalFocusedMinutes: 200,
-      recentSpecies: ["willow", "sakura"],
-      lastFocusedAt: new Date(Date.now() - 86400000 * 2).toISOString(),
-      visibility: "members",
-    },
-  ];
+  return [];
 }
 
 /**
