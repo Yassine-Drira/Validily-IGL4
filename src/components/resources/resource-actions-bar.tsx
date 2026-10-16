@@ -47,9 +47,17 @@ export function ResourceActionsBar({
 
     try {
       const res = await toggleBookmark(resourceId);
-      if (res.error) {
+      if (res?.error) {
         setIsBookmarked(previous);
-      } else if (res.bookmarked !== undefined) {
+        if (
+          res.error.toLowerCase().includes("authentification") ||
+          res.error.toLowerCase().includes("connecté")
+        ) {
+          const next = typeof window !== "undefined" ? window.location.pathname : "/library";
+          router.push(`/login?next=${encodeURIComponent(next)}`);
+          return;
+        }
+      } else if (res?.bookmarked !== undefined) {
         setIsBookmarked(res.bookmarked);
       }
     } catch {
@@ -66,8 +74,16 @@ export function ResourceActionsBar({
 
     try {
       const res = await updateRevisionStatus(resourceId, newStatus);
-      if (res.error) {
+      if (res?.error) {
         setStatus(previous);
+        if (
+          res.error.toLowerCase().includes("authentification") ||
+          res.error.toLowerCase().includes("connecté")
+        ) {
+          const next = typeof window !== "undefined" ? window.location.pathname : "/library";
+          router.push(`/login?next=${encodeURIComponent(next)}`);
+          return;
+        }
       }
     } catch {
       setStatus(previous);
@@ -78,7 +94,14 @@ export function ResourceActionsBar({
 
   const handleDelete = async () => {
     const res = await deleteResource(resourceId);
-    if (res.error) {
+    if (res?.error) {
+      if (
+        res.error.toLowerCase().includes("authentification") ||
+        res.error.toLowerCase().includes("connecté")
+      ) {
+        router.push(`/login?next=${encodeURIComponent(window.location.pathname)}`);
+        return;
+      }
       throw new Error(res.error);
     }
     // Navigate back to subject hub or library

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { useSidebar } from "./workspace-shell";
 import { createClient } from "@/lib/supabase/client";
 import { flushAuthCookiesClient } from "@/lib/auth/cookie-utils";
+import { serverLogoutAction } from "@/lib/auth/logout-action";
 import { FocusHeaderWidget } from "@/components/focus/focus-header-widget";
 
 export interface HeaderUser {
@@ -66,14 +67,46 @@ export function AppHeader({ initialUser }: { initialUser?: HeaderUser | null }) 
 
   const handleLogout = async () => {
     try {
-      const supabase = createClient();
-      await supabase.auth.signOut();
+      // 1. Invalidate server session, cookies and in-memory caches
+      try {
+        await serverLogoutAction();
+      } catch {
+        // Safe fallback if offline
+      }
+
+      // 2. Client-side Supabase signOut
+      try {
+        const supabase = createClient();
+        await supabase.auth.signOut();
+      } catch {
+        // Ignore
+      }
+
+      // 3. Flush client-accessible auth cookies
       flushAuthCookiesClient();
+
+      // 4. Purge all localStorage and sessionStorage caches to prevent data bleed
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.clear();
+        } catch {
+          // Ignore
+        }
+        try {
+          sessionStorage.clear();
+        } catch {
+          // Ignore
+        }
+      }
+
       setUser(null);
       setIsDropdownOpen(false);
-      window.location.href = "/";
+
+      // 5. Hard refresh and redirect to login
+      window.location.href = "/login?logged_out=1";
     } catch {
       setUser(null);
+      window.location.href = "/login";
     }
   };
 
@@ -106,8 +139,8 @@ export function AppHeader({ initialUser }: { initialUser?: HeaderUser | null }) 
         {/* Persistent Focus / Pomodoro Timer & Soundscapes */}
         <FocusHeaderWidget />
 
-        {/* Upload Resource Button */}
-        <Link href="/library?action=upload">
+        {/* Upload Resource Button: members upload, visitors redirected to login */}
+        <Link href={user ? "/library?action=upload" : "/login?next=/library?action=upload"}>
           <Button size="sm" variant="outline" className="text-xs">
             <UploadCloud className="w-3.5 h-3.5 text-[#2855D9]" />
             <span className="hidden md:inline">Ajouter un document</span>

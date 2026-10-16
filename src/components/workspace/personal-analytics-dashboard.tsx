@@ -107,10 +107,11 @@ export function PersonalAnalyticsDashboard({
   // Real 7-day focus minutes loaded from localStorage
   const [dailyFocusMap, setDailyFocusMap] = useState<{ [dateStr: string]: number }>({});
 
-  // 1. Load user goals on mount
+  // 1. Load user goals on mount (scoped strictly to authenticated student)
   useEffect(() => {
+    if (!user?.id) return;
     try {
-      const storageKey = `validily_goals_${user?.id || "guest"}`;
+      const storageKey = `validily_goals_${user.id}`;
       const saved = localStorage.getItem(storageKey);
       if (saved) {
         const parsed = JSON.parse(saved);
@@ -124,12 +125,20 @@ export function PersonalAnalyticsDashboard({
     }
   }, [user?.id]);
 
-  // 2. Load 7-day focus history from localStorage
+  // 2. Load 7-day focus history from localStorage (scoped to active user)
   useEffect(() => {
     const focusMap: { [dateStr: string]: number } = {};
+    if (!user?.id) {
+      last7Days.forEach((d) => {
+        focusMap[d.dateStr] = 0;
+      });
+      setDailyFocusMap(focusMap);
+      return;
+    }
+
     last7Days.forEach((d) => {
       try {
-        const saved = localStorage.getItem(`validily_focus_${d.dateStr}`);
+        const saved = localStorage.getItem(`validily_focus_${user.id}_${d.dateStr}`);
         if (saved) {
           const parsed = JSON.parse(saved);
           focusMap[d.dateStr] =
@@ -149,12 +158,16 @@ export function PersonalAnalyticsDashboard({
       Math.floor(totalFocusSecondsToday / 60)
     );
     setDailyFocusMap(focusMap);
-  }, [last7Days, totalFocusSecondsToday]);
+  }, [last7Days, totalFocusSecondsToday, user?.id]);
 
   // Save customized goals
   const handleSaveGoals = () => {
+    if (!user?.id) {
+      window.location.href = `/login?next=${encodeURIComponent(window.location.pathname)}`;
+      return;
+    }
     try {
-      const storageKey = `validily_goals_${user?.id || "guest"}`;
+      const storageKey = `validily_goals_${user.id}`;
       localStorage.setItem(storageKey, JSON.stringify(tempGoals));
       setGoals(tempGoals);
       setIsEditingGoals(false);

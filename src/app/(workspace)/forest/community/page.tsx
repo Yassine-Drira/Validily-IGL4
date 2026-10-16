@@ -67,6 +67,13 @@ export default function CommunityForestPage() {
         setCheerFeedback(res.message);
         setTimeout(() => setCheerFeedback(""), 4500);
       } else {
+        if (
+          res.error?.toLowerCase().includes("connecté") ||
+          res.error?.toLowerCase().includes("authentification")
+        ) {
+          window.location.href = "/login?next=/forest/community";
+          return;
+        }
         setCheerFeedback(res.error || "Erreur d'envoi");
         setTimeout(() => setCheerFeedback(""), 4000);
       }

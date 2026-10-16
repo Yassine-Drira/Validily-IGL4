@@ -167,6 +167,14 @@ export function FocusHubModal() {
       });
 
       if (!res.success) {
+        if (
+          res.error?.toLowerCase().includes("authentification") ||
+          res.error?.toLowerCase().includes("connecté")
+        ) {
+          const next = typeof window !== "undefined" ? window.location.pathname : "/";
+          window.location.href = `/login?next=${encodeURIComponent(next)}`;
+          return;
+        }
         setSoundFormError(res.error || "Échec de l'ajout du son.");
         return;
       }
@@ -205,6 +213,13 @@ export function FocusHubModal() {
         if (activeCustomAudio?.id === id) {
           setActiveCustomAudio(null);
         }
+      } else if (
+        res.error?.toLowerCase().includes("authentification") ||
+        res.error?.toLowerCase().includes("connecté")
+      ) {
+        const next = typeof window !== "undefined" ? window.location.pathname : "/";
+        window.location.href = `/login?next=${encodeURIComponent(next)}`;
+        return;
       }
     } catch {
       // Safe fallback

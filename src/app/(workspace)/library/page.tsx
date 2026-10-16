@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { getSubjects, getCategories, getResources } from "@/lib/supabase/repository";
 import { getRequesterUser } from "@/lib/auth/authorization";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
@@ -30,6 +31,11 @@ interface LibraryPageProps {
 export default async function LibraryPage({ searchParams }: LibraryPageProps) {
   const { action, subjectId, categoryId, category, q, uploaded } = await searchParams;
   const requester = await getRequesterUser();
+
+  if (action === "upload" && !requester) {
+    redirect(`/login?next=${encodeURIComponent("/library?action=upload")}`);
+  }
+
   const subjects = await getSubjects(undefined, requester?.id);
   const categories = await getCategories();
 

@@ -25,6 +25,7 @@ interface NotesManagerProps {
   subjects: Subject[];
   initialCreateOpen?: boolean;
   defaultSubjectId?: string;
+  isAuthenticated?: boolean;
 }
 
 export function NotesManager({
@@ -32,6 +33,7 @@ export function NotesManager({
   subjects,
   initialCreateOpen = false,
   defaultSubjectId,
+  isAuthenticated = true,
 }: NotesManagerProps) {
   const [notes, setNotes] = useState<Note[]>(initialNotes);
   const [noteToDelete, setNoteToDelete] = useState<Note | null>(null);
@@ -50,6 +52,10 @@ export function NotesManager({
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   const openCreateModal = () => {
+    if (!isAuthenticated) {
+      window.location.href = `/login?next=${encodeURIComponent("/notes?action=new")}`;
+      return;
+    }
     setEditingNote(null);
     setSubjectId(defaultSubjectId || subjects[0]?.id || "");
     setTitle("");
@@ -60,6 +66,10 @@ export function NotesManager({
   };
 
   const openEditModal = (note: Note) => {
+    if (!isAuthenticated) {
+      window.location.href = `/login?next=${encodeURIComponent("/notes")}`;
+      return;
+    }
     setEditingNote(note);
     setSubjectId(note.subject_id || "");
     setTitle(note.title);

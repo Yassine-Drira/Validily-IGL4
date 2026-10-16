@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { getBookmarks } from "@/lib/supabase/repository";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { SavedItemsManager } from "@/components/bookmarks/saved-items-manager";
@@ -7,7 +8,7 @@ import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 export const dynamic = "force-dynamic";
 
 export default async function BookmarksPage() {
-  let isGuest = true;
+  let isGuest = false;
   let bookmarkedResources: AcademicResource[] = [];
 
   try {
@@ -17,20 +18,25 @@ export default async function BookmarksPage() {
         data: { user },
       } = await supabase.auth.getUser();
 
-      if (user?.id) {
-        isGuest = false;
-        const bookmarks = await getBookmarks(user.id);
-        bookmarkedResources = bookmarks
-          .map((b) => b.resource)
-          .filter((r): r is AcademicResource => Boolean(r));
-      } else {
-        const bookmarks = await getBookmarks();
-        bookmarkedResources = bookmarks
-          .map((b) => b.resource)
-          .filter((r): r is AcademicResource => Boolean(r));
+      if (!user?.id) {
+        redirect("/login?next=/bookmarks");
       }
+
+      const bookmarks = await getBookmarks(user.id);
+      bookmarkedResources = bookmarks
+        .map((b) => b.resource)
+        .filter((r): r is AcademicResource => Boolean(r));
+    } else {
+      // In unconfigured / test environment, allow test execution
+      const bookmarks = await getBookmarks();
+      bookmarkedResources = bookmarks
+        .map((b) => b.resource)
+        .filter((r): r is AcademicResource => Boolean(r));
     }
-  } catch (err) {
+  } catch (err: any) {
+    if (err?.digest?.startsWith("NEXT_REDIRECT")) {
+      throw err;
+    }
     console.error("BookmarksPage error:", err);
   }
 

@@ -23,6 +23,14 @@ const profileMemoryCache = new Map<
   }
 >();
 
+export function invalidateProfileCache(userId?: string): void {
+  if (userId) {
+    profileMemoryCache.delete(userId);
+  } else {
+    profileMemoryCache.clear();
+  }
+}
+
 /**
  * Configure test user identity for local unit/adversarial verification
  */

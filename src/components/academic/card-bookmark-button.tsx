@@ -29,6 +29,14 @@ export function CardBookmarkButton({
       const res = await toggleBookmark(resourceId);
       if (res?.error) {
         setIsBookmarked(prev);
+        if (
+          res.error.toLowerCase().includes("authentification") ||
+          res.error.toLowerCase().includes("connecté")
+        ) {
+          const next = typeof window !== "undefined" ? window.location.pathname : "/library";
+          window.location.href = `/login?next=${encodeURIComponent(next)}`;
+          return;
+        }
       } else if (res?.bookmarked !== undefined) {
         setIsBookmarked(res.bookmarked);
       }

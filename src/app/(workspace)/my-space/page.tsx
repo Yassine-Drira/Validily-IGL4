@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { getServiceSupabase } from "@/lib/supabase/admin";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
@@ -27,8 +28,11 @@ export default async function MySpacePage() {
         data: { user: authUser },
       } = await supabase.auth.getUser();
 
-      if (authUser?.id) {
-        const service = getServiceSupabase();
+      if (!authUser?.id) {
+        redirect("/login?next=/my-space");
+      }
+
+      const service = getServiceSupabase();
 
         // 0. Fetch persisted student profile from database
         const { data: profile } = await service
@@ -77,8 +81,10 @@ export default async function MySpacePage() {
           (log: any) => log.actor_id === authUser.id || log.metadata?.user_id === authUser.id
         );
       }
+    } catch (err: any) {
+    if (err?.digest?.startsWith("NEXT_REDIRECT")) {
+      throw err;
     }
-  } catch (err) {
     console.error("MySpacePage error:", err);
   }
 

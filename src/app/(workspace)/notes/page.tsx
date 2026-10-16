@@ -1,4 +1,6 @@
+import { redirect } from "next/navigation";
 import { getNotes, getSubjects } from "@/lib/supabase/repository";
+import { getRequesterUser } from "@/lib/auth/authorization";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { NotesManager } from "@/components/notes/notes-manager";
 
@@ -13,8 +15,14 @@ interface NotesPageProps {
 
 export default async function NotesPage({ searchParams }: NotesPageProps) {
   const { action, subjectId } = await searchParams;
+  const requester = await getRequesterUser();
+
+  if (action === "new" && !requester) {
+    redirect("/login?next=/notes?action=new");
+  }
+
   const notes = await getNotes();
-  const subjects = await getSubjects();
+  const subjects = await getSubjects(undefined, requester?.id);
 
   return (
     <div className="space-y-6">
@@ -34,6 +42,7 @@ export default async function NotesPage({ searchParams }: NotesPageProps) {
         subjects={subjects}
         initialCreateOpen={action === "new"}
         defaultSubjectId={subjectId}
+        isAuthenticated={Boolean(requester)}
       />
     </div>
   );

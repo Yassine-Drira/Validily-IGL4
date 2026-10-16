@@ -92,9 +92,17 @@ export function InteractiveHtmlRunner({
       });
 
       if (res?.error) {
+        if (
+          res.error.toLowerCase().includes("authentification") ||
+          res.error.toLowerCase().includes("connecté")
+        ) {
+          window.location.href = `/login?next=${encodeURIComponent(window.location.pathname)}`;
+          return;
+        }
         setSubmitSuccess(`Score local : ${selfScore}/${totalScore} (${res.error})`);
       } else if (res?.isGuest) {
-        setSubmitSuccess(`Score : ${selfScore}/${totalScore} (Mode invité calculé avec succès)`);
+        window.location.href = `/login?next=${encodeURIComponent(window.location.pathname)}`;
+        return;
       } else {
         setSubmitSuccess(`Tentative enregistrée avec succès : ${selfScore} / ${totalScore}`);
       }

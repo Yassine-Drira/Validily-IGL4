@@ -98,11 +98,17 @@ export function FocusProvider({
 
   const totalFocusMinutesToday = Math.floor(totalFocusSecondsToday / 60);
 
-  // Load daily stats & tree preferences on mount
+  // Load daily stats & tree preferences on mount or when user changes
   useEffect(() => {
+    if (!user?.id) {
+      setCompletedPomodoros(0);
+      setTotalFocusSecondsToday(0);
+      return;
+    }
+
     try {
       const today = new Date().toISOString().split("T")[0];
-      const saved = localStorage.getItem(`validily_focus_${today}`);
+      const saved = localStorage.getItem(`validily_focus_${user.id}_${today}`);
       if (saved) {
         const parsed = JSON.parse(saved);
         setCompletedPomodoros(parsed.completedPomodoros || 0);
@@ -110,8 +116,11 @@ export function FocusProvider({
           parsed.totalFocusSeconds ||
           (parsed.totalFocusMinutes ? parsed.totalFocusMinutes * 60 : 0);
         setTotalFocusSecondsToday(sec);
+      } else {
+        setCompletedPomodoros(0);
+        setTotalFocusSecondsToday(0);
       }
-      const savedDuration = localStorage.getItem("validily_work_duration");
+      const savedDuration = localStorage.getItem(`validily_work_duration_${user.id}`);
       if (savedDuration) {
         const dur = parseInt(savedDuration, 10);
         if (!isNaN(dur) && dur > 0) {
@@ -119,7 +128,7 @@ export function FocusProvider({
           setTimeLeft(dur);
         }
       }
-      const savedSpecies = localStorage.getItem("validily_tree_species") as TreeSpecies | null;
+      const savedSpecies = localStorage.getItem(`validily_tree_species_${user.id}`) as TreeSpecies | null;
       if (
         savedSpecies &&
         ["cedar", "oak", "pine", "willow", "jacaranda", "sakura"].includes(savedSpecies)
@@ -129,14 +138,15 @@ export function FocusProvider({
     } catch {
       // LocalStorage access fallback
     }
-  }, []);
+  }, [user?.id]);
 
-  // Save daily stats helper
+  // Save daily stats helper (strictly scoped to active user)
   const persistDailyStats = useCallback((pomodoros: number, seconds: number) => {
+    if (!user?.id) return;
     try {
       const today = new Date().toISOString().split("T")[0];
       localStorage.setItem(
-        `validily_focus_${today}`,
+        `validily_focus_${user.id}_${today}`,
         JSON.stringify({
           completedPomodoros: pomodoros,
           totalFocusSeconds: seconds,
@@ -146,7 +156,7 @@ export function FocusProvider({
     } catch {
       // LocalStorage fallback
     }
-  }, []);
+  }, [user?.id]);
 
   // Dismiss celebration banner
   const dismissCelebration = useCallback(() => {
@@ -156,12 +166,13 @@ export function FocusProvider({
   // Set Tree Species
   const setTreeSpecies = useCallback((species: TreeSpecies) => {
     setTreeSpeciesState(species);
+    if (!user?.id) return;
     try {
-      localStorage.setItem("validily_tree_species", species);
+      localStorage.setItem(`validily_tree_species_${user.id}`, species);
     } catch {
       // LocalStorage fallback
     }
-  }, []);
+  }, [user?.id]);
 
   // Timer interval handling with continuous real-time focus accumulation
   useEffect(() => {
@@ -346,10 +357,12 @@ export function FocusProvider({
     (minutes: number) => {
       const seconds = minutes * 60;
       setWorkDuration(seconds);
-      try {
-        localStorage.setItem("validily_work_duration", seconds.toString());
-      } catch {
-        // LocalStorage fallback
+      if (user?.id) {
+        try {
+          localStorage.setItem(`validily_work_duration_${user.id}`, seconds.toString());
+        } catch {
+          // LocalStorage fallback
+        }
       }
       if (mode === "work") {
         if (isRunning && activeSessionIdRef.current) {
@@ -361,7 +374,7 @@ export function FocusProvider({
         }
       }
     },
-    [mode, isRunning, giveUpSession]
+    [mode, isRunning, giveUpSession, user?.id]
   );
 
   const setSoundscape = useCallback(

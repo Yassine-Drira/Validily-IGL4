@@ -40,6 +40,10 @@ export default function ForestPage() {
       const res = await getMyForest();
       if (res) {
         setIsAuthenticated(res.authenticated);
+        if (!res.authenticated) {
+          window.location.href = "/login?next=/forest";
+          return;
+        }
         if (res.trees) {
           setEntries(res.trees || []);
         }
