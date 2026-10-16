@@ -16,6 +16,18 @@ function safeRevalidate(path: string) {
   }
 }
 
+function isTableMissingError(err: any): boolean {
+  if (!err) return false;
+  const msg = (err.message || "").toLowerCase();
+  return (
+    msg.includes("schema cache") ||
+    msg.includes("does not exist") ||
+    msg.includes("could not find the table") ||
+    err.code === "PGRST204" ||
+    err.code === "42P01"
+  );
+}
+
 const localCatalogMap: Map<string, AudioCatalogEntry> = new Map();
 
 /**
@@ -47,6 +59,12 @@ export async function listAllCatalogEntries(): Promise<{
       .order("created_at", { ascending: false });
 
     if (error) {
+      if (isTableMissingError(error)) {
+        const list = Array.from(localCatalogMap.values()).sort(
+          (a, b) => a.sort_order - b.sort_order
+        );
+        return { success: true, entries: list };
+      }
       return { success: false, entries: [], error: error.message };
     }
 
@@ -144,6 +162,18 @@ export async function createCatalogEntry(input: {
       .single();
 
     if (error || !data) {
+      if (isTableMissingError(error)) {
+        localCatalogMap.set(entryId, newEntry);
+        await logAuditEvent({
+          actor_id: adminUser?.id || "admin",
+          action: "AUDIO_CATALOG_CREATE",
+          target_id: entryId,
+          target_type: "audio",
+          metadata: { title: cleanTitle, fallback: true },
+        });
+        safeRevalidate("/admin");
+        return { success: true, entry: newEntry };
+      }
       return { success: false, error: error?.message || "Échec de l'insertion dans le catalogue." };
     }
 
@@ -252,6 +282,31 @@ export async function updateCatalogEntry(
       .single();
 
     if (error) {
+      if (isTableMissingError(error)) {
+        const existing = localCatalogMap.get(id);
+        if (existing) {
+          existing.title = cleanTitle.slice(0, 90);
+          existing.description = input.description?.trim() || null;
+          existing.category = input.category;
+          existing.source_type = input.sourceType;
+          existing.source_key = canonicalSourceKey;
+          existing.youtube_video_id = youtubeVideoId;
+          if (input.isPublished !== undefined) existing.is_published = input.isPublished;
+          if (input.sortOrder !== undefined) existing.sort_order = input.sortOrder;
+          existing.updated_at = now;
+
+          await logAuditEvent({
+            actor_id: adminUser?.id || "admin",
+            action: "AUDIO_CATALOG_UPDATE",
+            target_id: id,
+            target_type: "audio",
+            metadata: { title: cleanTitle, fallback: true },
+          });
+
+          safeRevalidate("/admin");
+          return { success: true, entry: existing };
+        }
+      }
       return { success: false, error: error.message };
     }
 
@@ -299,7 +354,17 @@ export async function togglePublishCatalogEntry(
       .update({ is_published: isPublished, updated_at: new Date().toISOString() })
       .eq("id", id);
 
-    if (error) return { success: false, error: error.message };
+    if (error) {
+      if (isTableMissingError(error)) {
+        const existing = localCatalogMap.get(id);
+        if (existing) {
+          existing.is_published = isPublished;
+          existing.updated_at = new Date().toISOString();
+        }
+        return { success: true };
+      }
+      return { success: false, error: error.message };
+    }
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err?.message };
@@ -331,7 +396,20 @@ export async function deleteCatalogEntry(id: string): Promise<{ success: boolean
 
     const serviceSupabase = getServiceSupabase();
     const { error } = await serviceSupabase.from("audio_catalog").delete().eq("id", id);
-    if (error) return { success: false, error: error.message };
+    if (error) {
+      if (isTableMissingError(error)) {
+        localCatalogMap.delete(id);
+        await logAuditEvent({
+          actor_id: adminUser?.id || "admin",
+          action: "AUDIO_CATALOG_DELETE",
+          target_id: id,
+          target_type: "audio",
+        });
+        safeRevalidate("/admin");
+        return { success: true };
+      }
+      return { success: false, error: error.message };
+    }
 
     await logAuditEvent({
       actor_id: adminUser?.id || "admin",

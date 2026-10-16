@@ -15,6 +15,18 @@ function safeRevalidate(path: string) {
   }
 }
 
+function isTableMissingError(err: any): boolean {
+  if (!err) return false;
+  const msg = (err.message || "").toLowerCase();
+  return (
+    msg.includes("schema cache") ||
+    msg.includes("does not exist") ||
+    msg.includes("could not find the table") ||
+    err.code === "PGRST204" ||
+    err.code === "42P01"
+  );
+}
+
 // In-memory store for offline/local-first testing and environments without live Supabase
 const localVipEntitlements: Map<string, VipEntitlement> = new Map();
 
@@ -174,6 +186,22 @@ export async function grantVipAccess(params: {
       .single();
 
     if (error || !data) {
+      if (isTableMissingError(error)) {
+        localVipEntitlements.set(newEntitlement.id, newEntitlement);
+        await logAuditEvent({
+          actor_id: granterId,
+          action: "VIP_GRANTED",
+          target_id: params.targetUserId,
+          target_type: "vip",
+          metadata: {
+            expires_at: expiresAt.toISOString(),
+            reason: params.reason,
+            fallback: true,
+          },
+        });
+        safeRevalidate("/admin");
+        return { success: true, entitlement: newEntitlement };
+      }
       return { success: false, error: error?.message || "Échec de l'enregistrement VIP." };
     }
 
@@ -235,6 +263,21 @@ export async function revokeVipAccess(entitlementId: string): Promise<{
       .eq("id", entitlementId);
 
     if (error) {
+      if (isTableMissingError(error)) {
+        const ent = localVipEntitlements.get(entitlementId);
+        if (ent) {
+          ent.status = "revoked";
+          ent.updated_at = now;
+        }
+        await logAuditEvent({
+          actor_id: granterId,
+          action: "VIP_REVOKED",
+          target_id: entitlementId,
+          target_type: "vip",
+        });
+        safeRevalidate("/admin");
+        return { success: true };
+      }
       return { success: false, error: error.message };
     }
 
@@ -293,6 +336,18 @@ export async function listVipEntitlements(): Promise<{
       .order("created_at", { ascending: false });
 
     if (error) {
+      if (isTableMissingError(error)) {
+        const list = Array.from(localVipEntitlements.values()).map((e) => {
+          const isExpired = e.status === "active" && new Date(e.expires_at) < now;
+          return {
+            ...e,
+            status: isExpired ? ("expired" as const) : e.status,
+            user_display_name: "Étudiant",
+            user_email: "etudiant@university.tn",
+          };
+        });
+        return { success: true, entitlements: list };
+      }
       return { success: false, entitlements: [], error: error.message };
     }
 

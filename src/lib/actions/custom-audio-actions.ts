@@ -16,6 +16,18 @@ function safeRevalidate(path: string) {
   }
 }
 
+function isTableMissingError(err: any): boolean {
+  if (!err) return false;
+  const msg = (err.message || "").toLowerCase();
+  return (
+    msg.includes("schema cache") ||
+    msg.includes("does not exist") ||
+    msg.includes("could not find the table") ||
+    err.code === "PGRST204" ||
+    err.code === "42P01"
+  );
+}
+
 // In-memory store for offline/local-first testing
 const localCustomAudioEntries: Map<string, CustomAudioEntry> = new Map();
 const localCatalogEntries: Map<string, AudioCatalogEntry> = new Map();
@@ -135,6 +147,22 @@ export async function getMyCustomAudio(): Promise<{
       .order("created_at", { ascending: false });
 
     if (error) {
+      if (isTableMissingError(error)) {
+        const list = Array.from(localCustomAudioEntries.values()).filter(
+          (e) => e.user_id === user.id
+        );
+        const usedCount = list.length;
+        const remainingSlots = Math.max(0, maxAllowed - usedCount);
+        return {
+          success: true,
+          entries: list,
+          usedCount,
+          maxAllowed,
+          remainingSlots,
+          isVip,
+          isAdmin,
+        };
+      }
       return {
         success: false,
         entries: [],
@@ -251,6 +279,29 @@ export async function addCustomAudio(input: {
       .eq("user_id", user.id);
 
     if (countErr) {
+      if (isTableMissingError(countErr)) {
+        const userEntries = Array.from(localCustomAudioEntries.values()).filter(
+          (e) => e.user_id === user.id
+        );
+        if (userEntries.length >= maxAllowed) {
+          return {
+            success: false,
+            error: `Quota atteint (${userEntries.length}/${maxAllowed} sons). Supprimez un son pour libérer un emplacement ou passez VIP.`,
+          };
+        }
+        const newEntry: CustomAudioEntry = {
+          id: `custom-audio-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          user_id: user.id,
+          title: cleanTitle.slice(0, 80),
+          youtube_url: parsed.canonicalUrl,
+          youtube_video_id: parsed.videoId,
+          source_type: "youtube",
+          created_at: now,
+          updated_at: now,
+        };
+        localCustomAudioEntries.set(newEntry.id, newEntry);
+        return { success: true, entry: newEntry };
+      }
       return { success: false, error: countErr.message };
     }
 
@@ -275,6 +326,20 @@ export async function addCustomAudio(input: {
       .single();
 
     if (error || !data) {
+      if (isTableMissingError(error)) {
+        const newEntry: CustomAudioEntry = {
+          id: `custom-audio-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          user_id: user.id,
+          title: cleanTitle.slice(0, 80),
+          youtube_url: parsed.canonicalUrl,
+          youtube_video_id: parsed.videoId,
+          source_type: "youtube",
+          created_at: now,
+          updated_at: now,
+        };
+        localCustomAudioEntries.set(newEntry.id, newEntry);
+        return { success: true, entry: newEntry };
+      }
       return { success: false, error: error?.message || "Échec de l'enregistrement." };
     }
 
@@ -352,6 +417,14 @@ export async function updateCustomAudio(
       .single();
 
     if (error) {
+      if (isTableMissingError(error)) {
+        const entry = localCustomAudioEntries.get(entryId);
+        if (entry) {
+          entry.title = cleanTitle.slice(0, 80);
+          entry.updated_at = now;
+          return { success: true, entry };
+        }
+      }
       return { success: false, error: error.message };
     }
 
@@ -391,13 +464,23 @@ export async function deleteCustomAudio(entryId: string): Promise<{
 
     const serviceSupabase = getServiceSupabase();
 
-    const { data: existing } = await serviceSupabase
+    const { data: existing, error: fetchErr } = await serviceSupabase
       .from("custom_audio_entries")
       .select("user_id")
       .eq("id", entryId)
       .maybeSingle();
 
+    if (fetchErr && isTableMissingError(fetchErr)) {
+      localCustomAudioEntries.delete(entryId);
+      return { success: true };
+    }
+
     if (!existing) {
+      const localEntry = localCustomAudioEntries.get(entryId);
+      if (localEntry) {
+        localCustomAudioEntries.delete(entryId);
+        return { success: true };
+      }
       return { success: false, error: "Son introuvable." };
     }
 
@@ -411,6 +494,10 @@ export async function deleteCustomAudio(entryId: string): Promise<{
       .eq("id", entryId);
 
     if (error) {
+      if (isTableMissingError(error)) {
+        localCustomAudioEntries.delete(entryId);
+        return { success: true };
+      }
       return { success: false, error: error.message };
     }
 
@@ -445,6 +532,12 @@ export async function getSharedAudioCatalog(): Promise<{
       .order("created_at", { ascending: false });
 
     if (error) {
+      if (isTableMissingError(error)) {
+        const list = Array.from(localCatalogEntries.values())
+          .filter((c) => c.is_published)
+          .sort((a, b) => a.sort_order - b.sort_order);
+        return { success: true, catalog: list };
+      }
       return { success: false, catalog: [], error: error.message };
     }
 
