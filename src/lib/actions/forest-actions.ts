@@ -1498,22 +1498,38 @@ export async function getCommunityForests(): Promise<MemberForestSummary[]> {
       allTreesByUser.set(uid, []);
     }
 
+    const dbSessionsByUser = new Map<string, any[]>();
     if (serviceSupabase && visibleUserIds.length > 0) {
       try {
-        const { data: dbEntries } = await serviceSupabase
-          .from("forest_entries")
-          .select("user_id, tree_status, tree_species, earned_at")
-          .in("user_id", visibleUserIds)
-          .order("earned_at", { ascending: false });
-        if (dbEntries) {
-          for (const e of dbEntries) {
+        const [entriesRes, sessionsRes] = await Promise.all([
+          serviceSupabase
+            .from("forest_entries")
+            .select("id, user_id, tree_status, tree_species, earned_at, session:focus_sessions(actual_duration_seconds, target_duration_seconds)")
+            .in("user_id", visibleUserIds)
+            .order("earned_at", { ascending: false }),
+          serviceSupabase
+            .from("focus_sessions")
+            .select("user_id, actual_duration_seconds, target_duration_seconds, status")
+            .in("user_id", visibleUserIds)
+            .eq("status", "completed"),
+        ]);
+
+        if (entriesRes.data) {
+          for (const e of entriesRes.data) {
             const list = allTreesByUser.get(e.user_id) || [];
             list.push(e as ForestEntry);
             allTreesByUser.set(e.user_id, list);
           }
         }
-      } catch {}
 
+        if (sessionsRes.data) {
+          for (const s of sessionsRes.data) {
+            const list = dbSessionsByUser.get(s.user_id) || [];
+            list.push(s);
+            dbSessionsByUser.set(s.user_id, list);
+          }
+        }
+      } catch {}
     }
 
     // Also include in-memory localForestEntries
@@ -1539,7 +1555,14 @@ export async function getCommunityForests(): Promise<MemberForestSummary[]> {
         const sec = t.session?.actual_duration_seconds || t.session?.target_duration_seconds || 1500;
         return acc + (typeof sec === "number" && sec > 0 ? sec : 1500);
       }, 0);
-      const totalFocusedMinutes = Math.floor(totalFocusedSeconds / 60);
+
+      const userSessions = dbSessionsByUser.get(p.id) || [];
+      const sessionSeconds = userSessions.reduce((acc: number, s: any) => {
+        const sec = s.actual_duration_seconds || s.target_duration_seconds || 1500;
+        return acc + (typeof sec === "number" && sec > 0 ? sec : 1500);
+      }, 0);
+
+      const totalFocusedMinutes = Math.floor(Math.max(totalFocusedSeconds, sessionSeconds) / 60);
 
       const recentSpecies = Array.from(
         new Set(healthyTrees.map((t) => t.tree_species as TreeSpecies))

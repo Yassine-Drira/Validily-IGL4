@@ -402,7 +402,7 @@ export async function listStudentsPerformanceAction(): Promise<{
     }
 
     // Parallel fetch: profiles, auth users, and optional DB tables
-    const [profilesRes, authDataRes, treesRes, revProgressRes, quizAttemptsRes] = await Promise.all([
+    const [profilesRes, authDataRes, treesRes, sessionsRes, revProgressRes, quizAttemptsRes] = await Promise.all([
       serviceSupabase
         .from("profiles")
         .select("id, display_name, avatar_url, role, created_at")
@@ -410,7 +410,11 @@ export async function listStudentsPerformanceAction(): Promise<{
       serviceSupabase.auth.admin.listUsers().catch(() => ({ data: { users: [] } })),
       serviceSupabase
         .from("forest_entries")
-        .select("user_id, tree_status, created_at, earned_at, duration_minutes, tree_species"),
+        .select("id, user_id, tree_status, created_at, earned_at, tree_species, session:focus_sessions(actual_duration_seconds, target_duration_seconds)"),
+      serviceSupabase
+        .from("focus_sessions")
+        .select("user_id, actual_duration_seconds, target_duration_seconds, status, started_at, completed_at")
+        .eq("status", "completed"),
       serviceSupabase
         .from("revision_progress")
         .select("user_id, status, updated_at"),
@@ -433,6 +437,15 @@ export async function listStudentsPerformanceAction(): Promise<{
         const arr = dbTreesByUser.get(t.user_id) || [];
         arr.push(t);
         dbTreesByUser.set(t.user_id, arr);
+      });
+    }
+
+    const sessionsByUser = new Map<string, any[]>();
+    if (sessionsRes?.data && Array.isArray(sessionsRes.data)) {
+      sessionsRes.data.forEach((s: any) => {
+        const arr = sessionsByUser.get(s.user_id) || [];
+        arr.push(s);
+        sessionsByUser.set(s.user_id, arr);
       });
     }
 
@@ -495,7 +508,15 @@ export async function listStudentsPerformanceAction(): Promise<{
           const sec =
             t.session?.actual_duration_seconds ??
             t.session?.target_duration_seconds ??
-            (t.duration_minutes ? t.duration_minutes * 60 : 1500);
+            1500;
+          return acc + (typeof sec === "number" && sec > 0 ? sec : 1500);
+        }, 0) / 60
+      );
+
+      const userSessions = sessionsByUser.get(p.id) || [];
+      const sessionMinutes = Math.floor(
+        userSessions.reduce((acc: number, s: any) => {
+          const sec = s.actual_duration_seconds ?? s.target_duration_seconds ?? 1500;
           return acc + (typeof sec === "number" && sec > 0 ? sec : 1500);
         }, 0) / 60
       );
@@ -525,6 +546,16 @@ export async function listStudentsPerformanceAction(): Promise<{
         }
       });
 
+      // Add focus sessions dates
+      userSessions.forEach((s: any) => {
+        const raw = s.completed_at || s.started_at;
+        if (!raw) return;
+        const d = new Date(raw);
+        if (!isNaN(d.getTime())) {
+          activeDatesSet.add(d.toISOString().split("T")[0]);
+        }
+      });
+
       // Add revisions and quizzes active dates
       const revs = revsByUser.get(p.id) || [];
       revs.forEach((r: any) => {
@@ -542,7 +573,7 @@ export async function listStudentsPerformanceAction(): Promise<{
         }
       });
 
-      const totalMinutes = Math.max(healthyMinutes, dbDailyMinutes);
+      const totalMinutes = Math.max(healthyMinutes, sessionMinutes, dbDailyMinutes);
 
       // Streak calculation
       const activeDates = Array.from(activeDatesSet).sort().reverse();
