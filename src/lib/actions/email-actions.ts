@@ -54,16 +54,107 @@ export async function getBroadcastSettingsSummary(): Promise<BroadcastSummary> {
   };
 }
 
+import { getDistributedJson, setDistributedJson } from "@/lib/kv/redis";
+
+export interface CustomEmailTemplate {
+  subject: string;
+  html: string;
+  text?: string;
+  updatedAt?: string;
+}
+
+export async function getCustomEmailTemplateAction(): Promise<CustomEmailTemplate | null> {
+  const adminCheck = await assertAdmin();
+  if (!adminCheck.authorized) return null;
+
+  try {
+    const saved = await getDistributedJson<CustomEmailTemplate>("global:custom_email_broadcast_template");
+    if (saved && saved.html) return saved;
+  } catch {}
+
+  return null;
+}
+
+export async function saveCustomEmailTemplateAction(data: {
+  subject: string;
+  html: string;
+  text?: string;
+}): Promise<{ success: boolean; error?: string }> {
+  const adminCheck = await assertAdmin();
+  if (!adminCheck.authorized) {
+    return { success: false, error: "Privilèges administrateur requis." };
+  }
+
+  try {
+    const template: CustomEmailTemplate = {
+      subject: data.subject.trim() || "Validily IGL4 — Annonce Officielle",
+      html: data.html.trim(),
+      text: data.text?.trim() || data.html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim(),
+      updatedAt: new Date().toISOString(),
+    };
+    await setDistributedJson("global:custom_email_broadcast_template", template);
+    return { success: true };
+  } catch (e: any) {
+    return { success: false, error: e.message };
+  }
+}
+
+export async function resetCustomEmailTemplateAction(): Promise<{
+  success: boolean;
+  defaultTemplate: { subject: string; html: string; text: string };
+}> {
+  const adminCheck = await assertAdmin();
+  const defaultTemplate = generateReleaseEmailHtml({
+    releaseVersion: "v1.1",
+    releaseDate: "Octobre 2026",
+    siteUrl: process.env.NEXT_PUBLIC_SITE_URL || "https://validily.vercel.app",
+  });
+
+  if (!adminCheck.authorized) {
+    return { success: false, defaultTemplate };
+  }
+
+  try {
+    await setDistributedJson("global:custom_email_broadcast_template", null);
+  } catch {}
+
+  return { success: true, defaultTemplate };
+}
+
 export async function getReleaseEmailPreviewAction(version: string = "v1.1") {
-  return generateReleaseEmailHtml({
+  // Check if admin has saved a custom HTML template in distributed Redis
+  try {
+    const custom = await getDistributedJson<CustomEmailTemplate>("global:custom_email_broadcast_template");
+    if (custom && custom.html) {
+      return {
+        subject: custom.subject,
+        html: custom.html,
+        text: custom.text || custom.html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim(),
+        isCustom: true,
+      };
+    }
+  } catch {}
+
+  const standard = generateReleaseEmailHtml({
     releaseVersion: version,
     releaseDate: "Octobre 2026",
     siteUrl: process.env.NEXT_PUBLIC_SITE_URL || "https://validily.vercel.app",
   });
+
+  return {
+    ...standard,
+    isCustom: false,
+  };
 }
 
 export async function executeReleaseEmailBroadcastAction(
-  params: { dryRun?: boolean; targetVersion?: string } = {}
+  params: {
+    dryRun?: boolean;
+    targetVersion?: string;
+    customSubject?: string;
+    customHtml?: string;
+    customText?: string;
+  } = {}
 ): Promise<{ success: boolean; result?: SendMailResult; error?: string }> {
   try {
     const adminCheck = await assertAdmin();
@@ -106,10 +197,33 @@ export async function executeReleaseEmailBroadcastAction(
       recipientEmails = ["etudiant.igl4@university.tn", "delegate.igl4@university.tn"];
     }
 
-    const { subject, html, text } = generateReleaseEmailHtml({
-      releaseVersion: params.targetVersion || "v1.1",
-      releaseDate: "Octobre 2026",
-    });
+    let subject: string;
+    let html: string;
+    let text: string;
+
+    if (params.customHtml && params.customHtml.trim().length > 10) {
+      html = params.customHtml.trim();
+      subject = params.customSubject?.trim() || "Validily IGL4 — Annonce Officielle";
+      text =
+        params.customText?.trim() ||
+        html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    } else {
+      // Check if custom template is saved
+      const saved = await getDistributedJson<CustomEmailTemplate>("global:custom_email_broadcast_template");
+      if (saved && saved.html) {
+        html = saved.html;
+        subject = params.customSubject?.trim() || saved.subject;
+        text = saved.text || html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+      } else {
+        const generated = generateReleaseEmailHtml({
+          releaseVersion: params.targetVersion || "v1.1",
+          releaseDate: "Octobre 2026",
+        });
+        subject = params.customSubject?.trim() || generated.subject;
+        html = generated.html;
+        text = generated.text;
+      }
+    }
 
     const client = new SmtpClient();
     const result = await client.send({
@@ -129,6 +243,8 @@ export async function executeReleaseEmailBroadcastAction(
         recipientsCount: result.recipientsCount,
         isDryRun: result.isDryRun,
         messageId: result.messageId,
+        subject,
+        isCustomHtml: Boolean(params.customHtml),
       },
     });
 
