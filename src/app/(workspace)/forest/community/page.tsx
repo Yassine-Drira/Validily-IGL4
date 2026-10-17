@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
-import { getCommunityForests, sendClassmateCheer } from "@/lib/actions/forest-actions";
+import { getCommunityForests, getMyForest, sendClassmateCheer } from "@/lib/actions/forest-actions";
 import { MemberForestSummary, ForestEntry } from "@/types/database";
 import { TreeSvg, SPECIES_METADATA } from "@/components/forest/tree-models";
 import { ForestCanvas } from "@/components/forest/forest-canvas";
@@ -29,6 +29,8 @@ export default function CommunityForestPage() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [selectedMember, setSelectedMember] = useState<MemberForestSummary | null>(null);
+  const [peerTrees, setPeerTrees] = useState<ForestEntry[] | null>(null);
+  const [isLoadingPeer, setIsLoadingPeer] = useState<boolean>(false);
   const [cheerFeedback, setCheerFeedback] = useState<string>("");
   const [isCheering, setIsCheering] = useState<boolean>(false);
 
@@ -38,7 +40,7 @@ export default function CommunityForestPage() {
       const res = await getCommunityForests();
       if (Array.isArray(res)) {
         setMembers(res);
-        setIsAuthenticated(res.length > 0 || true);
+        setIsAuthenticated(res.length > 0);
       }
     } catch {
       // Local fallback
@@ -50,6 +52,31 @@ export default function CommunityForestPage() {
   useEffect(() => {
     fetchMembers();
   }, []);
+
+  useEffect(() => {
+    if (!selectedMember) {
+      setPeerTrees(null);
+      return;
+    }
+    let cancelled = false;
+    setIsLoadingPeer(true);
+    getMyForest(selectedMember.userId)
+      .then((res) => {
+        if (!cancelled && res?.trees && res.trees.length > 0) {
+          setPeerTrees(res.trees);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setPeerTrees(null);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingPeer(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedMember]);
 
   const handleSendCheer = async (type: "water" | "clap" | "fire" | "muscle") => {
     if (!selectedMember || isCheering) return;
@@ -119,6 +146,8 @@ export default function CommunityForestPage() {
     return entries;
   }, [selectedMember]);
 
+  const activePeerEntries = peerTrees && peerTrees.length > 0 ? peerTrees : peerPreviewEntries;
+
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-12 animate-in fade-in duration-300">
       {/* Header */}
@@ -164,29 +193,29 @@ export default function CommunityForestPage() {
       {/* Peer Grove Modal when a member is selected */}
       {selectedMember && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200"
+          className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-6 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200"
           onClick={() => setSelectedMember(null)}
         >
           <div
-            className="bg-white border border-[#E4E8F0] rounded-3xl max-w-4xl w-full max-h-[92vh] overflow-y-auto shadow-2xl p-6 space-y-4 relative"
+            className="bg-white border border-[#E4E8F0] rounded-3xl max-w-4xl w-full max-h-[94vh] sm:max-h-[92vh] overflow-y-auto shadow-2xl p-4 sm:p-6 space-y-3.5 sm:space-y-4 relative scrollbar-thin"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b border-[#E4E8F0] pb-3">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold text-sm border border-emerald-200">
+              <div className="flex items-center space-x-2.5 sm:space-x-3">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold text-xs sm:text-sm border border-emerald-200 shrink-0">
                   {selectedMember.displayName.slice(0, 2).toUpperCase()}
                 </div>
-                <div>
-                  <h3 className="text-base font-bold text-[#111A2E]">
+                <div className="min-w-0">
+                  <h3 className="text-sm sm:text-base font-bold text-[#111A2E] truncate">
                     Bosquet de {selectedMember.displayName}
                   </h3>
-                  <div className="flex items-center space-x-3 text-xs text-[#68748A] font-mono">
+                  <div className="flex items-center space-x-2 sm:space-x-3 text-[11px] sm:text-xs text-[#68748A] font-mono">
                     <span className="text-emerald-700 font-semibold">
-                      {selectedMember.healthyTreeCount} arbres sains
+                      {selectedMember.healthyTreeCount} arbres
                     </span>
                     <span>•</span>
                     <span className="text-[#2855D9] font-semibold">
-                      {Math.round(selectedMember.totalFocusedMinutes / 60)}h concentrées
+                      {Math.round(selectedMember.totalFocusedMinutes / 60)}h focus
                     </span>
                   </div>
                 </div>
@@ -195,26 +224,26 @@ export default function CommunityForestPage() {
               <button
                 type="button"
                 onClick={() => setSelectedMember(null)}
-                className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-[#F4F6FA] hover:bg-[#E4E8F0] text-[#182235] transition-colors cursor-pointer"
+                className="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold bg-[#F4F6FA] hover:bg-[#E4E8F0] text-[#182235] transition-colors cursor-pointer shrink-0"
               >
                 Fermer
               </button>
             </div>
 
             {/* Read-only interactive landscape */}
-            <ForestCanvas entries={peerPreviewEntries} readOnly={true} />
+            <ForestCanvas entries={activePeerEntries} readOnly={true} />
 
             {/* Encouragement & Cheers Interaction Toolbar */}
-            <div className="p-4 bg-gradient-to-r from-emerald-50/70 via-teal-50/60 to-blue-50/70 rounded-2xl border border-emerald-200/80 space-y-2.5">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="p-3 sm:p-4 bg-gradient-to-r from-emerald-50/70 via-teal-50/60 to-blue-50/70 rounded-2xl border border-emerald-200/80 space-y-2.5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-2">
                 <div className="flex items-center space-x-2">
-                  <Sparkles className="w-4 h-4 text-emerald-600" />
-                  <span className="text-xs font-bold text-[#111A2E]">
-                    Envoyer un encouragement à {selectedMember.displayName} :
+                  <Sparkles className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span className="text-xs font-bold text-[#111A2E] truncate">
+                    Encourager {selectedMember.displayName} :
                   </span>
                 </div>
                 {cheerFeedback && (
-                  <span className="text-xs font-bold text-emerald-700 bg-white px-2.5 py-1 rounded-lg border border-emerald-200 shadow-2xs animate-in fade-in">
+                  <span className="text-xs font-bold text-emerald-700 bg-white px-2.5 py-1 rounded-lg border border-emerald-200 shadow-2xs animate-in fade-in self-start sm:self-auto">
                     {cheerFeedback}
                   </span>
                 )}
@@ -225,17 +254,17 @@ export default function CommunityForestPage() {
                   type="button"
                   disabled={isCheering}
                   onClick={() => handleSendCheer("water")}
-                  className="px-3 py-2 rounded-xl text-xs font-semibold bg-white border border-emerald-200 hover:bg-emerald-50 text-emerald-800 flex items-center justify-center space-x-1.5 transition-all shadow-2xs hover:shadow-xs cursor-pointer disabled:opacity-50"
+                  className="px-2.5 sm:px-3 py-2 rounded-xl text-xs font-semibold bg-white border border-emerald-200 hover:bg-emerald-50 text-emerald-800 flex items-center justify-center space-x-1 sm:space-x-1.5 transition-all shadow-2xs hover:shadow-xs cursor-pointer disabled:opacity-50"
                   title="Arroser son bosquet pour soutenir ses efforts"
                 >
                   <span className="text-sm">💧</span>
-                  <span>Arroser le bosquet</span>
+                  <span>Arroser<span className="hidden sm:inline">&nbsp;le bosquet</span></span>
                 </button>
                 <button
                   type="button"
                   disabled={isCheering}
                   onClick={() => handleSendCheer("clap")}
-                  className="px-3 py-2 rounded-xl text-xs font-semibold bg-white border border-blue-200 hover:bg-blue-50 text-blue-800 flex items-center justify-center space-x-1.5 transition-all shadow-2xs hover:shadow-xs cursor-pointer disabled:opacity-50"
+                  className="px-2.5 sm:px-3 py-2 rounded-xl text-xs font-semibold bg-white border border-blue-200 hover:bg-blue-50 text-blue-800 flex items-center justify-center space-x-1 sm:space-x-1.5 transition-all shadow-2xs hover:shadow-xs cursor-pointer disabled:opacity-50"
                   title="Féliciter pour les sessions accomplies"
                 >
                   <span className="text-sm">👏</span>
@@ -245,21 +274,21 @@ export default function CommunityForestPage() {
                   type="button"
                   disabled={isCheering}
                   onClick={() => handleSendCheer("fire")}
-                  className="px-3 py-2 rounded-xl text-xs font-semibold bg-white border border-amber-200 hover:bg-amber-50 text-amber-800 flex items-center justify-center space-x-1.5 transition-all shadow-2xs hover:shadow-xs cursor-pointer disabled:opacity-50"
+                  className="px-2.5 sm:px-3 py-2 rounded-xl text-xs font-semibold bg-white border border-amber-200 hover:bg-amber-50 text-amber-800 flex items-center justify-center space-x-1 sm:space-x-1.5 transition-all shadow-2xs hover:shadow-xs cursor-pointer disabled:opacity-50"
                   title="Saluer l'assiduité d'étude"
                 >
                   <span className="text-sm">🔥</span>
-                  <span>Assiduité au top</span>
+                  <span>Assiduité<span className="hidden sm:inline">&nbsp;au top</span></span>
                 </button>
                 <button
                   type="button"
                   disabled={isCheering}
                   onClick={() => handleSendCheer("muscle")}
-                  className="px-3 py-2 rounded-xl text-xs font-semibold bg-white border border-purple-200 hover:bg-purple-50 text-purple-800 flex items-center justify-center space-x-1.5 transition-all shadow-2xs hover:shadow-xs cursor-pointer disabled:opacity-50"
+                  className="px-2.5 sm:px-3 py-2 rounded-xl text-xs font-semibold bg-white border border-purple-200 hover:bg-purple-50 text-purple-800 flex items-center justify-center space-x-1 sm:space-x-1.5 transition-all shadow-2xs hover:shadow-xs cursor-pointer disabled:opacity-50"
                   title="Envoyer de la force pour les révisions"
                 >
                   <span className="text-sm">💪</span>
-                  <span>Force & Révisions</span>
+                  <span>Force<span className="hidden sm:inline">&nbsp;& Révisions</span></span>
                 </button>
               </div>
             </div>
@@ -302,15 +331,40 @@ export default function CommunityForestPage() {
 
       {/* Members Forest Grid */}
       {filteredMembers.length === 0 ? (
-        <div className="text-center py-16 bg-white rounded-3xl border border-[#E4E8F0] p-8 space-y-3 shadow-2xs">
-          <Compass className="w-10 h-10 text-[#68748A] mx-auto opacity-50" />
-          <h3 className="text-sm font-bold text-[#111A2E]">
-            Aucun bosquet trouvé
-          </h3>
-          <p className="text-xs text-[#68748A] max-w-sm mx-auto">
-            Invitez vos camarades à valider leur première session de concentration dans leur Bosquet Focus.
-          </p>
-        </div>
+        !isAuthenticated ? (
+          <div className="text-center py-16 bg-white rounded-3xl border border-[#E4E8F0] p-8 space-y-4 shadow-2xs">
+            <Lock className="w-10 h-10 text-[#2855D9] mx-auto opacity-75" />
+            <div className="space-y-1">
+              <h3 className="text-sm font-bold text-[#111A2E]">
+                Galerie réservée aux membres de la promo IGL4
+              </h3>
+              <p className="text-xs text-[#68748A] max-w-md mx-auto">
+                Par respect pour la vie privée, les bosquets partagés sont réservés aux étudiants authentifiés. Connectez-vous pour célébrer les efforts de vos camarades !
+              </p>
+            </div>
+            <div>
+              <Link
+                href="/login?next=/forest/community"
+                className="inline-flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-[#2855D9] text-white text-xs font-semibold hover:bg-[#1E43B2] transition-colors shadow-2xs cursor-pointer"
+              >
+                <span>Se connecter pour voir les bosquets</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+          </div>
+        ) : (
+          <div className="text-center py-16 bg-white rounded-3xl border border-[#E4E8F0] p-8 space-y-3 shadow-2xs">
+            <Compass className="w-10 h-10 text-[#68748A] mx-auto opacity-50" />
+            <h3 className="text-sm font-bold text-[#111A2E]">
+              {searchQuery ? `Aucun camarade trouvé pour "${searchQuery}"` : "Aucun bosquet trouvé"}
+            </h3>
+            <p className="text-xs text-[#68748A] max-w-sm mx-auto">
+              {searchQuery
+                ? "Vérifiez l'orthographe du prénom ou du nom de votre camarade."
+                : "Invitez vos camarades à valider leur première session de concentration dans leur Bosquet Focus."}
+            </p>
+          </div>
+        )
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredMembers.map((member) => {

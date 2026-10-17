@@ -18,14 +18,14 @@ async function seed() {
     {
       id: "11111111-1111-1111-1111-111111111111",
       name: "Semester 1",
-      academic_year: "2024-2025",
+      academic_year: "2026-2027",
       sort_order: 1,
       is_active: true,
     },
     {
       id: "22222222-2222-2222-2222-222222222222",
       name: "Semester 2",
-      academic_year: "2024-2025",
+      academic_year: "2026-2027",
       sort_order: 2,
       is_active: true,
     },

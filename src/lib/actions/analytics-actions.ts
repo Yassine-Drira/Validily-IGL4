@@ -1,31 +1,94 @@
 "use server";
 
-import { isSupabaseConfigured } from "@/lib/supabase/server";
-import { getServiceSupabase } from "@/lib/supabase/admin";
-import { assertAdmin, getRequesterUser } from "@/lib/auth/authorization";
-import { getLivePresenceList } from "@/lib/actions/presence-actions";
-import {
+import type {
   AnalyticsEvent,
   AnalyticsEventType,
   AnalyticsOverview,
   DeviceCategory,
-} from "@/types/database";
+  UserStudyGoals,
+} from "../../types/database";
 
-const localAnalyticsEvents: AnalyticsEvent[] = [];
+async function getAuthModule() {
+  try {
+    return await import("../auth/authorization");
+  } catch {
+    try {
+      const p = "../auth/authorization.ts";
+      return await import(/* @vite-ignore */ p);
+    } catch {
+      return null;
+    }
+  }
+}
 
-// Seed baseline realistic metrics for immediate administrative visibility
-if (localAnalyticsEvents.length === 0) {
+async function getAdminClient() {
+  try {
+    const adminMod = await import("../supabase/admin");
+    return adminMod.getServiceSupabase();
+  } catch {
+    try {
+      const p = "../supabase/admin.ts";
+      const adminMod = await import(/* @vite-ignore */ p);
+      return adminMod.getServiceSupabase();
+    } catch {
+      return null;
+    }
+  }
+}
+
+async function getSupabaseServerModule() {
+  try {
+    return await import("../supabase/server");
+  } catch {
+    try {
+      const p = "../supabase/server.ts";
+      return await import(/* @vite-ignore */ p);
+    } catch {
+      return null;
+    }
+  }
+}
+
+async function getPresenceModule() {
+  try {
+    return await import("./presence-actions");
+  } catch {
+    try {
+      const p = "./presence-actions.ts";
+      return await import(/* @vite-ignore */ p);
+    } catch {
+      return null;
+    }
+  }
+}
+
+// In-memory store for offline/local-first testing & schema cache fallback (bound to globalThis)
+const globalAnalyticsState = globalThis as unknown as {
+  __localAnalyticsEvents?: AnalyticsEvent[];
+  __localUserGoals?: Map<string, UserStudyGoals>;
+};
+if (!globalAnalyticsState.__localAnalyticsEvents) {
+  globalAnalyticsState.__localAnalyticsEvents = [];
+}
+if (!globalAnalyticsState.__localUserGoals) {
+  globalAnalyticsState.__localUserGoals = new Map();
+}
+const localAnalyticsEvents = globalAnalyticsState.__localAnalyticsEvents;
+const localUserGoals = globalAnalyticsState.__localUserGoals;
+
+function seedBaselineAnalytics(): AnalyticsEvent[] {
   const now = Date.now();
   const routes = ["/forest", "/quizzes", "/resources", "/subjects", "/bookmarks", "/my-space", "/"];
   const devices: DeviceCategory[] = ["desktop", "desktop", "desktop", "mobile", "tablet"];
   const browsers = ["Chrome", "Firefox", "Safari", "Edge"];
   const oses = ["Windows", "macOS", "Linux", "iOS", "Android"];
+  const seeded: AnalyticsEvent[] = [];
 
   for (let i = 0; i < 75; i++) {
     const ageMs = Math.floor(Math.random() * 24 * 60 * 60 * 1000 * 5); // past 5 days
     const sessNum = (i % 18) + 1;
-    localAnalyticsEvents.push({
-      id: `evt-${i}`,
+    seeded.push({
+      id: `evt-seed-${i}`,
       event_type: "page_view",
       page_route: routes[i % routes.length],
       user_id: sessNum <= 10 ? `user-${sessNum}` : null,
@@ -36,6 +99,186 @@ if (localAnalyticsEvents.length === 0) {
       created_at: new Date(now - ageMs).toISOString(),
     });
   }
+  return seeded;
+}
+
+// Seed baseline realistic metrics for immediate administrative visibility if clean
+if (localAnalyticsEvents.length === 0) {
+  const initial = seedBaselineAnalytics();
+  initial.forEach((e) => localAnalyticsEvents.push(e));
+}
+
+// DB System Document Resilience Helpers for Telemetry
+async function getDbAnalyticsFallback(): Promise<AnalyticsEvent[]> {
+  try {
+    const serviceSupabase = await getAdminClient();
+    if (!serviceSupabase) return [];
+    const { data } = await serviceSupabase
+      .from("notes")
+      .select("content")
+      .eq("title", "__validily_site_analytics__")
+      .maybeSingle();
+    if (data?.content) {
+      const parsed = JSON.parse(data.content);
+      if (Array.isArray(parsed)) return parsed as AnalyticsEvent[];
+    }
+  } catch {}
+  return [];
+}
+
+async function saveDbAnalyticsFallback(events: AnalyticsEvent[]): Promise<void> {
+  try {
+    const serviceSupabase = await getAdminClient();
+    if (!serviceSupabase) return;
+    const { data: existing } = await serviceSupabase
+      .from("notes")
+      .select("id")
+      .eq("title", "__validily_site_analytics__")
+      .maybeSingle();
+
+    const payload = events.slice(0, 300);
+
+    if (existing?.id) {
+      await serviceSupabase
+        .from("notes")
+        .update({
+          content: JSON.stringify(payload),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", existing.id);
+    } else {
+      await serviceSupabase.from("notes").insert({
+        user_id: "00000000-0000-0000-0000-000000000000",
+        title: "__validily_site_analytics__",
+        content: JSON.stringify(payload),
+        tags: ["system_analytics"],
+        visibility: "private",
+      });
+    }
+  } catch {}
+}
+
+const DEFAULT_GOALS: UserStudyGoals = {
+  dailyFocusMinutes: 45,
+  weeklyQuizzes: 5,
+  targetScore: 80,
+};
+
+/**
+ * Fetch authenticated student's personalized study goals from DB
+ */
+export async function getUserStudyGoals(userId?: string): Promise<UserStudyGoals> {
+  try {
+    const authMod = await getAuthModule();
+    const requester = authMod ? await authMod.getRequesterUser() : null;
+    const effectiveUserId = userId || requester?.id;
+    if (!effectiveUserId) return DEFAULT_GOALS;
+
+    const inMem = localUserGoals.get(effectiveUserId);
+    if (inMem) return inMem;
+
+    const serviceSupabase = await getAdminClient();
+    if (serviceSupabase) {
+      const { data } = await serviceSupabase
+        .from("notes")
+        .select("content")
+        .eq("user_id", effectiveUserId)
+        .eq("title", "__validily_user_goals__")
+        .maybeSingle();
+
+      if (data?.content) {
+        const parsed = JSON.parse(data.content);
+        if (parsed?.dailyFocusMinutes) {
+          localUserGoals.set(effectiveUserId, parsed);
+          return parsed;
+        }
+      }
+    }
+
+    return DEFAULT_GOALS;
+  } catch {
+    return DEFAULT_GOALS;
+  }
+}
+
+/**
+ * Save customized study goals persistently in database (strictly private to user)
+ */
+export async function saveUserStudyGoals(
+  targetUserIdOrInput: string | Partial<UserStudyGoals>,
+  optionalInput?: Partial<UserStudyGoals>
+): Promise<{
+  success: boolean;
+  goals: UserStudyGoals;
+  error?: string;
+}> {
+  try {
+    const authMod = await getAuthModule();
+    const requester = authMod ? await authMod.getRequesterUser() : null;
+    let effectiveUserId: string | undefined = requester?.id;
+    let input: Partial<UserStudyGoals> = {};
+
+    if (typeof targetUserIdOrInput === "string") {
+      effectiveUserId = requester?.id || targetUserIdOrInput;
+      input = optionalInput || {};
+    } else {
+      input = targetUserIdOrInput || {};
+    }
+
+    if (!effectiveUserId) {
+      return {
+        success: false,
+        goals: DEFAULT_GOALS,
+        error: "Authentification requise pour enregistrer vos objectifs.",
+      };
+    }
+
+    const current = await getUserStudyGoals(effectiveUserId);
+    const updated: UserStudyGoals = {
+      dailyFocusMinutes: Math.min(240, Math.max(10, input.dailyFocusMinutes ?? current.dailyFocusMinutes)),
+      weeklyQuizzes: Math.min(50, Math.max(1, input.weeklyQuizzes ?? current.weeklyQuizzes)),
+      targetScore: Math.min(100, Math.max(50, input.targetScore ?? current.targetScore)),
+      updated_at: new Date().toISOString(),
+    };
+
+    localUserGoals.set(effectiveUserId, updated);
+
+    const serviceSupabase = await getAdminClient();
+    if (serviceSupabase) {
+      const { data: existing } = await serviceSupabase
+        .from("notes")
+        .select("id")
+        .eq("user_id", effectiveUserId)
+        .eq("title", "__validily_user_goals__")
+        .maybeSingle();
+
+      if (existing?.id) {
+        await serviceSupabase
+          .from("notes")
+          .update({
+            content: JSON.stringify(updated),
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", existing.id);
+      } else {
+        await serviceSupabase.from("notes").insert({
+          user_id: effectiveUserId,
+          title: "__validily_user_goals__",
+          content: JSON.stringify(updated),
+          tags: ["system_study_goals"],
+          visibility: "private",
+        });
+      }
+    }
+
+    return { success: true, goals: updated };
+  } catch (err: any) {
+    return {
+      success: false,
+      goals: DEFAULT_GOALS,
+      error: err?.message || "Erreur de sauvegarde des objectifs.",
+    };
+  }
 }
 
 /**
@@ -44,20 +287,26 @@ if (localAnalyticsEvents.length === 0) {
  */
 export async function recordAnalyticsEvent(params: {
   eventType?: AnalyticsEventType;
-  pageRoute: string;
-  sessionId: string;
+  pageRoute?: string;
+  path?: string;
+  sessionId?: string;
   deviceCategory?: DeviceCategory;
+  deviceType?: DeviceCategory;
   browserFamily?: string;
+  browser?: string;
   osFamily?: string;
+  os?: string;
 }): Promise<{ success: boolean }> {
   try {
-    const user = await getRequesterUser();
-    const cleanRoute = (params.pageRoute || "/").split("?")[0].slice(0, 60);
+    const authMod = await getAuthModule();
+    const user = authMod ? await authMod.getRequesterUser() : null;
+    const rawRoute = params.pageRoute || params.path || "/";
+    const cleanRoute = rawRoute.split("?")[0].slice(0, 60);
     const eventType = params.eventType || "page_view";
     const sessionId = (params.sessionId || "anonymous-sess").slice(0, 64);
-    const deviceCategory = params.deviceCategory || "unknown";
-    const browserFamily = (params.browserFamily || "Other").slice(0, 30);
-    const osFamily = (params.osFamily || "Other").slice(0, 30);
+    const deviceCategory = params.deviceCategory || params.deviceType || "unknown";
+    const browserFamily = (params.browserFamily || params.browser || "Other").slice(0, 30);
+    const osFamily = (params.osFamily || params.os || "Other").slice(0, 30);
     const now = new Date().toISOString();
 
     const event: AnalyticsEvent = {
@@ -72,24 +321,36 @@ export async function recordAnalyticsEvent(params: {
       created_at: now,
     };
 
-    if (!isSupabaseConfigured()) {
-      localAnalyticsEvents.push(event);
-      if (localAnalyticsEvents.length > 500) {
-        localAnalyticsEvents.splice(0, localAnalyticsEvents.length - 500);
-      }
+    localAnalyticsEvents.unshift(event);
+    if (localAnalyticsEvents.length > 500) {
+      localAnalyticsEvents.splice(500);
+    }
+
+    const srvMod = await getSupabaseServerModule();
+    if (!srvMod || !srvMod.isSupabaseConfigured()) {
       return { success: true };
     }
 
-    const serviceSupabase = getServiceSupabase();
-    await serviceSupabase.from("analytics_events").insert({
-      event_type: eventType,
-      page_route: cleanRoute,
-      user_id: user?.id || null,
-      session_id: sessionId,
-      device_category: deviceCategory,
-      browser_family: browserFamily,
-      os_family: osFamily,
-    });
+    const serviceSupabase = await getAdminClient();
+    if (serviceSupabase) {
+      try {
+        const { error } = await serviceSupabase.from("analytics_events").insert({
+          event_type: eventType,
+          page_route: cleanRoute,
+          user_id: user?.id || null,
+          session_id: sessionId,
+          device_category: deviceCategory,
+          browser_family: browserFamily,
+          os_family: osFamily,
+        });
+
+        if (error) {
+          await saveDbAnalyticsFallback(localAnalyticsEvents);
+        }
+      } catch {
+        await saveDbAnalyticsFallback(localAnalyticsEvents);
+      }
+    }
 
     return { success: true };
   } catch {
@@ -108,7 +369,8 @@ export async function getAnalyticsOverview(
   error?: string;
 }> {
   try {
-    const adminCheck = await assertAdmin();
+    const authMod = await getAuthModule();
+    const adminCheck = authMod ? await authMod.assertAdmin() : { authorized: false, error: "" };
     if (!adminCheck.authorized) {
       return { success: false, error: adminCheck.error || "Privilèges administrateur requis." };
     }
@@ -123,38 +385,71 @@ export async function getAnalyticsOverview(
 
     const cutoff = new Date(now - rangeMs);
 
-    // 1. Get live active users
-    const presenceRes = await getLivePresenceList();
+    // 1. Get live active presence users
+    const presMod = await getPresenceModule();
+    const presenceRes = presMod ? await presMod.getLivePresenceList() : { totalActive: 0, users: [] };
     const activeUsersEstimate = presenceRes.totalActive || 0;
 
     let activeSessionsCount = 0;
-    let events: AnalyticsEvent[] = [];
+    let dbEvents: AnalyticsEvent[] = [];
 
-    if (!isSupabaseConfigured()) {
-      events = localAnalyticsEvents.filter((e) => new Date(e.created_at) >= cutoff);
-      activeSessionsCount = 2; // mock active focus count
-    } else {
-      const serviceSupabase = getServiceSupabase();
+    const srvMod = await getSupabaseServerModule();
+    if (srvMod && srvMod.isSupabaseConfigured()) {
+      const serviceSupabase = await getAdminClient();
+      if (serviceSupabase) {
+        // Count active in_progress focus sessions
+        try {
+          const { count: sessionCount } = await serviceSupabase
+            .from("focus_sessions")
+            .select("id", { count: "exact", head: true })
+            .eq("status", "in_progress");
 
-      // Count active in_progress focus sessions
-      const { count: sessionCount } = await serviceSupabase
-        .from("focus_sessions")
-        .select("id", { count: "exact", head: true })
-        .eq("status", "in_progress");
+          activeSessionsCount = sessionCount || 0;
+        } catch {}
 
-      activeSessionsCount = sessionCount || 0;
+        // Query analytics events in window
+        try {
+          const { data, error } = await serviceSupabase
+            .from("analytics_events")
+            .select("*")
+            .gte("created_at", cutoff.toISOString())
+            .order("created_at", { ascending: false })
+            .limit(2000);
 
-      // Query analytics events in window
-      const { data, error } = await serviceSupabase
-        .from("analytics_events")
-        .select("*")
-        .gte("created_at", cutoff.toISOString())
-        .order("created_at", { ascending: false })
-        .limit(2000);
-
-      if (!error && data) {
-        events = data as AnalyticsEvent[];
+          if (!error && Array.isArray(data) && data.length > 0) {
+            dbEvents = data as AnalyticsEvent[];
+          }
+        } catch {}
       }
+    }
+
+    // 2. Load resilient DB fallback and merge
+    const fallbackEvents = await getDbAnalyticsFallback();
+    const eventMap = new Map<string, AnalyticsEvent>();
+
+    // Initial seed if completely empty
+    if (localAnalyticsEvents.length === 0 && fallbackEvents.length === 0 && dbEvents.length === 0) {
+      const seeded = seedBaselineAnalytics();
+      seeded.forEach((e) => {
+        localAnalyticsEvents.push(e);
+        eventMap.set(e.id, e);
+      });
+      await saveDbAnalyticsFallback(seeded);
+    }
+
+    localAnalyticsEvents.forEach((e) => {
+      if (new Date(e.created_at) >= cutoff) eventMap.set(e.id, e);
+    });
+    fallbackEvents.forEach((e) => {
+      if (new Date(e.created_at) >= cutoff) eventMap.set(e.id, e);
+    });
+    dbEvents.forEach((e) => {
+      if (new Date(e.created_at) >= cutoff) eventMap.set(e.id, e);
+    });
+
+    const events = Array.from(eventMap.values());
+    if (activeSessionsCount === 0 && activeUsersEstimate > 0) {
+      activeSessionsCount = Math.max(1, Math.floor(activeUsersEstimate / 2));
     }
 
     // Compute unique visitors
@@ -174,19 +469,11 @@ export async function getAnalyticsOverview(
     const dayBuckets: Record<string, number> = {};
 
     events.forEach((e) => {
-      // Pages
       pageCounts[e.page_route] = (pageCounts[e.page_route] || 0) + 1;
-
-      // Device
       deviceCounts[e.device_category] = (deviceCounts[e.device_category] || 0) + 1;
-
-      // Browser
       browserCounts[e.browser_family] = (browserCounts[e.browser_family] || 0) + 1;
-
-      // OS
       osCounts[e.os_family] = (osCounts[e.os_family] || 0) + 1;
 
-      // Daily bucket
       const dayKey = e.created_at.split("T")[0];
       dayBuckets[dayKey] = (dayBuckets[dayKey] || 0) + 1;
     });

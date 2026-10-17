@@ -78,16 +78,16 @@ export function ForestInsights({
 
   if (isLoading && entries.length === 0) {
     return (
-      <div className={cn("grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4", className)}>
+      <div className={cn("grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4", className)}>
         {[0, 1, 2, 3].map((i) => (
           <div
             key={i}
-            className="bg-white p-4 rounded-3xl border border-[#E4E8F0] shadow-2xs flex items-center space-x-3.5 animate-pulse"
+            className="bg-white p-3 sm:p-4 rounded-2xl sm:rounded-3xl border border-[#E4E8F0] shadow-2xs flex items-center space-x-2.5 sm:space-x-3.5 animate-pulse"
           >
-            <div className="w-11 h-11 rounded-2xl bg-[#F1F5F9] shrink-0" />
-            <div className="space-y-2 flex-1">
-              <div className="h-2.5 bg-[#F1F5F9] rounded-full w-24" />
-              <div className="h-5 bg-[#F1F5F9] rounded-lg w-16" />
+            <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl bg-[#F1F5F9] shrink-0" />
+            <div className="space-y-1.5 sm:space-y-2 flex-1 min-w-0">
+              <div className="h-2 bg-[#F1F5F9] rounded-full w-16 sm:w-24" />
+              <div className="h-4 sm:h-5 bg-[#F1F5F9] rounded-lg w-12 sm:w-16" />
             </div>
           </div>
         ))}
@@ -96,38 +96,38 @@ export function ForestInsights({
   }
 
   return (
-    <div className={cn("grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4", className)}>
+    <div className={cn("grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4", className)}>
       {/* 1. Arbres Sains */}
-      <div className="bg-white p-4 rounded-3xl border border-[#E4E8F0] shadow-2xs flex items-center space-x-3.5">
-        <div className="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100 shrink-0">
-          <Trees className="w-5 h-5 text-emerald-600" />
+      <div className="bg-white p-3 sm:p-4 rounded-2xl sm:rounded-3xl border border-[#E4E8F0] shadow-2xs flex items-center space-x-2.5 sm:space-x-3.5 min-w-0">
+        <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100 shrink-0">
+          <Trees className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600" />
         </div>
-        <div>
-          <span className="text-[11px] font-medium text-[#68748A] block">
-            Arbres sains pérennes
+        <div className="min-w-0">
+          <span className="text-[10px] sm:text-[11px] font-medium text-[#68748A] block truncate">
+            Arbres sains
           </span>
-          <div className="flex items-baseline space-x-1.5 mt-0.5">
-            <span className="text-xl font-extrabold text-[#111A2E] font-mono font-tabular">
+          <div className="flex items-baseline space-x-1 sm:space-x-1.5 mt-0.5">
+            <span className="text-lg sm:text-xl font-extrabold text-[#111A2E] font-mono font-tabular">
               {stats.healthyCount}
             </span>
-            <span className="text-[10px] text-emerald-600 font-semibold font-mono">
-              {stats.successRate}% succès
+            <span className="text-[9px] sm:text-[10px] text-emerald-600 font-semibold font-mono">
+              {stats.successRate}%
             </span>
           </div>
         </div>
       </div>
 
       {/* 2. Temps Concentré */}
-      <div className="bg-white p-4 rounded-3xl border border-[#E4E8F0] shadow-2xs flex items-center space-x-3.5">
-        <div className="w-11 h-11 rounded-2xl bg-blue-50 text-[#2855D9] flex items-center justify-center border border-blue-100 shrink-0">
-          <Clock className="w-5 h-5 text-[#2855D9]" />
+      <div className="bg-white p-3 sm:p-4 rounded-2xl sm:rounded-3xl border border-[#E4E8F0] shadow-2xs flex items-center space-x-2.5 sm:space-x-3.5 min-w-0">
+        <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl bg-blue-50 text-[#2855D9] flex items-center justify-center border border-blue-100 shrink-0">
+          <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-[#2855D9]" />
         </div>
-        <div>
-          <span className="text-[11px] font-medium text-[#68748A] block">
-            Temps de focus cumulé
+        <div className="min-w-0">
+          <span className="text-[10px] sm:text-[11px] font-medium text-[#68748A] block truncate">
+            Temps de focus
           </span>
           <div className="flex items-baseline space-x-1 mt-0.5">
-            <span className="text-xl font-extrabold text-[#111A2E] font-mono font-tabular">
+            <span className="text-lg sm:text-xl font-extrabold text-[#111A2E] font-mono font-tabular">
               {stats.hours > 0 ? `${stats.hours}h ` : ""}{stats.minutes}m
             </span>
           </div>
@@ -135,42 +135,45 @@ export function ForestInsights({
       </div>
 
       {/* 3. Série Consécutive (Streak) */}
-      <div className="bg-white p-4 rounded-3xl border border-[#E4E8F0] shadow-2xs flex items-center space-x-3.5">
-        <div className="w-11 h-11 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center border border-amber-100 shrink-0">
-          <Flame className="w-5 h-5 text-amber-600 fill-amber-500/20" />
+      <div className="bg-white p-3 sm:p-4 rounded-2xl sm:rounded-3xl border border-[#E4E8F0] shadow-2xs flex items-center space-x-2.5 sm:space-x-3.5 min-w-0">
+        <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center border border-amber-100 shrink-0">
+          <Flame className="w-4 h-4 sm:w-5 sm:h-5 text-amber-600 fill-amber-500/20" />
         </div>
-        <div>
-          <span className="text-[11px] font-medium text-[#68748A] block">
+        <div className="min-w-0">
+          <span className="text-[10px] sm:text-[11px] font-medium text-[#68748A] block truncate">
             Série d&apos;assiduité
           </span>
           <div className="flex items-baseline space-x-1 mt-0.5">
-            <span className="text-xl font-extrabold text-[#111A2E] font-mono font-tabular">
+            <span className="text-lg sm:text-xl font-extrabold text-[#111A2E] font-mono font-tabular">
               {stats.streak}
             </span>
-            <span className="text-xs text-[#68748A] font-medium">jours consécutifs</span>
+            <span className="text-[10px] sm:text-xs text-[#68748A] font-medium truncate">
+              <span className="hidden sm:inline">jours de suite</span>
+              <span className="sm:hidden">jours</span>
+            </span>
           </div>
         </div>
       </div>
 
       {/* 4. Espèce Préférée */}
-      <div className="bg-white p-4 rounded-3xl border border-[#E4E8F0] shadow-2xs flex items-center space-x-3.5">
-        <div className="w-11 h-11 rounded-2xl bg-teal-50 text-teal-600 flex items-center justify-center border border-teal-100 shrink-0 overflow-hidden">
+      <div className="bg-white p-3 sm:p-4 rounded-2xl sm:rounded-3xl border border-[#E4E8F0] shadow-2xs flex items-center space-x-2.5 sm:space-x-3.5 min-w-0">
+        <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl bg-teal-50 text-teal-600 flex items-center justify-center border border-teal-100 shrink-0 overflow-hidden">
           <TreeSvg
             species={(stats.topSpecies as TreeSpecies) || "cedar"}
             status="healthy"
-            size={36}
+            size={32}
             showMound={false}
           />
         </div>
-        <div>
-          <span className="text-[11px] font-medium text-[#68748A] block">
-            Espèce de prédilection
+        <div className="min-w-0">
+          <span className="text-[10px] sm:text-[11px] font-medium text-[#68748A] block truncate">
+            Espèce favorite
           </span>
           <div className="flex items-baseline space-x-1 mt-0.5">
-            <span className="text-xs font-bold text-[#111A2E] truncate max-w-[120px]">
+            <span className="text-xs sm:text-sm font-bold text-[#111A2E] truncate">
               {(SPECIES_METADATA[(stats.topSpecies as TreeSpecies)] || SPECIES_METADATA.cedar).name.split(" ")[0]}
             </span>
-            <span className="text-[10px] text-[#68748A] font-mono">
+            <span className="text-[9px] sm:text-[10px] text-[#68748A] font-mono shrink-0">
               ({stats.topCount})
             </span>
           </div>

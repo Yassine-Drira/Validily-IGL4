@@ -9,6 +9,7 @@ export function FocusHeaderWidget() {
     mode,
     timeLeft,
     isRunning,
+    isPaused,
     toggleTimer,
     setIsModalOpen,
     soundscape,
@@ -23,16 +24,12 @@ export function FocusHeaderWidget() {
 
   return (
     <div className="flex items-center space-x-1.5 bg-[#F4F6FA] hover:bg-[#EEF2F6] border border-[#E4E8F0] rounded-xl p-1 transition-all">
-      {/* Quick Play or Hub Trigger Button (No pause during work mode) */}
+      {/* Quick Play/Pause or Hub Trigger Button */}
       <button
         type="button"
         onClick={(e) => {
           e.stopPropagation();
-          if (isRunning && !isBreak) {
-            setIsModalOpen(true);
-          } else {
-            toggleTimer();
-          }
+          toggleTimer();
         }}
         className={cn(
           "w-7 h-7 rounded-lg flex items-center justify-center transition-all cursor-pointer",
@@ -40,29 +37,27 @@ export function FocusHeaderWidget() {
             ? isBreak
               ? "bg-emerald-600 text-white shadow-xs"
               : "bg-[#2855D9] text-white shadow-xs"
+            : isPaused
+            ? "bg-amber-500 text-white shadow-xs"
             : "bg-white text-[#182235] hover:text-[#2855D9] shadow-2xs"
         )}
         aria-label={
           isRunning
-            ? isBreak
-              ? "Mettre en pause la pause"
-              : "Session de concentration active - Ouvrir le Focus Hub"
+            ? "Mettre en pause la session"
+            : isPaused
+            ? "Reprendre la session"
             : "Démarrer le Pomodoro"
         }
         title={
           isRunning
-            ? isBreak
-              ? "Mettre en pause"
-              : "Session de travail active (Pas de pause autorisée) - Ouvrir Focus Hub"
+            ? "Mettre en pause la session"
+            : isPaused
+            ? "Reprendre la session"
             : "Démarrer"
         }
       >
         {isRunning ? (
-          isBreak ? (
-            <Pause className="w-3.5 h-3.5 fill-current" />
-          ) : (
-            <Sparkles className="w-3.5 h-3.5 fill-current animate-pulse" />
-          )
+          <Pause className="w-3.5 h-3.5 fill-current" />
         ) : (
           <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
         )}
@@ -82,6 +77,8 @@ export function FocusHeaderWidget() {
               ? isBreak
                 ? "bg-emerald-500 animate-pulse"
                 : "bg-blue-600 animate-pulse"
+              : isPaused
+              ? "bg-amber-500 animate-pulse"
               : "bg-[#94A3B8]"
           )}
         />
@@ -91,16 +88,29 @@ export function FocusHeaderWidget() {
           <span
             className={cn(
               "flex items-center",
-              isSoundMuted ? "text-[#94A3B8]" : "text-[#2855D9] animate-pulse"
+              isSoundMuted || isPaused ? "text-[#94A3B8]" : "text-[#2855D9] animate-pulse"
             )}
-            title={isSoundMuted ? `Ambiance ${soundscape} en pause` : `Ambiance ${soundscape} active`}
+            title={
+              isSoundMuted
+                ? `Ambiance ${soundscape} en sourdine`
+                : isPaused
+                ? `Ambiance ${soundscape} en pause`
+                : `Ambiance ${soundscape} active`
+            }
           >
             <Headphones className="w-3 h-3 ml-0.5" />
           </span>
         )}
 
-        <span className="hidden lg:inline text-[10px] font-sans text-[#68748A] bg-white border border-[#E4E8F0] px-1.5 py-0.2 rounded-md font-medium">
-          {mode === "work" ? "Focus" : "Pause"}
+        <span
+          className={cn(
+            "hidden lg:inline text-[10px] font-sans border px-1.5 py-0.2 rounded-md font-medium",
+            isPaused
+              ? "bg-amber-50 text-amber-800 border-amber-200"
+              : "bg-white text-[#68748A] border-[#E4E8F0]"
+          )}
+        >
+          {isPaused ? "Pause" : mode === "work" ? "Focus" : "Pause"}
         </span>
       </button>
     </div>

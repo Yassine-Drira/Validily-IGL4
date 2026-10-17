@@ -189,6 +189,7 @@ export type TreeSpecies = "cedar" | "oak" | "pine" | "willow" | "jacaranda" | "s
 export type TreeStatus = "healthy" | "leafless";
 export type FocusSessionStatus =
   | "in_progress"
+  | "paused"
   | "completed"
   | "interrupted"
   | "cancelled"
@@ -209,6 +210,9 @@ export interface FocusSession {
   interrupted_at: string | null;
   interruption_reason: string | null;
   idempotency_key: string | null;
+  paused_at?: string | null;
+  total_paused_seconds?: number;
+  pause_count?: number;
   created_at: string;
   updated_at: string;
   subject?: Subject | null;
@@ -350,5 +354,12 @@ export interface AnalyticsOverview {
   deviceDistribution: Record<DeviceCategory, number>;
   browserDistribution: Record<string, number>;
   osDistribution: Record<string, number>;
+}
+
+export interface UserStudyGoals {
+  dailyFocusMinutes: number;
+  weeklyQuizzes: number;
+  targetScore: number;
+  updated_at?: string;
 }
 

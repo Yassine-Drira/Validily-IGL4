@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { getMyForest, updateForestPreferences } from "@/lib/actions/forest-actions";
 import { ForestEntry, ForestPreferences, ForestVisibility } from "@/types/database";
 import { ForestCanvas } from "@/components/forest/forest-canvas";
@@ -23,6 +24,7 @@ import {
 import { cn } from "@/lib/utils";
 
 export default function ForestPage() {
+  const router = useRouter();
   const { setIsModalOpen } = useFocusTimer();
 
   const [viewMode, setViewMode] = useState<"canvas" | "timeline">("canvas");
@@ -32,11 +34,39 @@ export default function ForestPage() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
   const [showPrivacyModal, setShowPrivacyModal] = useState<boolean>(false);
   const [selectedVisibility, setSelectedVisibility] = useState<ForestVisibility>("members");
-  const [isSavingPref, setIsSavingPref] = useState<boolean>(false);
 
   const fetchForest = async () => {
     setIsLoading(true);
     try {
+      // 1. Gather all client-cached trees (healthy and dead) for resilient instant display
+      const localClientTrees: ForestEntry[] = [];
+      try {
+        if (typeof window !== "undefined") {
+          for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (k && k.startsWith("validily_forest_trees_")) {
+              const raw = localStorage.getItem(k);
+              if (raw) {
+                const parsed = JSON.parse(raw);
+                if (Array.isArray(parsed)) {
+                  for (const item of parsed) {
+                    if (
+                      !localClientTrees.some(
+                        (t) =>
+                          t.id === item.id ||
+                          (t.session_id && item.session_id && t.session_id === item.session_id)
+                      )
+                    ) {
+                      localClientTrees.push(item);
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      } catch {}
+
       const res = await getMyForest();
       if (res) {
         setIsAuthenticated(res.authenticated);
@@ -44,13 +74,33 @@ export default function ForestPage() {
           window.location.href = "/login?next=/forest";
           return;
         }
-        if (res.trees) {
-          setEntries(res.trees || []);
+
+        const serverTrees = res.trees || [];
+        const mergedMap = new Map<string, ForestEntry>();
+
+        for (const t of serverTrees) {
+          mergedMap.set(t.id, t);
         }
+        for (const lt of localClientTrees) {
+          if (
+            !mergedMap.has(lt.id) &&
+            !Array.from(mergedMap.values()).some(
+              (st) => st.session_id && lt.session_id && st.session_id === lt.session_id
+            )
+          ) {
+            mergedMap.set(lt.id, lt);
+          }
+        }
+
+        const finalTrees = Array.from(mergedMap.values());
+        setEntries(finalTrees);
+
         if (res.preferences) {
           setPreferences(res.preferences);
           setSelectedVisibility(res.preferences.visibility);
         }
+      } else if (localClientTrees.length > 0) {
+        setEntries(localClientTrees);
       }
     } catch {
       // Local / Offline fallback
@@ -61,10 +111,20 @@ export default function ForestPage() {
 
   useEffect(() => {
     fetchForest();
+
+    const handleForestUpdate = () => {
+      fetchForest();
+    };
+
+    window.addEventListener("validily_forest_updated", handleForestUpdate);
+    window.addEventListener("storage", handleForestUpdate);
+    return () => {
+      window.removeEventListener("validily_forest_updated", handleForestUpdate);
+      window.removeEventListener("storage", handleForestUpdate);
+    };
   }, []);
 
   const handleSaveVisibility = async (vis: ForestVisibility) => {
-    setIsSavingPref(true);
     setSelectedVisibility(vis);
     try {
       await updateForestPreferences({ visibility: vis });
@@ -74,8 +134,6 @@ export default function ForestPage() {
       setShowPrivacyModal(false);
     } catch {
       // Handle error
-    } finally {
-      setIsSavingPref(false);
     }
   };
 
@@ -196,12 +254,12 @@ export default function ForestPage() {
         </div>
 
         {/* Action Header Buttons */}
-        <div className="flex items-center space-x-2.5 self-start sm:self-auto">
+        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap sm:space-x-2.5 self-start sm:self-auto w-full sm:w-auto">
           {/* Privacy Settings Button */}
           <button
             type="button"
             onClick={() => setShowPrivacyModal(true)}
-            className="px-3 py-2 rounded-xl text-xs font-semibold bg-white border border-[#E4E8F0] text-[#182235] hover:bg-[#F4F6FA] flex items-center space-x-1.5 transition-colors cursor-pointer"
+            className="flex-1 sm:flex-none px-2.5 sm:px-3 py-2 rounded-xl text-xs font-semibold bg-white border border-[#E4E8F0] text-[#182235] hover:bg-[#F4F6FA] flex items-center justify-center space-x-1.5 transition-colors cursor-pointer"
             title="Paramètres de visibilité du bosquet"
           >
             {preferences?.visibility === "private" ? (
@@ -211,29 +269,29 @@ export default function ForestPage() {
             ) : (
               <Users className="w-3.5 h-3.5 text-emerald-600" />
             )}
-            <span className="capitalize hidden sm:inline">
+            <span className="capitalize">
               {preferences?.visibility === "private"
                 ? "Privé"
                 : preferences?.visibility === "public"
                 ? "Public"
-                : "Membres IGL4"}
+                : "Membres"}
             </span>
           </button>
 
           {/* Peer Gallery Link */}
           <Link
             href="/forest/community"
-            className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-white border border-[#E4E8F0] text-[#182235] hover:bg-[#F4F6FA] flex items-center space-x-1.5 transition-colors"
+            className="flex-1 sm:flex-none px-2.5 sm:px-3.5 py-2 rounded-xl text-xs font-semibold bg-white border border-[#E4E8F0] text-[#182235] hover:bg-[#F4F6FA] flex items-center justify-center space-x-1.5 transition-colors whitespace-nowrap"
           >
             <Compass className="w-3.5 h-3.5 text-[#2855D9]" />
-            <span>Galerie de Promo</span>
+            <span>Galerie</span>
           </Link>
 
           {/* Launch Focus Timer */}
           <button
             type="button"
             onClick={() => setIsModalOpen(true)}
-            className="px-4 py-2 rounded-xl text-xs font-bold bg-[#2855D9] hover:bg-[#1E40AF] text-white flex items-center space-x-2 shadow-xs transition-all cursor-pointer transform hover:-translate-y-0.5"
+            className="w-full sm:w-auto px-4 py-2 rounded-xl text-xs font-bold bg-[#2855D9] hover:bg-[#1E40AF] text-white flex items-center justify-center space-x-2 shadow-xs transition-all cursor-pointer transform hover:-translate-y-0.5"
           >
             <Play className="w-3.5 h-3.5 fill-current" />
             <span>Lancer Focus</span>

@@ -24,11 +24,68 @@ function isTableMissingError(err: any): boolean {
     msg.includes("does not exist") ||
     msg.includes("could not find the table") ||
     err.code === "PGRST204" ||
+    err.code === "PGRST205" ||
     err.code === "42P01"
   );
 }
 
-const localCatalogMap: Map<string, AudioCatalogEntry> = new Map();
+const globalAudioState = globalThis as unknown as {
+  __localCatalogEntries?: Map<string, AudioCatalogEntry>;
+};
+if (!globalAudioState.__localCatalogEntries) {
+  globalAudioState.__localCatalogEntries = new Map();
+}
+const localCatalogMap = globalAudioState.__localCatalogEntries;
+
+// Supabase DB System Record Resilience Helpers (Guarantees catalog persistence across restarts)
+async function getDbCatalogFallback(): Promise<AudioCatalogEntry[]> {
+  try {
+    const serviceSupabase = getServiceSupabase();
+    if (!serviceSupabase) return [];
+    const { data } = await serviceSupabase
+      .from("notes")
+      .select("content")
+      .eq("title", "__validily_audio_catalog__")
+      .maybeSingle();
+    if (data?.content) {
+      const parsed = JSON.parse(data.content);
+      if (Array.isArray(parsed)) return parsed as AudioCatalogEntry[];
+    }
+  } catch {}
+  return [];
+}
+
+async function saveDbCatalogFallback(entries: AudioCatalogEntry[]): Promise<void> {
+  try {
+    const serviceSupabase = getServiceSupabase();
+    if (!serviceSupabase) return;
+    const { data: existing } = await serviceSupabase
+      .from("notes")
+      .select("id")
+      .eq("title", "__validily_audio_catalog__")
+      .maybeSingle();
+
+    if (existing?.id) {
+      await serviceSupabase
+        .from("notes")
+        .update({
+          content: JSON.stringify(entries),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", existing.id);
+    } else {
+      const user = await getRequesterUser();
+      const adminId = user?.id || "00000000-0000-0000-0000-000000000000";
+      await serviceSupabase.from("notes").insert({
+        user_id: adminId,
+        title: "__validily_audio_catalog__",
+        content: JSON.stringify(entries),
+        tags: ["system_audio_catalog"],
+        visibility: "public",
+      });
+    }
+  } catch {}
+}
 
 /**
  * List all catalog entries including unpublished drafts (Admin only).
@@ -45,6 +102,8 @@ export async function listAllCatalogEntries(): Promise<{
     }
 
     if (!isSupabaseConfigured()) {
+      const dbCatalog = await getDbCatalogFallback();
+      dbCatalog.forEach((c) => localCatalogMap.set(c.id, c));
       const list = Array.from(localCatalogMap.values()).sort(
         (a, b) => a.sort_order - b.sort_order
       );
@@ -60,6 +119,8 @@ export async function listAllCatalogEntries(): Promise<{
 
     if (error) {
       if (isTableMissingError(error)) {
+        const dbCatalog = await getDbCatalogFallback();
+        dbCatalog.forEach((c) => localCatalogMap.set(c.id, c));
         const list = Array.from(localCatalogMap.values()).sort(
           (a, b) => a.sort_order - b.sort_order
         );
@@ -68,7 +129,26 @@ export async function listAllCatalogEntries(): Promise<{
       return { success: false, entries: [], error: error.message };
     }
 
-    return { success: true, entries: (data as AudioCatalogEntry[]) || [] };
+    const map = new Map<string, AudioCatalogEntry>();
+    const dbCatalog = await getDbCatalogFallback();
+    dbCatalog.forEach((c) => {
+      map.set(c.id, c);
+      localCatalogMap.set(c.id, c);
+    });
+    for (const c of localCatalogMap.values()) {
+      map.set(c.id, c);
+    }
+    if (Array.isArray(data)) {
+      for (const c of data) {
+        map.set(c.id, c as AudioCatalogEntry);
+        localCatalogMap.set(c.id, c as AudioCatalogEntry);
+      }
+    }
+
+    const list = Array.from(map.values()).sort(
+      (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)
+    );
+    return { success: true, entries: list };
   } catch (err: any) {
     return { success: false, entries: [], error: err?.message };
   }
@@ -134,6 +214,7 @@ export async function createCatalogEntry(input: {
 
     if (!isSupabaseConfigured()) {
       localCatalogMap.set(entryId, newEntry);
+      await saveDbCatalogFallback(Array.from(localCatalogMap.values()));
       await logAuditEvent({
         actor_id: adminUser?.id || "admin",
         action: "AUDIO_CATALOG_CREATE",
@@ -164,6 +245,7 @@ export async function createCatalogEntry(input: {
     if (error || !data) {
       if (isTableMissingError(error)) {
         localCatalogMap.set(entryId, newEntry);
+        await saveDbCatalogFallback(Array.from(localCatalogMap.values()));
         await logAuditEvent({
           actor_id: adminUser?.id || "admin",
           action: "AUDIO_CATALOG_CREATE",
@@ -176,6 +258,9 @@ export async function createCatalogEntry(input: {
       }
       return { success: false, error: error?.message || "Échec de l'insertion dans le catalogue." };
     }
+
+    localCatalogMap.set((data as AudioCatalogEntry).id, data as AudioCatalogEntry);
+    await saveDbCatalogFallback(Array.from(localCatalogMap.values()));
 
     await logAuditEvent({
       actor_id: adminUser?.id || "admin",
@@ -252,6 +337,8 @@ export async function updateCatalogEntry(
       if (input.sortOrder !== undefined) existing.sort_order = input.sortOrder;
       existing.updated_at = now;
 
+      await saveDbCatalogFallback(Array.from(localCatalogMap.values()));
+
       await logAuditEvent({
         actor_id: adminUser?.id || "admin",
         action: "AUDIO_CATALOG_UPDATE",
@@ -295,6 +382,8 @@ export async function updateCatalogEntry(
           if (input.sortOrder !== undefined) existing.sort_order = input.sortOrder;
           existing.updated_at = now;
 
+          await saveDbCatalogFallback(Array.from(localCatalogMap.values()));
+
           await logAuditEvent({
             actor_id: adminUser?.id || "admin",
             action: "AUDIO_CATALOG_UPDATE",
@@ -309,6 +398,9 @@ export async function updateCatalogEntry(
       }
       return { success: false, error: error.message };
     }
+
+    localCatalogMap.set((data as AudioCatalogEntry).id, data as AudioCatalogEntry);
+    await saveDbCatalogFallback(Array.from(localCatalogMap.values()));
 
     await logAuditEvent({
       actor_id: adminUser?.id || "admin",
@@ -344,7 +436,10 @@ export async function togglePublishCatalogEntry(
       if (existing) {
         existing.is_published = isPublished;
         existing.updated_at = new Date().toISOString();
+        await saveDbCatalogFallback(Array.from(localCatalogMap.values()));
       }
+      safeRevalidate("/admin");
+      safeRevalidate("/");
       return { success: true };
     }
 
@@ -360,11 +455,24 @@ export async function togglePublishCatalogEntry(
         if (existing) {
           existing.is_published = isPublished;
           existing.updated_at = new Date().toISOString();
+          await saveDbCatalogFallback(Array.from(localCatalogMap.values()));
         }
+        safeRevalidate("/admin");
+        safeRevalidate("/");
         return { success: true };
       }
       return { success: false, error: error.message };
     }
+
+    const inMem = localCatalogMap.get(id);
+    if (inMem) {
+      inMem.is_published = isPublished;
+      inMem.updated_at = new Date().toISOString();
+    }
+    await saveDbCatalogFallback(Array.from(localCatalogMap.values()));
+
+    safeRevalidate("/admin");
+    safeRevalidate("/");
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err?.message };
@@ -385,12 +493,15 @@ export async function deleteCatalogEntry(id: string): Promise<{ success: boolean
 
     if (!isSupabaseConfigured()) {
       localCatalogMap.delete(id);
+      await saveDbCatalogFallback(Array.from(localCatalogMap.values()));
       await logAuditEvent({
         actor_id: adminUser?.id || "admin",
         action: "AUDIO_CATALOG_DELETE",
         target_id: id,
         target_type: "audio",
       });
+      safeRevalidate("/admin");
+      safeRevalidate("/");
       return { success: true };
     }
 
@@ -399,6 +510,7 @@ export async function deleteCatalogEntry(id: string): Promise<{ success: boolean
     if (error) {
       if (isTableMissingError(error)) {
         localCatalogMap.delete(id);
+        await saveDbCatalogFallback(Array.from(localCatalogMap.values()));
         await logAuditEvent({
           actor_id: adminUser?.id || "admin",
           action: "AUDIO_CATALOG_DELETE",
@@ -406,10 +518,14 @@ export async function deleteCatalogEntry(id: string): Promise<{ success: boolean
           target_type: "audio",
         });
         safeRevalidate("/admin");
+        safeRevalidate("/");
         return { success: true };
       }
       return { success: false, error: error.message };
     }
+
+    localCatalogMap.delete(id);
+    await saveDbCatalogFallback(Array.from(localCatalogMap.values()));
 
     await logAuditEvent({
       actor_id: adminUser?.id || "admin",
@@ -419,6 +535,7 @@ export async function deleteCatalogEntry(id: string): Promise<{ success: boolean
     });
 
     safeRevalidate("/admin");
+    safeRevalidate("/");
 
     return { success: true };
   } catch (err: any) {

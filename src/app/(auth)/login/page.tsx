@@ -38,12 +38,6 @@ function LoginForm() {
       if (error) {
         setErrorMsg(error.message);
       } else {
-        try {
-          sessionStorage.setItem("validily_login_event", "true");
-          document.cookie = "validily_intro_pending=1; path=/; max-age=15; SameSite=Lax";
-        } catch {
-          // LocalStorage fallback
-        }
         window.location.href = nextUrl;
       }
     } catch (err: any) {

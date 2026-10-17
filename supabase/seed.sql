@@ -1,8 +1,8 @@
 -- 1. Insert Semesters
 insert into public.semesters (id, name, academic_year, sort_order, is_active)
 values
-  ('11111111-1111-1111-1111-111111111111', 'Semester 1', '2024-2025', 1, true),
-  ('22222222-2222-2222-2222-222222222222', 'Semester 2', '2024-2025', 2, true)
+  ('11111111-1111-1111-1111-111111111111', 'Semester 1', '2026-2027', 1, true),
+  ('22222222-2222-2222-2222-222222222222', 'Semester 2', '2026-2027', 2, true)
 on conflict (id) do nothing;
 
 -- 2. Insert the 9 Resource Categories

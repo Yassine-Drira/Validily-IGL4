@@ -37,7 +37,7 @@ export function UploadDropzone({
   const [categoryId, setCategoryId] = useState<string>("");
   const [title, setTitle] = useState<string>("");
   const [instructor, setInstructor] = useState<string>("");
-  const [academicYear, setAcademicYear] = useState<string>("2024-2025");
+  const [academicYear, setAcademicYear] = useState<string>("2026-2027");
   const [examSession, setExamSession] = useState<string>("");
   const [chapter, setChapter] = useState<string>("");
   const [tagInput, setTagInput] = useState<string>("");
@@ -323,7 +323,7 @@ export function UploadDropzone({
               type="text"
               value={academicYear}
               onChange={(e) => setAcademicYear(e.target.value)}
-              placeholder="2024-2025"
+              placeholder="2026-2027"
               className="w-full bg-[#F4F6FA] border border-[#E4E8F0] rounded-md px-3 py-2 text-xs text-[#182235] focus:outline-none focus:border-[#2855D9]"
             />
           </div>

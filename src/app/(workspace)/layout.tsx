@@ -6,7 +6,6 @@ import { getRequesterUser } from "@/lib/auth/authorization";
 import { FocusProvider } from "@/components/focus/focus-provider";
 import { FocusHubModal } from "@/components/focus/focus-hub-modal";
 import { PresenceAndAnalyticsTracker } from "@/components/analytics/presence-tracker";
-import { PremiumCardIntro } from "@/components/brand/premium-card-intro";
 
 export const dynamic = "force-dynamic";
 
@@ -29,25 +28,16 @@ export default async function WorkspaceLayout({
     : null;
 
   return (
-    <>
-      <script
-        id="validily-intro-holding-script"
-        dangerouslySetInnerHTML={{
-          __html: `(function(){try{var s=window.location.search;var p=new URLSearchParams(s).get('intro');var l=sessionStorage.getItem('validily_login_event')==='true';var c=document.cookie.indexOf('validily_intro_pending=1')!==-1;var r=p==='replay'||p==='true'||p==='hold';var pl=sessionStorage.getItem('validily_intro_played')==='true';var init=sessionStorage.getItem('validily_session_initialized');if(r||l||c||(!pl&&!init)){document.documentElement.classList.add('validily-intro-holding');}}catch(e){}})();`,
-        }}
-      />
-      <FocusProvider user={initialUser}>
-        <WorkspaceShell
-          key="workspace-shell"
-          sidebar={<AppSidebar key="app-sidebar" subjects={subjects} isAdmin={isAdmin} />}
-          header={<AppHeader key="app-header" initialUser={initialUser} />}
-        >
-          {children}
-        </WorkspaceShell>
-        <FocusHubModal key="focus-hub-modal" />
-        <PresenceAndAnalyticsTracker key="presence-tracker" />
-        <PremiumCardIntro user={initialUser} />
-      </FocusProvider>
-    </>
+    <FocusProvider user={initialUser}>
+      <WorkspaceShell
+        key="workspace-shell"
+        sidebar={<AppSidebar key="app-sidebar" subjects={subjects} isAdmin={isAdmin} />}
+        header={<AppHeader key="app-header" initialUser={initialUser} />}
+      >
+        {children}
+      </WorkspaceShell>
+      <FocusHubModal key="focus-hub-modal" />
+      <PresenceAndAnalyticsTracker key="presence-tracker" />
+    </FocusProvider>
   );
 }

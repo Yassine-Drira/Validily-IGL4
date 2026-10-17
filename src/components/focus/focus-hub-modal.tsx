@@ -26,6 +26,7 @@ import {
   Zap,
   Trees,
   AlertOctagon,
+  PauseCircle,
   Compass,
   Plus,
   Trash2,
@@ -48,6 +49,8 @@ export function FocusHubModal() {
     mode,
     timeLeft,
     isRunning,
+    isPaused,
+    sessionState,
     workDuration,
     soundscape,
     volume,
@@ -61,6 +64,8 @@ export function FocusHubModal() {
     treeSpecies,
     isCelebrating,
     toggleTimer,
+    pauseTimer,
+    resumeTimer,
     resetTimer,
     setMode,
     setWorkDurationMinutes,
@@ -115,6 +120,19 @@ export function FocusHubModal() {
   }, [isModalOpen, setIsModalOpen]);
 
   const loadAudioData = async () => {
+    // Rehydrate from client cache first for zero-flash display
+    try {
+      if (typeof window !== "undefined") {
+        const cached = localStorage.getItem("validily_custom_audio_cache");
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setCustomEntries(parsed);
+          }
+        }
+      }
+    } catch {}
+
     setIsLoadingAudio(true);
     try {
       const [customRes, catalogRes] = await Promise.all([
@@ -124,6 +142,11 @@ export function FocusHubModal() {
 
       if (customRes.success) {
         setCustomEntries(customRes.entries);
+        try {
+          if (typeof window !== "undefined") {
+            localStorage.setItem("validily_custom_audio_cache", JSON.stringify(customRes.entries));
+          }
+        } catch {}
         setAudioQuota({
           usedCount: customRes.usedCount,
           maxAllowed: customRes.maxAllowed,
@@ -180,7 +203,16 @@ export function FocusHubModal() {
       }
 
       if (res.entry) {
-        setCustomEntries((prev) => [res.entry!, ...prev]);
+        const newEntry = res.entry;
+        setCustomEntries((prev) => {
+          const next = [newEntry, ...prev.filter((e) => e.id !== newEntry.id)];
+          try {
+            if (typeof window !== "undefined") {
+              localStorage.setItem("validily_custom_audio_cache", JSON.stringify(next));
+            }
+          } catch {}
+          return next;
+        });
         setAudioQuota((prev) => ({
           ...prev,
           usedCount: prev.usedCount + 1,
@@ -204,7 +236,15 @@ export function FocusHubModal() {
     try {
       const res = await deleteCustomAudio(id);
       if (res.success) {
-        setCustomEntries((prev) => prev.filter((s) => s.id !== id));
+        setCustomEntries((prev) => {
+          const next = prev.filter((s) => s.id !== id);
+          try {
+            if (typeof window !== "undefined") {
+              localStorage.setItem("validily_custom_audio_cache", JSON.stringify(next));
+            }
+          } catch {}
+          return next;
+        });
         setAudioQuota((prev) => ({
           ...prev,
           usedCount: Math.max(0, prev.usedCount - 1),
@@ -270,35 +310,35 @@ export function FocusHubModal() {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/50 backdrop-blur-sm transition-opacity animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-black/50 backdrop-blur-sm transition-opacity animate-in fade-in duration-200"
       onClick={() => setIsModalOpen(false)}
     >
       <div
-        className="bg-white/95 backdrop-blur-xl border border-[#E4E8F0] rounded-3xl max-w-xl w-full max-h-[92vh] overflow-y-auto shadow-2xl p-5 sm:p-7 space-y-5 relative scrollbar-thin"
+        className="bg-white/95 backdrop-blur-xl border border-[#E4E8F0] rounded-3xl max-w-xl w-full max-h-[94vh] sm:max-h-[92vh] overflow-y-auto shadow-2xl p-4 sm:p-7 space-y-4 sm:space-y-5 relative scrollbar-thin"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top Header */}
-        <div className="flex items-center justify-between border-b border-[#E4E8F0] pb-3.5">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#EDF2FF] to-[#DCE7FF] text-[#2855D9] flex items-center justify-center border border-[#BACDFE] shadow-2xs">
-              <Zap className="w-5 h-5 text-[#2855D9] fill-[#2855D9]/20" />
+        <div className="flex items-center justify-between border-b border-[#E4E8F0] pb-3 sm:pb-3.5">
+          <div className="flex items-center space-x-2.5 sm:space-x-3">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-gradient-to-br from-[#EDF2FF] to-[#DCE7FF] text-[#2855D9] flex items-center justify-center border border-[#BACDFE] shadow-2xs shrink-0">
+              <Zap className="w-4 h-4 sm:w-5 sm:h-5 text-[#2855D9] fill-[#2855D9]/20" />
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="flex items-center space-x-2">
-                <h2 className="text-base font-bold text-[#111A2E] tracking-tight">
+                <h2 className="text-sm sm:text-base font-bold text-[#111A2E] tracking-tight">
                   Focus Hub & Pomodoro
                 </h2>
-                <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-[#2855D9] border border-blue-200">
+                <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-[#2855D9] border border-blue-200 shrink-0">
                   IGL4 Study
                 </span>
               </div>
-              <p className="text-[11px] text-[#68748A]">
+              <p className="text-[10px] sm:text-[11px] text-[#68748A] truncate">
                 Concentration académique & croissance vivante de votre Bosquet
               </p>
             </div>
           </div>
 
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-2 shrink-0">
             <Link
               href="/forest"
               onClick={() => setIsModalOpen(false)}
@@ -321,7 +361,7 @@ export function FocusHubModal() {
         </div>
 
         {/* Mode Selector Tabs (Focus / Pause courte / Pause longue) */}
-        <div className="grid grid-cols-3 gap-1 bg-[#F4F6FA] p-1.5 rounded-2xl border border-[#E4E8F0]">
+        <div className="grid grid-cols-3 gap-1 bg-[#F4F6FA] p-1 sm:p-1.5 rounded-2xl border border-[#E4E8F0]">
           {(
             [
               { key: "work", label: "Focus Forest", dur: `${Math.round(workDuration / 60)}m` },
@@ -334,13 +374,13 @@ export function FocusHubModal() {
               type="button"
               onClick={() => setMode(t.key as TimerMode)}
               className={cn(
-                "py-2 px-3 rounded-xl text-xs transition-all text-center flex flex-col items-center justify-center cursor-pointer",
+                "py-1.5 sm:py-2 px-2 sm:px-3 rounded-xl text-xs transition-all text-center flex flex-col items-center justify-center cursor-pointer",
                 mode === t.key
                   ? "bg-white text-[#111A2E] shadow-xs font-bold border border-[#E4E8F0]"
                   : "text-[#68748A] hover:text-[#182235]"
               )}
             >
-              <span>{t.label}</span>
+              <span className="text-[11px] sm:text-xs truncate max-w-full">{t.label}</span>
               <span className="text-[10px] text-[#2855D9] font-mono font-semibold mt-0.5">
                 {t.dur}
               </span>
@@ -365,7 +405,7 @@ export function FocusHubModal() {
 
         {/* Radial Timer Visual with Center Controls */}
         <div className="flex flex-col items-center justify-center py-1 relative">
-          <div className="relative w-52 h-52 sm:w-56 sm:h-56 flex items-center justify-center">
+          <div className="relative w-44 h-44 sm:w-56 sm:h-56 flex items-center justify-center">
             {/* Ambient Background Glow */}
             <div
               className={cn(
@@ -416,8 +456,23 @@ export function FocusHubModal() {
               </span>
 
               <span className="text-xs font-semibold text-[#68748A] mt-1 capitalize">
-                {mode === "work" ? "Session de travail" : "Temps de pause"}
+                {mode === "work"
+                  ? isPaused
+                    ? "Session en pause"
+                    : isRunning
+                    ? "Session active"
+                    : "Session de travail"
+                  : isPaused
+                  ? "Pause suspendue"
+                  : "Temps de pause"}
               </span>
+
+              {isPaused && (
+                <div className="flex items-center space-x-1.5 mt-2 bg-amber-50 text-amber-800 px-2.5 py-0.5 rounded-full border border-amber-200 text-[10px] font-semibold shadow-2xs">
+                  <PauseCircle className="w-3 h-3 text-amber-600 animate-pulse" />
+                  <span>Chronomètre suspendu (Sans pénalité)</span>
+                </div>
+              )}
 
               {/* Quick Soundscape Indicator & 1-Click Mute Toggle */}
               {soundscape !== "none" && (
@@ -464,7 +519,7 @@ export function FocusHubModal() {
               variant="outline"
               size="sm"
               onClick={() => {
-                if (isRunning && mode === "work") {
+                if ((isRunning || isPaused) && mode === "work") {
                   setConfirmAbandon(true);
                 } else {
                   resetTimer();
@@ -476,85 +531,121 @@ export function FocusHubModal() {
               <RotateCcw className="w-4 h-4" />
             </Button>
 
-            <Button
-              type="button"
-              variant="primary"
-              onClick={() => {
-                if (isRunning && mode === "work") {
-                  setConfirmAbandon(true);
-                } else {
-                  toggleTimer();
-                }
-              }}
-              className={cn(
-                "h-12 px-8 rounded-2xl text-sm font-bold flex items-center space-x-2.5 shadow-md transition-all cursor-pointer transform hover:-translate-y-0.5",
-                isRunning && mode === "work"
-                  ? "bg-rose-600 hover:bg-rose-700 text-white shadow-rose-500/20"
-                  : mode === "work"
-                  ? "bg-[#2855D9] hover:bg-[#1E40AF] text-white shadow-blue-500/20"
-                  : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/20"
-              )}
-            >
-              {isRunning && mode === "work" ? (
-                <>
-                  <AlertOctagon className="w-4 h-4 fill-current" />
-                  <span>Abandonner (Pénalité)</span>
-                </>
-              ) : isRunning ? (
-                <>
+            {/* Main Action Button */}
+            {mode === "work" ? (
+              isRunning ? (
+                <Button
+                  type="button"
+                  variant="primary"
+                  onClick={pauseTimer}
+                  className="h-12 px-6 rounded-2xl text-xs sm:text-sm font-bold flex items-center space-x-2 bg-amber-500 hover:bg-amber-600 text-white shadow-md shadow-amber-500/20 transition-all cursor-pointer transform hover:-translate-y-0.5"
+                  title="Suspendre le chronomètre temporairement sans pénalité"
+                >
                   <Pause className="w-4 h-4 fill-current" />
                   <span>Mettre en Pause</span>
-                </>
+                </Button>
+              ) : isPaused ? (
+                <Button
+                  type="button"
+                  variant="primary"
+                  onClick={resumeTimer}
+                  className="h-12 px-6 rounded-2xl text-xs sm:text-sm font-bold flex items-center space-x-2 bg-[#2855D9] hover:bg-[#1E40AF] text-white shadow-md shadow-blue-500/20 transition-all cursor-pointer transform hover:-translate-y-0.5"
+                  title="Reprendre la session de concentration"
+                >
+                  <Play className="w-4 h-4 fill-current ml-0.5" />
+                  <span>Reprendre Focus</span>
+                </Button>
               ) : (
-                <>
+                <Button
+                  type="button"
+                  variant="primary"
+                  onClick={toggleTimer}
+                  className="h-12 px-8 rounded-2xl text-sm font-bold flex items-center space-x-2 bg-[#2855D9] hover:bg-[#1E40AF] text-white shadow-md shadow-blue-500/20 transition-all cursor-pointer transform hover:-translate-y-0.5"
+                >
                   <Play className="w-4 h-4 fill-current ml-0.5" />
                   <span>Démarrer Focus</span>
-                </>
-              )}
-            </Button>
+                </Button>
+              )
+            ) : (
+              <Button
+                type="button"
+                variant="primary"
+                onClick={toggleTimer}
+                className="h-12 px-8 rounded-2xl text-sm font-bold flex items-center space-x-2 bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-500/20 transition-all cursor-pointer transform hover:-translate-y-0.5"
+              >
+                {isRunning ? (
+                  <>
+                    <Pause className="w-4 h-4 fill-current" />
+                    <span>Mettre en Pause</span>
+                  </>
+                ) : (
+                  <>
+                    <Play className="w-4 h-4 fill-current ml-0.5" />
+                    <span>Démarrer Pause</span>
+                  </>
+                )}
+              </Button>
+            )}
 
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                if (isRunning && mode === "work") {
-                  setConfirmAbandon(true);
-                } else {
-                  skipSession();
-                }
-              }}
-              className="w-10 h-10 p-0 rounded-2xl text-[#68748A] hover:text-[#182235] hover:bg-[#F4F6FA] border-[#E4E8F0]"
-              title="Passer à la session suivante"
-            >
-              <SkipForward className="w-4 h-4" />
-            </Button>
+            {/* Separate Abandon Button in Work Mode when session is active or paused */}
+            {mode === "work" && (isRunning || isPaused) ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setConfirmAbandon(true)}
+                className="h-10 px-3 rounded-2xl text-xs font-semibold text-rose-700 hover:text-white hover:bg-rose-600 border-rose-200 hover:border-rose-600 flex items-center space-x-1.5 transition-all cursor-pointer"
+                title="Abandonner volontairement la session (Pénalité arbre mort)"
+              >
+                <AlertOctagon className="w-4 h-4 shrink-0" />
+                <span className="hidden sm:inline">Abandonner</span>
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if ((isRunning || isPaused) && mode === "work") {
+                    setConfirmAbandon(true);
+                  } else {
+                    skipSession();
+                  }
+                }}
+                className="w-10 h-10 p-0 rounded-2xl text-[#68748A] hover:text-[#182235] hover:bg-[#F4F6FA] border-[#E4E8F0]"
+                title="Passer à la session suivante"
+              >
+                <SkipForward className="w-4 h-4" />
+              </Button>
+            )}
           </div>
 
-          {/* Strict Anti-Bypass Abandon Confirmation Dialog */}
-          {isRunning && mode === "work" && (
+          {/* Strict Anti-Bypass Abandon Confirmation Dialog & Status Indicators */}
+          {mode === "work" && (isRunning || isPaused) && (
             <div className="mt-3 text-center">
               {confirmAbandon ? (
-                <div className="bg-rose-50 border border-rose-200 rounded-2xl p-3 animate-in fade-in duration-150 text-left max-w-sm mx-auto shadow-xs">
-                  <div className="flex items-start space-x-2.5">
-                    <AlertOctagon className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 animate-in fade-in duration-150 text-left max-w-md mx-auto shadow-sm">
+                  <div className="flex items-start space-x-3">
+                    <div className="w-8 h-8 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center shrink-0 mt-0.5">
+                      <AlertOctagon className="w-4 h-4 text-rose-600" />
+                    </div>
                     <div>
                       <p className="text-xs text-rose-950 font-bold">
-                        Aucune pause autorisée en session de travail
+                        Confirmer l&apos;abandon avec pénalité ?
                       </p>
-                      <p className="text-[11px] text-rose-800 leading-snug mt-0.5">
-                        Si vous abandonnez maintenant, vous acceptez d&apos;avoir échoué : un arbre mort permanent sera planté dans votre bosquet comme pénalité indélébile.
+                      <p className="text-[11px] text-rose-800 leading-relaxed mt-1">
+                        Cette décision est irréversible. Un <strong className="font-semibold">arbre mort (défeuillé)</strong> sera certifié par le serveur et immédiatement planté dans votre Bosquet pour refléter cette interruption.
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center space-x-2 mt-3 pt-2.5 border-t border-rose-200/70">
+                  <div className="flex items-center space-x-2 mt-3 pt-3 border-t border-rose-200/70">
                     <button
                       type="button"
                       onClick={() => {
                         giveUpSession("Abandon volontaire de concentration");
                         setConfirmAbandon(false);
                       }}
-                      className="px-3.5 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold cursor-pointer transition-all shadow-2xs"
+                      className="px-3.5 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold cursor-pointer transition-all shadow-xs"
                     >
                       Confirmer l&apos;abandon (Arbre mort)
                     </button>
@@ -563,14 +654,19 @@ export function FocusHubModal() {
                       onClick={() => setConfirmAbandon(false)}
                       className="px-3.5 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 text-xs font-semibold cursor-pointer transition-all"
                     >
-                      Continuer à étudier
+                      Continuer mon focus
                     </button>
                   </div>
                 </div>
+              ) : isPaused ? (
+                <span className="text-[11px] font-medium text-amber-700 flex items-center justify-center space-x-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                  <span>Session en pause : le temps de pause est déduit et ne compte pas dans votre focus certifié</span>
+                </span>
               ) : (
                 <span className="text-[11px] font-medium text-[#68748A] flex items-center justify-center space-x-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  <span>Session active : concentration continue sans pause</span>
+                  <span>Session active : concentration certifiée et enregistrée en direct</span>
                 </span>
               )}
             </div>
@@ -611,46 +707,52 @@ export function FocusHubModal() {
 
         {/* Audio Hub (Built-in, Custom YouTube & Shared Catalog) */}
         <div className="space-y-3 border-t border-[#E4E8F0] pt-3.5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-1 bg-[#F4F6FA] p-1 rounded-2xl border border-[#E4E8F0]">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center space-x-1 bg-[#F4F6FA] p-1 rounded-2xl border border-[#E4E8F0] overflow-x-auto scrollbar-none w-full sm:w-auto">
               <button
                 type="button"
                 onClick={() => setAudioCategoryTab("synth")}
                 className={cn(
-                  "px-3 py-1 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition-all cursor-pointer",
+                  "flex-1 sm:flex-none px-2.5 sm:px-3 py-1.5 sm:py-1 rounded-xl text-xs font-semibold flex items-center justify-center space-x-1.5 transition-all cursor-pointer whitespace-nowrap shrink-0",
                   audioCategoryTab === "synth"
                     ? "bg-white text-[#111A2E] shadow-2xs font-bold"
                     : "text-[#68748A] hover:text-[#182235]"
                 )}
               >
                 <Headphones className="w-3.5 h-3.5 text-[#2855D9]" />
-                <span>Synthèse (0kB)</span>
+                <span className="hidden sm:inline">Synthèse (0kB)</span>
+                <span className="sm:hidden">Synthèse</span>
               </button>
               <button
                 type="button"
                 onClick={() => setAudioCategoryTab("custom")}
                 className={cn(
-                  "px-3 py-1 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition-all cursor-pointer",
+                  "flex-1 sm:flex-none px-2.5 sm:px-3 py-1.5 sm:py-1 rounded-xl text-xs font-semibold flex items-center justify-center space-x-1.5 transition-all cursor-pointer whitespace-nowrap shrink-0",
                   audioCategoryTab === "custom"
                     ? "bg-white text-[#111A2E] shadow-2xs font-bold"
                     : "text-[#68748A] hover:text-[#182235]"
                 )}
               >
                 <Music className="w-3.5 h-3.5 text-red-500" />
-                <span>Mes Sons & YouTube</span>
+                <span className="hidden sm:inline">Mes Sons & YouTube</span>
+                <span className="sm:hidden">Mes Sons</span>
               </button>
               <button
                 type="button"
                 onClick={() => setAudioCategoryTab("catalog")}
                 className={cn(
-                  "px-3 py-1 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition-all cursor-pointer",
+                  "flex-1 sm:flex-none px-2.5 sm:px-3 py-1.5 sm:py-1 rounded-xl text-xs font-semibold flex items-center justify-center space-x-1.5 transition-all cursor-pointer whitespace-nowrap shrink-0",
                   audioCategoryTab === "catalog"
                     ? "bg-white text-[#111A2E] shadow-2xs font-bold"
                     : "text-[#68748A] hover:text-[#182235]"
                 )}
               >
                 <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                <span>Catalogue Promo</span>
+                <span className="hidden sm:inline">Catalogue Promo</span>
+                <span className="sm:hidden">Catalogue</span>
+                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-emerald-100 text-emerald-800 font-mono">
+                  Bonus
+                </span>
               </button>
             </div>
 
@@ -660,7 +762,7 @@ export function FocusHubModal() {
                 type="button"
                 onClick={toggleSoundMute}
                 className={cn(
-                  "text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition-all flex items-center space-x-1.5 cursor-pointer",
+                  "self-end sm:self-auto text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition-all flex items-center space-x-1.5 cursor-pointer",
                   isSoundMuted
                     ? "bg-amber-50 border-amber-200 text-amber-800 hover:bg-amber-100"
                     : "bg-emerald-50 border-emerald-200 text-emerald-800 hover:bg-emerald-100"
@@ -936,9 +1038,14 @@ export function FocusHubModal() {
           {/* TAB 3: Catalogue Promo (Admin-Curated Shared Library) */}
           {audioCategoryTab === "catalog" && (
             <div className="space-y-2 animate-in fade-in duration-150">
-              <div className="p-2 rounded-xl bg-blue-50/60 border border-blue-200/60 text-[11px] text-[#2855D9] flex items-center space-x-2">
-                <Sparkles className="w-3.5 h-3.5 shrink-0" />
-                <span>Pistes d&apos;ambiance certifiées et partagées par l&apos;administration IGL4.</span>
+              <div className="p-2.5 rounded-xl bg-blue-50/70 border border-blue-200/80 text-[11px] text-[#2855D9] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5">
+                <div className="flex items-center space-x-2">
+                  <Sparkles className="w-4 h-4 text-amber-500 shrink-0" />
+                  <span className="font-medium">Pistes certifiées et publiées par l&apos;administration IGL4.</span>
+                </div>
+                <span className="inline-flex items-center text-[10px] font-bold font-mono px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 self-start sm:self-auto shrink-0 shadow-2xs">
+                  Bonus Gratuit • Hors Quota (Accès Illimité)
+                </span>
               </div>
 
               {catalogEntries.length === 0 ? (
@@ -990,8 +1097,8 @@ export function FocusHubModal() {
                         )}
 
                         <div className="flex items-center justify-between mt-2 pt-1.5 border-t border-slate-100 w-full text-[10px]">
-                          <span className="text-slate-400 capitalize">
-                            {track.source_type === "youtube" ? "YouTube Stream" : "Web Audio"}
+                          <span className="text-emerald-700 font-semibold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100/80">
+                            Bonus Promo • Hors Quota
                           </span>
                           <span
                             className={cn(

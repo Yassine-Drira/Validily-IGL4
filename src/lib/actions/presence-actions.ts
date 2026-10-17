@@ -1,9 +1,9 @@
 "use server";
 
-import { isSupabaseConfigured } from "@/lib/supabase/server";
-import { getServiceSupabase } from "@/lib/supabase/admin";
-import { assertAdmin, getRequesterUser } from "@/lib/auth/authorization";
-import { UserPresence, DeviceCategory } from "@/types/database";
+import { isSupabaseConfigured } from "../supabase/server";
+import { getServiceSupabase } from "../supabase/admin";
+import { assertAdmin, getRequesterUser } from "../auth/authorization";
+import { UserPresence, DeviceCategory } from "../../types/database";
 
 function isTableMissingError(err: any): boolean {
   if (!err) return false;

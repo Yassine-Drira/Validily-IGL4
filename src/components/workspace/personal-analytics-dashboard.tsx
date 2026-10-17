@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useFocusTimer } from "@/components/focus/focus-provider";
+import { getUserStudyGoals, saveUserStudyGoals } from "@/lib/actions/analytics-actions";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
@@ -74,6 +75,9 @@ interface PersonalAnalyticsDashboardProps {
   streak: number;
   averageScore: number | null;
   last7Days: DayActivity[];
+  initialDailyFocusMap?: { [dateStr: string]: number };
+  initialGoals?: UserGoals;
+  practicedSubjectIds?: string[];
   allSubjects?: any[];
   weakAttempt?: any;
   recentAttempt?: any;
@@ -87,16 +91,19 @@ export function PersonalAnalyticsDashboard({
   streak,
   averageScore,
   last7Days,
+  initialDailyFocusMap,
+  initialGoals,
+  practicedSubjectIds = [],
   allSubjects = [],
   weakAttempt,
   recentAttempt,
 }: PersonalAnalyticsDashboardProps) {
   const { totalFocusSecondsToday, isRunning, toggleTimer, setIsModalOpen } = useFocusTimer();
 
-  // Goals State (Persistent per user)
-  const [goals, setGoals] = useState<UserGoals>(DEFAULT_GOALS);
+  // Goals State (Persistent in DB per user + cached locally)
+  const [goals, setGoals] = useState<UserGoals>(initialGoals || DEFAULT_GOALS);
   const [isEditingGoals, setIsEditingGoals] = useState(false);
-  const [tempGoals, setTempGoals] = useState<UserGoals>(DEFAULT_GOALS);
+  const [tempGoals, setTempGoals] = useState<UserGoals>(initialGoals || DEFAULT_GOALS);
   const [goalSavedToast, setGoalSavedToast] = useState(false);
 
   // Chart view modes
@@ -104,64 +111,75 @@ export function PersonalAnalyticsDashboard({
   const [curveMetric, setCurveMetric] = useState<"focus" | "quizzes">("focus");
   const [hoveredDayIndex, setHoveredDayIndex] = useState<number | null>(null);
 
-  // Real 7-day focus minutes loaded from localStorage
-  const [dailyFocusMap, setDailyFocusMap] = useState<{ [dateStr: string]: number }>({});
+  // Real 7-day focus minutes loaded from DB + live timer
+  const [dailyFocusMap, setDailyFocusMap] = useState<{ [dateStr: string]: number }>(
+    initialDailyFocusMap || {}
+  );
 
   // 1. Load user goals on mount (scoped strictly to authenticated student)
   useEffect(() => {
+    if (initialGoals && initialGoals.dailyFocusMinutes) {
+      setGoals(initialGoals);
+      setTempGoals(initialGoals);
+    }
     if (!user?.id) return;
-    try {
-      const storageKey = `validily_goals_${user.id}`;
-      const saved = localStorage.getItem(storageKey);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed.dailyFocusMinutes) {
-          setGoals(parsed);
-          setTempGoals(parsed);
-        }
-      }
-    } catch {
-      // LocalStorage access fallback
-    }
-  }, [user?.id]);
 
-  // 2. Load 7-day focus history from localStorage (scoped to active user)
-  useEffect(() => {
-    const focusMap: { [dateStr: string]: number } = {};
-    if (!user?.id) {
-      last7Days.forEach((d) => {
-        focusMap[d.dateStr] = 0;
+    // Revalidate against DB server action with local cache fallback
+    getUserStudyGoals(user.id)
+      .then((serverGoals) => {
+        if (serverGoals && serverGoals.dailyFocusMinutes) {
+          setGoals(serverGoals);
+          setTempGoals(serverGoals);
+          try {
+            localStorage.setItem(`validily_goals_${user.id}`, JSON.stringify(serverGoals));
+          } catch {}
+        }
+      })
+      .catch(() => {
+        try {
+          const storageKey = `validily_goals_${user.id}`;
+          const saved = localStorage.getItem(storageKey);
+          if (saved) {
+            const parsed = JSON.parse(saved);
+            if (parsed.dailyFocusMinutes) {
+              setGoals(parsed);
+              setTempGoals(parsed);
+            }
+          }
+        } catch {}
       });
-      setDailyFocusMap(focusMap);
-      return;
-    }
+  }, [user?.id, initialGoals]);
 
+  // 2. Load 7-day focus history combining server DB records and live running timer
+  useEffect(() => {
+    const focusMap: { [dateStr: string]: number } = { ...(initialDailyFocusMap || {}) };
     last7Days.forEach((d) => {
-      try {
-        const saved = localStorage.getItem(`validily_focus_${user.id}_${d.dateStr}`);
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          focusMap[d.dateStr] =
-            parsed.totalFocusMinutes || Math.floor((parsed.totalFocusSeconds || 0) / 60);
-        } else {
-          focusMap[d.dateStr] = 0;
-        }
-      } catch {
+      if (focusMap[d.dateStr] === undefined) {
         focusMap[d.dateStr] = 0;
+      }
+      if (user?.id) {
+        try {
+          const saved = localStorage.getItem(`validily_focus_${user.id}_${d.dateStr}`);
+          if (saved) {
+            const parsed = JSON.parse(saved);
+            const localMins =
+              parsed.totalFocusMinutes || Math.floor((parsed.totalFocusSeconds || 0) / 60);
+            focusMap[d.dateStr] = Math.max(focusMap[d.dateStr], localMins);
+          }
+        } catch {}
       }
     });
 
     // Merge live today seconds
     const todayStr = new Date().toISOString().split("T")[0];
-    focusMap[todayStr] = Math.max(
-      focusMap[todayStr] || 0,
-      Math.floor(totalFocusSecondsToday / 60)
-    );
-    setDailyFocusMap(focusMap);
-  }, [last7Days, totalFocusSecondsToday, user?.id]);
+    const liveMins = Math.floor(totalFocusSecondsToday / 60);
+    focusMap[todayStr] = Math.max(focusMap[todayStr] || 0, liveMins);
 
-  // Save customized goals
-  const handleSaveGoals = () => {
+    setDailyFocusMap(focusMap);
+  }, [last7Days, totalFocusSecondsToday, user?.id, initialDailyFocusMap]);
+
+  // Save customized goals persistently to Supabase DB
+  const handleSaveGoals = async () => {
     if (!user?.id) {
       window.location.href = `/login?next=${encodeURIComponent(window.location.pathname)}`;
       return;
@@ -173,6 +191,9 @@ export function PersonalAnalyticsDashboard({
       setIsEditingGoals(false);
       setGoalSavedToast(true);
       setTimeout(() => setGoalSavedToast(false), 3000);
+
+      // Persist to Supabase notes table
+      await saveUserStudyGoals(tempGoals);
     } catch {
       setIsEditingGoals(false);
     }
@@ -192,16 +213,19 @@ export function PersonalAnalyticsDashboard({
     return `${hours}h ${remMins}m`;
   };
 
-  const todayFocusMinutes = Math.floor(totalFocusSecondsToday / 60);
-  const formattedTodayFocus = formatSeconds(totalFocusSecondsToday);
+  const todayStr = new Date().toISOString().split("T")[0];
+  const dbTodaySeconds = (dailyFocusMap[todayStr] || 0) * 60;
+  const effectiveTodayFocusSeconds = Math.max(totalFocusSecondsToday, dbTodaySeconds);
+  const todayFocusMinutes = Math.floor(effectiveTodayFocusSeconds / 60);
+  const formattedTodayFocus = formatSeconds(effectiveTodayFocusSeconds);
 
   // Goal Progress (100% Dynamic)
   const targetFocusSeconds = goals.dailyFocusMinutes * 60;
   const goalProgressPercent = Math.min(
     100,
-    Math.round((totalFocusSecondsToday / targetFocusSeconds) * 100)
+    Math.round((effectiveTodayFocusSeconds / targetFocusSeconds) * 100)
   );
-  const remainingFocusSeconds = Math.max(0, targetFocusSeconds - totalFocusSecondsToday);
+  const remainingFocusSeconds = Math.max(0, targetFocusSeconds - effectiveTodayFocusSeconds);
 
   // --- Real Subject Breakdown (Zero Hardcoding) ---
   const subjectDistribution = useMemo(() => {
@@ -230,15 +254,15 @@ export function PersonalAnalyticsDashboard({
       .sort((a, b) => b.count - a.count);
   }, [userAttempts]);
 
-  // Distinct subjects practiced out of available
+  // Distinct subjects practiced out of available (combining Quizzes & Focus sessions)
   const practicedSubjects = useMemo(() => {
-    const set = new Set<string>();
+    const set = new Set<string>(practicedSubjectIds || []);
     userAttempts.forEach((a) => {
       const subKey = a.quiz?.subject_id || a.quiz?.subject?.id || a.quiz?.subject?.name;
       if (subKey) set.add(subKey);
     });
     return set;
-  }, [userAttempts]);
+  }, [userAttempts, practicedSubjectIds]);
 
   const uniqueSubjectsCount = practicedSubjects.size;
   const totalAvailableSubjects = Math.max(1, allSubjects.length || 10);
@@ -324,7 +348,7 @@ export function PersonalAnalyticsDashboard({
         <div className="bg-[#EDF2FF]/70 border border-[#BACDFE] rounded-2xl p-3 sm:px-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-[#1E3A8A] animate-in fade-in duration-300">
           <div className="flex items-center space-x-2 min-w-0">
             <Sparkles className="w-4 h-4 text-[#2855D9] shrink-0" />
-            <span className="truncate sm:whitespace-normal">
+            <span className="text-xs leading-relaxed">
               Vos sessions Focus et objectifs d&apos;étude sont conservés localement. Connectez-vous pour synchroniser vos quiz cloud.
             </span>
           </div>
@@ -340,40 +364,40 @@ export function PersonalAnalyticsDashboard({
 
       {/* 1. Header Bar: Identity + Privacy + Goals Customizer Trigger */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[#E4E8F0]">
-        <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#EDF2FF] to-[#DCE7FF] text-[#2855D9] flex items-center justify-center border border-[#BACDFE] shadow-2xs">
+        <div className="flex items-start sm:items-center space-x-3">
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#EDF2FF] to-[#DCE7FF] text-[#2855D9] flex items-center justify-center border border-[#BACDFE] shadow-2xs shrink-0">
             <Target className="w-5 h-5 text-[#2855D9]" />
           </div>
-          <div>
-            <div className="flex items-center space-x-2">
-              <h2 className="text-base font-bold text-[#111A2E] tracking-tight">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <h2 className="text-sm sm:text-base font-bold text-[#111A2E] tracking-tight">
                 Tableau de Bord Personnel • {displayName}
               </h2>
               {isGuest ? (
-                <span className="inline-flex items-center space-x-1 text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-[#475569] border border-[#E2E8F0]">
+                <span className="inline-flex items-center space-x-1 text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-[#475569] border border-[#E2E8F0] shrink-0">
                   <span>Mode Local</span>
                 </span>
               ) : (
-                <span className="inline-flex items-center space-x-1 text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                <span className="inline-flex items-center space-x-1 text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
                   <Lock className="w-2.5 h-2.5" />
                   <span>Strictement Privé</span>
                 </span>
               )}
             </div>
-            <p className="text-xs text-[#68748A]">
+            <p className="text-xs text-[#68748A] mt-0.5">
               Métriques dynamiques 100% calculées à partir de vos sessions réelles.
             </p>
           </div>
         </div>
 
-        {/* Action Controls */}
-        <div className="flex items-center space-x-2 shrink-0">
+        {/* Action Controls: 2x2 grid on mobile, flex row on sm+ */}
+        <div className="grid grid-cols-2 gap-2 w-full sm:flex sm:items-center sm:space-x-2 sm:w-auto shrink-0 pt-1 sm:pt-0">
           <Button
             size="sm"
             variant="outline"
             onClick={() => setIsEditingGoals(!isEditingGoals)}
             className={cn(
-              "text-xs h-8 px-3 rounded-xl border-[#E4E8F0] font-semibold transition-all cursor-pointer",
+              "text-xs h-8 px-2.5 sm:px-3 rounded-xl border-[#E4E8F0] font-semibold transition-all cursor-pointer w-full justify-center",
               isEditingGoals ? "bg-blue-50 text-[#2855D9] border-[#2855D9]" : "bg-[#FAFBFD] text-[#182235] hover:bg-[#F4F6FA]"
             )}
             title="Personnaliser vos objectifs quotidiens et hebdomadaires"
@@ -384,7 +408,7 @@ export function PersonalAnalyticsDashboard({
 
           <Link
             href="/forest"
-            className="text-xs h-8 px-3 rounded-xl border border-emerald-200 bg-emerald-50/80 hover:bg-emerald-100 text-emerald-800 font-semibold flex items-center space-x-1.5 transition-colors"
+            className="text-xs h-8 px-2.5 sm:px-3 rounded-xl border border-emerald-200 bg-emerald-50/80 hover:bg-emerald-100 text-emerald-800 font-semibold flex items-center justify-center space-x-1.5 transition-colors w-full"
             title="Consulter votre Bosquet Focus permanent"
           >
             <Trees className="w-3.5 h-3.5 text-emerald-600" />
@@ -395,7 +419,7 @@ export function PersonalAnalyticsDashboard({
             size="sm"
             variant="outline"
             onClick={() => setIsModalOpen(true)}
-            className="text-xs h-8 px-3 rounded-xl border-[#E4E8F0] bg-[#FAFBFD] hover:bg-[#F4F6FA] text-[#182235] font-semibold"
+            className="text-xs h-8 px-2.5 sm:px-3 rounded-xl border-[#E4E8F0] bg-[#FAFBFD] hover:bg-[#F4F6FA] text-[#182235] font-semibold w-full justify-center"
           >
             <Clock className="w-3.5 h-3.5 mr-1.5 text-[#2855D9]" />
             <span>Focus Hub</span>
@@ -406,7 +430,7 @@ export function PersonalAnalyticsDashboard({
             variant="primary"
             onClick={toggleTimer}
             className={cn(
-              "text-xs h-8 px-3.5 rounded-xl font-bold transition-all shadow-2xs cursor-pointer",
+              "text-xs h-8 px-2.5 sm:px-3.5 rounded-xl font-bold transition-all shadow-2xs cursor-pointer w-full justify-center",
               isRunning
                 ? "bg-amber-600 hover:bg-amber-700 text-white"
                 : "bg-[#2855D9] hover:bg-[#1E40AF] text-white"

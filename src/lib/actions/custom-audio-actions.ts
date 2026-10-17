@@ -24,13 +24,24 @@ function isTableMissingError(err: any): boolean {
     msg.includes("does not exist") ||
     msg.includes("could not find the table") ||
     err.code === "PGRST204" ||
+    err.code === "PGRST205" ||
     err.code === "42P01"
   );
 }
 
-// In-memory store for offline/local-first testing
-const localCustomAudioEntries: Map<string, CustomAudioEntry> = new Map();
-const localCatalogEntries: Map<string, AudioCatalogEntry> = new Map();
+// In-memory store for offline/local-first testing & schema cache fallback (bound to globalThis)
+const globalAudioState = globalThis as unknown as {
+  __localCustomAudioEntries?: Map<string, CustomAudioEntry>;
+  __localCatalogEntries?: Map<string, AudioCatalogEntry>;
+};
+if (!globalAudioState.__localCustomAudioEntries) {
+  globalAudioState.__localCustomAudioEntries = new Map();
+}
+if (!globalAudioState.__localCatalogEntries) {
+  globalAudioState.__localCatalogEntries = new Map();
+}
+const localCustomAudioEntries = globalAudioState.__localCustomAudioEntries;
+const localCatalogEntries = globalAudioState.__localCatalogEntries;
 
 // Seed baseline catalog entries if empty for immediate rich study experience
 if (localCatalogEntries.size === 0) {
@@ -78,6 +89,73 @@ if (localCatalogEntries.size === 0) {
   seeds.forEach((s) => localCatalogEntries.set(s.id, s));
 }
 
+// Supabase DB System Record Resilience Helpers (Guarantees persistence across restarts)
+async function getDbCustomAudioFallback(userId: string): Promise<CustomAudioEntry[]> {
+  try {
+    const serviceSupabase = getServiceSupabase();
+    if (!serviceSupabase) return [];
+    const { data } = await serviceSupabase
+      .from("notes")
+      .select("content")
+      .eq("user_id", userId)
+      .eq("title", "__validily_custom_audio__")
+      .maybeSingle();
+    if (data?.content) {
+      const parsed = JSON.parse(data.content);
+      if (Array.isArray(parsed)) return parsed as CustomAudioEntry[];
+    }
+  } catch {}
+  return [];
+}
+
+async function saveDbCustomAudioFallback(userId: string, entries: CustomAudioEntry[]): Promise<void> {
+  try {
+    const serviceSupabase = getServiceSupabase();
+    if (!serviceSupabase) return;
+    const { data: existing } = await serviceSupabase
+      .from("notes")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("title", "__validily_custom_audio__")
+      .maybeSingle();
+
+    if (existing?.id) {
+      await serviceSupabase
+        .from("notes")
+        .update({
+          content: JSON.stringify(entries),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", existing.id);
+    } else {
+      await serviceSupabase.from("notes").insert({
+        user_id: userId,
+        title: "__validily_custom_audio__",
+        content: JSON.stringify(entries),
+        tags: ["system_custom_audio"],
+        visibility: "private",
+      });
+    }
+  } catch {}
+}
+
+async function getDbCatalogFallback(): Promise<AudioCatalogEntry[]> {
+  try {
+    const serviceSupabase = getServiceSupabase();
+    if (!serviceSupabase) return [];
+    const { data } = await serviceSupabase
+      .from("notes")
+      .select("content")
+      .eq("title", "__validily_audio_catalog__")
+      .maybeSingle();
+    if (data?.content) {
+      const parsed = JSON.parse(data.content);
+      if (Array.isArray(parsed)) return parsed as AudioCatalogEntry[];
+    }
+  } catch {}
+  return [];
+}
+
 const FREE_QUOTA_LIMIT = 2;
 const VIP_QUOTA_LIMIT = 25;
 const ADMIN_QUOTA_LIMIT = 100;
@@ -120,17 +198,27 @@ export async function getMyCustomAudio(): Promise<{
       ? VIP_QUOTA_LIMIT
       : FREE_QUOTA_LIMIT;
 
-    if (!isSupabaseConfigured()) {
-      const entries = Array.from(localCustomAudioEntries.values())
-        .filter((e) => e.user_id === user.id)
-        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    const dbFallback = await getDbCustomAudioFallback(user.id);
+    const map = new Map<string, CustomAudioEntry>();
+    for (const e of dbFallback) {
+      if (e.user_id === user.id) map.set(e.id, e);
+    }
+    for (const e of localCustomAudioEntries.values()) {
+      if (e.user_id === user.id) map.set(e.id, e);
+    }
 
-      const usedCount = entries.length;
+    if (!isSupabaseConfigured()) {
+      const merged = Array.from(map.values()).sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+      merged.forEach((e) => localCustomAudioEntries.set(e.id, e));
+
+      const usedCount = merged.length;
       const remainingSlots = Math.max(0, maxAllowed - usedCount);
 
       return {
         success: true,
-        entries,
+        entries: merged,
         usedCount,
         maxAllowed,
         remainingSlots,
@@ -146,41 +234,23 @@ export async function getMyCustomAudio(): Promise<{
       .eq("user_id", user.id)
       .order("created_at", { ascending: false });
 
-    if (error) {
-      if (isTableMissingError(error)) {
-        const list = Array.from(localCustomAudioEntries.values()).filter(
-          (e) => e.user_id === user.id
-        );
-        const usedCount = list.length;
-        const remainingSlots = Math.max(0, maxAllowed - usedCount);
-        return {
-          success: true,
-          entries: list,
-          usedCount,
-          maxAllowed,
-          remainingSlots,
-          isVip,
-          isAdmin,
-        };
+    if (!error && Array.isArray(entries)) {
+      for (const e of entries) {
+        if (e.user_id === user.id) map.set(e.id, e as CustomAudioEntry);
       }
-      return {
-        success: false,
-        entries: [],
-        usedCount: 0,
-        maxAllowed,
-        remainingSlots: 0,
-        isVip,
-        isAdmin,
-        error: error.message,
-      };
     }
 
-    const usedCount = entries?.length || 0;
+    const merged = Array.from(map.values()).sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+    merged.forEach((e) => localCustomAudioEntries.set(e.id, e));
+
+    const usedCount = merged.length;
     const remainingSlots = Math.max(0, maxAllowed - usedCount);
 
     return {
       success: true,
-      entries: (entries as CustomAudioEntry[]) || [],
+      entries: merged,
       usedCount,
       maxAllowed,
       remainingSlots,
@@ -267,6 +337,9 @@ export async function addCustomAudio(input: {
       };
 
       localCustomAudioEntries.set(newEntry.id, newEntry);
+      const dbFallback = await getDbCustomAudioFallback(user.id);
+      const updatedList = [newEntry, ...dbFallback.filter((e) => e.id !== newEntry.id)];
+      await saveDbCustomAudioFallback(user.id, updatedList);
       return { success: true, entry: newEntry };
     }
 
@@ -280,13 +353,15 @@ export async function addCustomAudio(input: {
 
     if (countErr) {
       if (isTableMissingError(countErr)) {
-        const userEntries = Array.from(localCustomAudioEntries.values()).filter(
-          (e) => e.user_id === user.id
-        );
-        if (userEntries.length >= maxAllowed) {
+        const dbFallback = await getDbCustomAudioFallback(user.id);
+        const existingList = dbFallback.length > 0
+          ? dbFallback
+          : Array.from(localCustomAudioEntries.values()).filter((e) => e.user_id === user.id);
+
+        if (existingList.length >= maxAllowed) {
           return {
             success: false,
-            error: `Quota atteint (${userEntries.length}/${maxAllowed} sons). Supprimez un son pour libérer un emplacement ou passez VIP.`,
+            error: `Quota atteint (${existingList.length}/${maxAllowed} sons). Supprimez un son pour libérer un emplacement ou passez VIP.`,
           };
         }
         const newEntry: CustomAudioEntry = {
@@ -299,6 +374,8 @@ export async function addCustomAudio(input: {
           created_at: now,
           updated_at: now,
         };
+        const updatedList = [newEntry, ...existingList.filter((e) => e.id !== newEntry.id)];
+        await saveDbCustomAudioFallback(user.id, updatedList);
         localCustomAudioEntries.set(newEntry.id, newEntry);
         return { success: true, entry: newEntry };
       }
@@ -337,13 +414,22 @@ export async function addCustomAudio(input: {
           created_at: now,
           updated_at: now,
         };
+        const dbFallback = await getDbCustomAudioFallback(user.id);
+        const updatedList = [newEntry, ...dbFallback.filter((e) => e.id !== newEntry.id)];
+        await saveDbCustomAudioFallback(user.id, updatedList);
         localCustomAudioEntries.set(newEntry.id, newEntry);
         return { success: true, entry: newEntry };
       }
       return { success: false, error: error?.message || "Échec de l'enregistrement." };
     }
 
-    return { success: true, entry: data as CustomAudioEntry };
+    const newEntry = data as CustomAudioEntry;
+    localCustomAudioEntries.set(newEntry.id, newEntry);
+    const dbFallback = await getDbCustomAudioFallback(user.id);
+    const updatedList = [newEntry, ...dbFallback.filter((e) => e.id !== newEntry.id)];
+    await saveDbCustomAudioFallback(user.id, updatedList);
+
+    return { success: true, entry: newEntry };
   } catch (err: any) {
     return { success: false, error: err?.message || "Erreur lors de l'ajout du son." };
   }
@@ -472,6 +558,9 @@ export async function deleteCustomAudio(entryId: string): Promise<{
 
     if (fetchErr && isTableMissingError(fetchErr)) {
       localCustomAudioEntries.delete(entryId);
+      const existingList = await getDbCustomAudioFallback(user.id);
+      const filtered = existingList.filter((e) => e.id !== entryId);
+      await saveDbCustomAudioFallback(user.id, filtered);
       return { success: true };
     }
 
@@ -479,6 +568,9 @@ export async function deleteCustomAudio(entryId: string): Promise<{
       const localEntry = localCustomAudioEntries.get(entryId);
       if (localEntry) {
         localCustomAudioEntries.delete(entryId);
+        const existingList = await getDbCustomAudioFallback(user.id);
+        const filtered = existingList.filter((e) => e.id !== entryId);
+        await saveDbCustomAudioFallback(user.id, filtered);
         return { success: true };
       }
       return { success: false, error: "Son introuvable." };
@@ -496,6 +588,9 @@ export async function deleteCustomAudio(entryId: string): Promise<{
     if (error) {
       if (isTableMissingError(error)) {
         localCustomAudioEntries.delete(entryId);
+        const existingList = await getDbCustomAudioFallback(user.id);
+        const filtered = existingList.filter((e) => e.id !== entryId);
+        await saveDbCustomAudioFallback(user.id, filtered);
         return { success: true };
       }
       return { success: false, error: error.message };
@@ -509,6 +604,7 @@ export async function deleteCustomAudio(entryId: string): Promise<{
 
 /**
  * Get published catalog entries curated by administrators.
+ * Public bonus tracks available to all students with zero quota consumption.
  */
 export async function getSharedAudioCatalog(): Promise<{
   success: boolean;
@@ -516,32 +612,49 @@ export async function getSharedAudioCatalog(): Promise<{
   error?: string;
 }> {
   try {
-    if (!isSupabaseConfigured()) {
-      const list = Array.from(localCatalogEntries.values())
-        .filter((c) => c.is_published)
-        .sort((a, b) => a.sort_order - b.sort_order);
-      return { success: true, catalog: list };
+    const dbCatalog = await getDbCatalogFallback();
+    const map = new Map<string, AudioCatalogEntry>();
+
+    // 1. Initial seeds and memory entries
+    for (const c of localCatalogEntries.values()) {
+      if (c.is_published) map.set(c.id, c);
     }
 
-    const serviceSupabase = getServiceSupabase();
-    const { data, error } = await serviceSupabase
-      .from("audio_catalog")
-      .select("*")
-      .eq("is_published", true)
-      .order("sort_order", { ascending: true })
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      if (isTableMissingError(error)) {
-        const list = Array.from(localCatalogEntries.values())
-          .filter((c) => c.is_published)
-          .sort((a, b) => a.sort_order - b.sort_order);
-        return { success: true, catalog: list };
+    // 2. Fallback DB entries from notes table (__validily_audio_catalog__)
+    for (const c of dbCatalog) {
+      if (c.is_published) {
+        map.set(c.id, c);
+        localCatalogEntries.set(c.id, c);
       }
-      return { success: false, catalog: [], error: error.message };
     }
 
-    return { success: true, catalog: (data as AudioCatalogEntry[]) || [] };
+    // 3. Supabase audio_catalog table (if available)
+    if (isSupabaseConfigured()) {
+      try {
+        const serviceSupabase = getServiceSupabase();
+        const { data, error } = await serviceSupabase
+          .from("audio_catalog")
+          .select("*")
+          .eq("is_published", true)
+          .order("sort_order", { ascending: true })
+          .order("created_at", { ascending: false });
+
+        if (!error && Array.isArray(data)) {
+          for (const c of data) {
+            if (c.is_published) {
+              map.set(c.id, c as AudioCatalogEntry);
+              localCatalogEntries.set(c.id, c as AudioCatalogEntry);
+            }
+          }
+        }
+      } catch {}
+    }
+
+    const list = Array.from(map.values()).sort(
+      (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)
+    );
+
+    return { success: true, catalog: list };
   } catch (err: any) {
     return { success: false, catalog: [], error: err?.message };
   }

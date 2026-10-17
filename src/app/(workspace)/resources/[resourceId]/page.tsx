@@ -266,7 +266,7 @@ export default async function ResourceDetailPage({
               <div className="flex justify-between py-1 border-b border-[#E4E8F0]">
                 <span className="text-[#68748A]">Academic Year:</span>
                 <span className="font-mono text-[#182235]">
-                  {resource.academic_year || "2024-2025"}
+                  {resource.academic_year || "2026-2027"}
                 </span>
               </div>
               <div className="flex justify-between py-1 border-b border-[#E4E8F0]">

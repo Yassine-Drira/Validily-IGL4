@@ -91,3 +91,19 @@ test("Semester 2 is supported without invented subjects", () => {
     "Semester 2 must not have invented initial subjects"
   );
 });
+
+test("Academic Hierarchy: Both Semesters 1 and 2 are assigned to Academic Year 2026-2027", () => {
+  const seedContent = fs.readFileSync(
+    path.join(process.cwd(), "supabase", "seed.sql"),
+    "utf-8"
+  );
+
+  assert.ok(
+    seedContent.includes("('11111111-1111-1111-1111-111111111111', 'Semester 1', '2026-2027'"),
+    "Semester 1 must be configured with academic year 2026-2027 in seed.sql"
+  );
+  assert.ok(
+    seedContent.includes("('22222222-2222-2222-2222-222222222222', 'Semester 2', '2026-2027'"),
+    "Semester 2 must be configured with academic year 2026-2027 in seed.sql"
+  );
+});

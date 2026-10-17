@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   FileEdit,
   Plus,
@@ -8,11 +9,6 @@ import {
   Trash2,
   Calendar,
   X,
-  Check,
-  Tag,
-  BookOpen,
-  Code,
-  Eye,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatDate } from "@/lib/utils";
@@ -35,6 +31,7 @@ export function NotesManager({
   defaultSubjectId,
   isAuthenticated = true,
 }: NotesManagerProps) {
+  const router = useRouter();
   const [notes, setNotes] = useState<Note[]>(initialNotes);
   const [noteToDelete, setNoteToDelete] = useState<Note | null>(null);
   const [search, setSearch] = useState<string>("");
@@ -53,7 +50,7 @@ export function NotesManager({
 
   const openCreateModal = () => {
     if (!isAuthenticated) {
-      window.location.href = `/login?next=${encodeURIComponent("/notes?action=new")}`;
+      router.push(`/login?next=${encodeURIComponent("/notes?action=new")}`);
       return;
     }
     setEditingNote(null);
@@ -67,7 +64,7 @@ export function NotesManager({
 
   const openEditModal = (note: Note) => {
     if (!isAuthenticated) {
-      window.location.href = `/login?next=${encodeURIComponent("/notes")}`;
+      router.push(`/login?next=${encodeURIComponent("/notes")}`);
       return;
     }
     setEditingNote(note);

@@ -8,7 +8,7 @@ import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 export const dynamic = "force-dynamic";
 
 export default async function BookmarksPage() {
-  let isGuest = false;
+  const isGuest = false;
   let bookmarkedResources: AcademicResource[] = [];
 
   try {

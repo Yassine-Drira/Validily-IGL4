@@ -126,7 +126,7 @@ export function AdminManager({
   // Semester Modal State
   const [isSemesterModalOpen, setIsSemesterModalOpen] = useState(false);
   const [semName, setSemName] = useState("");
-  const [semYear, setSemYear] = useState("2024-2025");
+  const [semYear, setSemYear] = useState("2026-2027");
   const [isSubmittingSem, setIsSubmittingSem] = useState(false);
 
   // Audit Logs State
@@ -1110,7 +1110,7 @@ export function AdminManager({
                   type="text"
                   value={semYear}
                   onChange={(e) => setSemYear(e.target.value)}
-                  placeholder="2024-2025"
+                  placeholder="2026-2027"
                   required
                   className="w-full bg-[#FAFBFD] border border-[#E4E8F0] rounded-xl px-3 py-2 text-xs text-[#111A2E] focus:outline-none focus:border-[#2855D9]"
                 />

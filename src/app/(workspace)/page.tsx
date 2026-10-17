@@ -8,6 +8,8 @@ import {
 } from "@/lib/supabase/repository";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { getStudentQuizAttempts, getStudentMistakes } from "@/lib/actions/quiz-actions";
+import { getMyForest } from "@/lib/actions/forest-actions";
+import { getUserStudyGoals } from "@/lib/actions/analytics-actions";
 import { ResourceCard } from "@/components/academic/resource-card";
 import { InteractiveFlowSelector } from "@/components/academic/interactive-flow-selector";
 import { PersonalAnalyticsDashboard } from "@/components/workspace/personal-analytics-dashboard";
@@ -56,6 +58,8 @@ export default async function HomePage() {
   let userAttempts: any[] = [];
   let userBookmarksCount = 0;
   let userMistakesCount = 0;
+  let userForestData: any = null;
+  let userGoals: any = null;
 
   try {
     const user = await getRequesterUser();
@@ -65,14 +69,18 @@ export default async function HomePage() {
         name: user.name || user.email?.split("@")[0] || "Étudiant",
         email: user.email,
       };
-      const [attempts, bookmarks, mistakes] = await Promise.all([
+      const [attempts, bookmarks, mistakes, forestData, studyGoals] = await Promise.all([
         getStudentQuizAttempts(user.id),
         getBookmarks(user.id),
         getStudentMistakes(user.id),
+        getMyForest(user.id),
+        getUserStudyGoals(user.id),
       ]);
       userAttempts = attempts || [];
       userBookmarksCount = bookmarks.length;
       userMistakesCount = mistakes?.length || 0;
+      userForestData = forestData;
+      userGoals = studyGoals;
     }
   } catch (err) {
     console.error("HomePage user fetch error:", err);
@@ -89,34 +97,74 @@ export default async function HomePage() {
     return { dateStr, dayLabel, count };
   });
 
-  const attemptDates = Array.from(
-    new Set(userAttempts.map((a) => a.completed_at?.split("T")[0]).filter(Boolean))
-  )
-    .sort()
-    .reverse();
+  // Real 7-day focus minutes from completed DB sessions
+  const dailyFocusMap: { [dateStr: string]: number } = {};
+  last7Days.forEach((d) => {
+    dailyFocusMap[d.dateStr] = 0;
+  });
+
+  if (userForestData?.trees) {
+    userForestData.trees.forEach((t: any) => {
+      if (t.tree_status === "healthy" && t.earned_at) {
+        const dateStr = t.earned_at.split("T")[0];
+        if (dailyFocusMap[dateStr] !== undefined) {
+          const durationSec =
+            t.session?.actual_duration_seconds ||
+            t.session?.target_duration_seconds ||
+            1500;
+          dailyFocusMap[dateStr] += Math.floor(durationSec / 60);
+        }
+      }
+    });
+  }
+
+  // Unified study streak: combines Quizzes + Focus Pomodoro sessions
+  const allActiveDatesSet = new Set<string>();
+  userAttempts.forEach((a) => {
+    if (a.completed_at) allActiveDatesSet.add(a.completed_at.split("T")[0]);
+  });
+  if (userForestData?.trees) {
+    userForestData.trees.forEach((t: any) => {
+      if (t.tree_status === "healthy" && t.earned_at) {
+        allActiveDatesSet.add(t.earned_at.split("T")[0]);
+      }
+    });
+  }
+
+  const activeDates = Array.from(allActiveDatesSet).sort().reverse();
 
   let streak = 0;
-  if (attemptDates.length > 0) {
+  if (activeDates.length > 0) {
     const todayStr = today.toISOString().split("T")[0];
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
     const yesterdayStr = yesterday.toISOString().split("T")[0];
 
     const checkDate =
-      attemptDates[0] === todayStr ? today : attemptDates[0] === yesterdayStr ? yesterday : null;
+      activeDates[0] === todayStr ? today : activeDates[0] === yesterdayStr ? yesterday : null;
     if (checkDate) {
       streak = 1;
       const curr = new Date(checkDate);
-      for (let i = 1; i < attemptDates.length; i++) {
+      for (let i = 1; i < activeDates.length; i++) {
         curr.setDate(curr.getDate() - 1);
         const expectedStr = curr.toISOString().split("T")[0];
-        if (attemptDates[i] === expectedStr) {
+        if (activeDates[i] === expectedStr) {
           streak++;
         } else {
           break;
         }
       }
     }
+  }
+
+  const practicedSubjectIds: string[] = [];
+  if (userForestData?.trees) {
+    userForestData.trees.forEach((t: any) => {
+      const sid = t.session?.subject_id || t.session?.subject?.id;
+      if (sid && !practicedSubjectIds.includes(sid)) {
+        practicedSubjectIds.push(sid);
+      }
+    });
   }
 
   const averageScore =
@@ -198,6 +246,9 @@ export default async function HomePage() {
         streak={streak}
         averageScore={averageScore}
         last7Days={last7Days}
+        initialDailyFocusMap={dailyFocusMap}
+        initialGoals={userGoals}
+        practicedSubjectIds={practicedSubjectIds}
         allSubjects={allSubjects}
         weakAttempt={weakAttempt}
         recentAttempt={recentAttempt}

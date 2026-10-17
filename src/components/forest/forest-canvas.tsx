@@ -161,6 +161,38 @@ export function ForestCanvas({
     setIsDragging(false);
   };
 
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length !== 1) return;
+    const touch = e.touches[0];
+    setIsDragging(true);
+    hasMovedRef.current = false;
+    dragStartRef.current = {
+      clientX: touch.clientX,
+      clientY: touch.clientY,
+      startPanX: pan.x,
+      startPanY: pan.y,
+    };
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isDragging || e.touches.length !== 1) return;
+    const touch = e.touches[0];
+    const dx = touch.clientX - dragStartRef.current.clientX;
+    const dy = touch.clientY - dragStartRef.current.clientY;
+
+    if (Math.hypot(dx, dy) > 4) {
+      hasMovedRef.current = true;
+    }
+
+    const newX = Math.min(MAX_PAN_X, Math.max(-MAX_PAN_X, dragStartRef.current.startPanX + dx));
+    const newY = Math.min(MAX_PAN_Y, Math.max(-MAX_PAN_Y, dragStartRef.current.startPanY + dy));
+    setPan({ x: newX, y: newY });
+  };
+
+  const handleTouchEnd = () => {
+    setIsDragging(false);
+  };
+
   const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault();
     const factor = e.deltaY < 0 ? 1.08 : 0.92;
@@ -296,7 +328,7 @@ export function ForestCanvas({
     <div
       ref={containerRef}
       className={cn(
-        "relative w-full h-[580px] sm:h-[660px] rounded-3xl overflow-hidden border border-[#16382B]/60 select-none shadow-2xl transition-colors duration-500",
+        "relative w-full h-[520px] sm:h-[660px] rounded-3xl overflow-hidden border border-[#16382B]/60 select-none shadow-2xl transition-colors duration-500 touch-none",
         `bg-gradient-to-b ${biomeTheme.bgGradient}`,
         isDragging ? "cursor-grabbing" : "cursor-grab",
         className
@@ -305,6 +337,10 @@ export function ForestCanvas({
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchEnd}
       onWheel={handleWheel}
       role="region"
       aria-label="Diorama Isométrique du Bosquet Focus"
@@ -349,48 +385,95 @@ export function ForestCanvas({
         <circle cx="480" cy="140" r="2.5" fill={biomeTheme.particleColor} opacity="0.7" />
       </svg>
 
-      {/* 2. Top Navigation Bar: Season Selector & Tree Counters */}
-      <div className="absolute top-4 left-4 z-20 flex flex-wrap items-center gap-2">
-        {/* Tree Count Status Badge */}
-        <div className="px-3.5 py-1.5 rounded-2xl bg-black/50 backdrop-blur-md border border-white/15 text-white text-xs font-semibold flex items-center space-x-2 shadow-lg">
-          <span
-            className={cn(
-              "w-2.5 h-2.5 rounded-full",
-              isLoading
-                ? "bg-amber-400 animate-ping"
-                : leaflessCount > 0 && healthyCount === 0
-                ? "bg-rose-400 animate-pulse"
-                : "bg-emerald-400 animate-pulse"
-            )}
-          />
-          {isLoading ? (
-            <span className="text-white/80 font-normal">Synchronisation du bosquet...</span>
-          ) : (
-            <>
-              <span className={healthyCount > 0 ? "text-emerald-300" : "text-white/80"}>
-                {healthyCount} {healthyCount > 1 ? "arbres sains" : "arbre sain"}
-              </span>
-              {leaflessCount > 0 && (
-                <>
-                  <span className="text-white/40">•</span>
-                  <span className="text-rose-400 font-medium">
-                    {leaflessCount} {leaflessCount > 1 ? "arbres morts (pénalités)" : "arbre mort (pénalité)"}
-                  </span>
-                </>
+      {/* 2. Top Navigation Bar: Season Selector, Tree Counters & Camera Controls */}
+      <div className="absolute top-3 left-3 right-3 sm:top-4 sm:left-4 sm:right-4 z-20 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pointer-events-none">
+        {/* Row 1 on mobile: Status Badge + Mobile Camera Controls | On desktop: Left group */}
+        <div className="flex items-center justify-between sm:justify-start gap-2 w-full sm:w-auto pointer-events-auto">
+          {/* Tree Count Status Badge */}
+          <div className="px-3 py-1.5 rounded-2xl bg-black/50 backdrop-blur-md border border-white/15 text-white text-xs font-semibold flex items-center space-x-1.5 sm:space-x-2 shadow-lg shrink-0">
+            <span
+              className={cn(
+                "w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full shrink-0",
+                isLoading
+                  ? "bg-amber-400 animate-ping"
+                  : leaflessCount > 0 && healthyCount === 0
+                  ? "bg-rose-400 animate-pulse"
+                  : "bg-emerald-400 animate-pulse"
               )}
-              <span className="text-white/40">•</span>
-              <span className="text-emerald-300 font-mono text-[11px]">
-                {entries.length > GROVE_CAPACITY
-                  ? `Bosquet ${currentGrovePage + 1}/${totalGroves} (${activeGroveEntries.length} arbres)`
-                  : `${activeGroveEntries.length}/36 parcelles`}
-              </span>
-            </>
-          )}
+            />
+            {isLoading ? (
+              <span className="text-white/80 font-normal">Synchronisation...</span>
+            ) : (
+              <>
+                <span className={healthyCount > 0 ? "text-emerald-300" : "text-white/80"}>
+                  {healthyCount} <span className="hidden xs:inline">{healthyCount > 1 ? "arbres sains" : "arbre sain"}</span>
+                  <span className="xs:hidden">sain{healthyCount > 1 ? "s" : ""}</span>
+                </span>
+                {leaflessCount > 0 && (
+                  <>
+                    <span className="text-white/40">•</span>
+                    <span className="text-rose-400 font-medium">
+                      {leaflessCount} <span className="hidden sm:inline">{leaflessCount > 1 ? "morts" : "mort"}</span>
+                    </span>
+                  </>
+                )}
+                <span className="text-white/40">•</span>
+                <span className="text-emerald-300 font-mono text-[11px]">
+                  {entries.length > GROVE_CAPACITY
+                    ? `B.${currentGrovePage + 1}/${totalGroves}`
+                    : `${activeGroveEntries.length}/36`}
+                </span>
+              </>
+            )}
+          </div>
+
+          {/* Camera Controls on Mobile (in line with badge) */}
+          <div className="sm:hidden flex items-center space-x-1 p-1 rounded-2xl bg-black/50 backdrop-blur-md border border-white/15 text-white shadow-lg shrink-0">
+            <button
+              type="button"
+              onClick={zoomIn}
+              disabled={zoom >= MAX_ZOOM}
+              className={cn(
+                "p-1.5 rounded-xl transition-colors cursor-pointer",
+                zoom >= MAX_ZOOM
+                  ? "opacity-40 cursor-not-allowed text-white/50"
+                  : "text-white/80 hover:text-white hover:bg-white/15"
+              )}
+              title="Zoom avant (+)"
+              aria-label="Zoom avant"
+            >
+              <ZoomIn className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={zoomOut}
+              disabled={zoom <= MIN_ZOOM}
+              className={cn(
+                "p-1.5 rounded-xl transition-colors cursor-pointer",
+                zoom <= MIN_ZOOM
+                  ? "opacity-40 cursor-not-allowed text-white/50"
+                  : "text-white/80 hover:text-white hover:bg-white/15"
+              )}
+              title="Zoom arrière (-)"
+              aria-label="Zoom arrière"
+            >
+              <ZoomOut className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={resetView}
+              className="p-1.5 text-white/80 hover:text-white hover:bg-white/15 rounded-xl transition-colors cursor-pointer"
+              title="Recentrer l'île (100%)"
+              aria-label="Recentrer la vue"
+            >
+              <Maximize2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
 
         {/* Season Selector Bar */}
         <div
-          className="flex items-center space-x-1 p-1 rounded-2xl bg-black/50 backdrop-blur-md border border-white/15 text-xs shadow-lg"
+          className="flex items-center space-x-1 p-1 rounded-2xl bg-black/50 backdrop-blur-md border border-white/15 text-xs shadow-lg self-start pointer-events-auto"
           role="radiogroup"
           aria-label="Sélection de la saison de présentation"
         >
@@ -400,7 +483,7 @@ export function ForestCanvas({
             aria-checked={season === "summer"}
             onClick={() => setSeason("summer")}
             className={cn(
-              "px-2.5 py-1 rounded-xl transition-all cursor-pointer flex items-center space-x-1",
+              "px-2 sm:px-2.5 py-1 rounded-xl transition-all cursor-pointer flex items-center space-x-1",
               season === "summer"
                 ? "bg-emerald-500 text-white font-bold shadow-xs"
                 : "text-white/70 hover:text-white"
@@ -417,7 +500,7 @@ export function ForestCanvas({
             aria-checked={season === "autumn"}
             onClick={() => setSeason("autumn")}
             className={cn(
-              "px-2.5 py-1 rounded-xl transition-all cursor-pointer flex items-center space-x-1",
+              "px-2 sm:px-2.5 py-1 rounded-xl transition-all cursor-pointer flex items-center space-x-1",
               season === "autumn"
                 ? "bg-amber-500 text-white font-bold shadow-xs"
                 : "text-white/70 hover:text-white"
@@ -434,7 +517,7 @@ export function ForestCanvas({
             aria-checked={season === "winter"}
             onClick={() => setSeason("winter")}
             className={cn(
-              "px-2.5 py-1 rounded-xl transition-all cursor-pointer flex items-center space-x-1",
+              "px-2 sm:px-2.5 py-1 rounded-xl transition-all cursor-pointer flex items-center space-x-1",
               season === "winter"
                 ? "bg-sky-500 text-white font-bold shadow-xs"
                 : "text-white/70 hover:text-white"
@@ -451,7 +534,7 @@ export function ForestCanvas({
             aria-checked={season === "spring"}
             onClick={() => setSeason("spring")}
             className={cn(
-              "px-2.5 py-1 rounded-xl transition-all cursor-pointer flex items-center space-x-1",
+              "px-2 sm:px-2.5 py-1 rounded-xl transition-all cursor-pointer flex items-center space-x-1",
               season === "spring"
                 ? "bg-pink-500 text-white font-bold shadow-xs"
                 : "text-white/70 hover:text-white"
@@ -462,49 +545,49 @@ export function ForestCanvas({
             <span className="hidden sm:inline">Printemps</span>
           </button>
         </div>
-      </div>
 
-      {/* 3. Top-Right Constrained Camera Controls */}
-      <div className="absolute top-4 right-4 z-20 flex items-center space-x-1.5 p-1 rounded-2xl bg-black/50 backdrop-blur-md border border-white/15 text-white shadow-lg">
-        <button
-          type="button"
-          onClick={zoomIn}
-          disabled={zoom >= MAX_ZOOM}
-          className={cn(
-            "p-2 rounded-xl transition-colors cursor-pointer",
-            zoom >= MAX_ZOOM
-              ? "opacity-40 cursor-not-allowed text-white/50"
-              : "text-white/80 hover:text-white hover:bg-white/15"
-          )}
-          title="Zoom avant (+)"
-          aria-label="Zoom avant"
-        >
-          <ZoomIn className="w-4 h-4" />
-        </button>
-        <button
-          type="button"
-          onClick={zoomOut}
-          disabled={zoom <= MIN_ZOOM}
-          className={cn(
-            "p-2 rounded-xl transition-colors cursor-pointer",
-            zoom <= MIN_ZOOM
-              ? "opacity-40 cursor-not-allowed text-white/50"
-              : "text-white/80 hover:text-white hover:bg-white/15"
-          )}
-          title="Zoom arrière (-)"
-          aria-label="Zoom arrière"
-        >
-          <ZoomOut className="w-4 h-4" />
-        </button>
-        <button
-          type="button"
-          onClick={resetView}
-          className="p-2 text-white/80 hover:text-white hover:bg-white/15 rounded-xl transition-colors cursor-pointer"
-          title="Recentrer l'île (100%)"
-          aria-label="Recentrer la vue"
-        >
-          <Maximize2 className="w-4 h-4" />
-        </button>
+        {/* Camera Controls on Desktop */}
+        <div className="hidden sm:flex items-center space-x-1.5 p-1 rounded-2xl bg-black/50 backdrop-blur-md border border-white/15 text-white shadow-lg pointer-events-auto">
+          <button
+            type="button"
+            onClick={zoomIn}
+            disabled={zoom >= MAX_ZOOM}
+            className={cn(
+              "p-2 rounded-xl transition-colors cursor-pointer",
+              zoom >= MAX_ZOOM
+                ? "opacity-40 cursor-not-allowed text-white/50"
+                : "text-white/80 hover:text-white hover:bg-white/15"
+            )}
+            title="Zoom avant (+)"
+            aria-label="Zoom avant"
+          >
+            <ZoomIn className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={zoomOut}
+            disabled={zoom <= MIN_ZOOM}
+            className={cn(
+              "p-2 rounded-xl transition-colors cursor-pointer",
+              zoom <= MIN_ZOOM
+                ? "opacity-40 cursor-not-allowed text-white/50"
+                : "text-white/80 hover:text-white hover:bg-white/15"
+            )}
+            title="Zoom arrière (-)"
+            aria-label="Zoom arrière"
+          >
+            <ZoomOut className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={resetView}
+            className="p-2 text-white/80 hover:text-white hover:bg-white/15 rounded-xl transition-colors cursor-pointer"
+            title="Recentrer l'île (100%)"
+            aria-label="Recentrer la vue"
+          >
+            <Maximize2 className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {/* 4. Bottom Multi-Grove Pagination (When trees exceed single island capacity of 36) */}
@@ -840,49 +923,49 @@ export function ForestCanvas({
               );
             })}
           </div>
-
-          {/* E. Subtle Loading Overlay during Grove Fetch */}
-          {isLoading && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center pointer-events-none z-30">
-              <div className="px-5 py-3 rounded-2xl bg-black/60 backdrop-blur-xl border border-white/15 text-white flex items-center space-x-3 shadow-2xl animate-in fade-in duration-200">
-                <RefreshCw className="w-4 h-4 text-emerald-400 animate-spin" />
-                <span className="text-xs font-semibold text-white/90">Synchronisation de votre île...</span>
-              </div>
-            </div>
-          )}
-
-          {/* F. Empty State — Welcoming Focal Island with Seedling Altar */}
-          {!isLoading && entries.length === 0 && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center pointer-events-auto z-40">
-              <div className="p-8 max-w-md bg-black/60 backdrop-blur-xl rounded-3xl border border-white/15 text-white shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-300">
-                <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-emerald-400/20 to-teal-500/20 border border-emerald-400/40 flex items-center justify-center mx-auto text-emerald-300 shadow-lg">
-                  <Sprout className="w-8 h-8 text-emerald-400 animate-bounce" />
-                </div>
-
-                <div>
-                  <h3 className="text-lg font-extrabold text-white tracking-tight">
-                    Votre Île Isométrique Attend Sa Première Pousse
-                  </h3>
-                  <p className="text-xs text-white/75 mt-1.5 leading-relaxed">
-                    Chaque session Pomodoro accomplie sans distraction plantera un arbre illustré
-                    sur cette île flottante. Lancez votre première session pour enrichir votre diorama.
-                  </p>
-                </div>
-
-                {!readOnly && (
-                  <button
-                    type="button"
-                    onClick={() => setIsModalOpen(true)}
-                    className="w-full py-3 px-5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold text-xs flex items-center justify-center space-x-2 shadow-lg shadow-emerald-500/25 transition-all cursor-pointer transform hover:-translate-y-0.5"
-                  >
-                    <Play className="w-4 h-4 fill-current" />
-                    <span>Lancer Ma Première Session Focus</span>
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
         </div>
+
+        {/* E. Subtle Loading Overlay during Grove Fetch (Fixed to responsive viewport) */}
+        {isLoading && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center pointer-events-none z-30">
+            <div className="px-5 py-3 rounded-2xl bg-black/60 backdrop-blur-xl border border-white/15 text-white flex items-center space-x-3 shadow-2xl animate-in fade-in duration-200">
+              <RefreshCw className="w-4 h-4 text-emerald-400 animate-spin" />
+              <span className="text-xs font-semibold text-white/90">Synchronisation de votre île...</span>
+            </div>
+          </div>
+        )}
+
+        {/* F. Empty State — Welcoming Focal Island with Seedling Altar (Fixed to responsive viewport) */}
+        {!isLoading && entries.length === 0 && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center p-4 sm:p-6 text-center pointer-events-none z-30">
+            <div className="p-5 sm:p-8 max-w-[92vw] sm:max-w-md w-full bg-black/65 backdrop-blur-xl rounded-3xl border border-white/15 text-white shadow-2xl space-y-3.5 sm:space-y-4 animate-in fade-in zoom-in-95 duration-300 pointer-events-auto">
+              <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-2xl sm:rounded-3xl bg-gradient-to-br from-emerald-400/20 to-teal-500/20 border border-emerald-400/40 flex items-center justify-center mx-auto text-emerald-300 shadow-lg">
+                <Sprout className="w-6 h-6 sm:w-8 sm:h-8 text-emerald-400 animate-bounce" />
+              </div>
+
+              <div>
+                <h3 className="text-base sm:text-lg font-extrabold text-white tracking-tight">
+                  Votre Île Isométrique Attend Sa Première Pousse
+                </h3>
+                <p className="text-[11px] sm:text-xs text-white/75 mt-1 sm:mt-1.5 leading-relaxed">
+                  Chaque session Pomodoro accomplie sans distraction plantera un arbre illustré
+                  sur cette île flottante. Lancez votre première session pour enrichir votre diorama.
+                </p>
+              </div>
+
+              {!readOnly && (
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(true)}
+                  className="w-full py-2.5 sm:py-3 px-4 sm:px-5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold text-xs flex items-center justify-center space-x-2 shadow-lg shadow-emerald-500/25 transition-all cursor-pointer transform hover:-translate-y-0.5"
+                >
+                  <Play className="w-3.5 h-3.5 sm:w-4 sm:h-4 fill-current" />
+                  <span>Lancer Ma Première Session Focus</span>
+                </button>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 6. Selected Tree Detail Modal with Season Pass-through */}
