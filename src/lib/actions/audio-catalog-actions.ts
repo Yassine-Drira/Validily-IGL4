@@ -7,6 +7,7 @@ import { assertAdmin, getRequesterUser } from "@/lib/auth/authorization";
 import { parseAndValidateYouTubeUrl } from "@/lib/audio/youtube-parser";
 import { AudioCatalogEntry, AudioCatalogCategory, AudioSourceType } from "@/types/database";
 import { logAuditEvent } from "@/lib/audit/audit-logger";
+import { getDistributedJson, setDistributedJson } from "@/lib/kv/redis";
 
 function safeRevalidate(path: string) {
   try {
@@ -134,8 +135,15 @@ async function getValidSystemUserId(serviceSupabase: any): Promise<string> {
   return "12b54e6a-f1e0-4bee-b520-b4e479da3044";
 }
 
-// Audio Catalog Resilience Helpers (Disk Cache & Memory Store - Never touches notes table)
+// Audio Catalog Resilience Helpers (Distributed Redis KV + Disk Cache + Memory Store)
 async function getDbCatalogFallback(): Promise<AudioCatalogEntry[]> {
+  try {
+    const redisCatalog = await getDistributedJson<AudioCatalogEntry[]>("global:audio_catalog_entries");
+    if (Array.isArray(redisCatalog) && redisCatalog.length > 0) {
+      return redisCatalog;
+    }
+  } catch {}
+
   const disk = readDiskCatalogCache();
   if (disk.length > 0) return disk;
   return DEFAULT_SEEDS;
@@ -143,6 +151,9 @@ async function getDbCatalogFallback(): Promise<AudioCatalogEntry[]> {
 
 async function saveDbCatalogFallback(entries: AudioCatalogEntry[]): Promise<void> {
   writeDiskCatalogCache(entries);
+  try {
+    await setDistributedJson("global:audio_catalog_entries", entries);
+  } catch {}
 }
 
 

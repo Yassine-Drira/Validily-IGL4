@@ -7,6 +7,7 @@ import { getRequesterUser, isUserAdmin } from "@/lib/auth/authorization";
 import { parseAndValidateYouTubeUrl } from "@/lib/audio/youtube-parser";
 import { getUserVipStatus } from "@/lib/actions/vip-actions";
 import { CustomAudioEntry, AudioCatalogEntry } from "@/types/database";
+import { getDistributedJson } from "@/lib/kv/redis";
 
 function safeRevalidate(path: string) {
   try {
@@ -159,6 +160,13 @@ async function saveDbCustomAudioFallback(userId: string, entries: CustomAudioEnt
 }
 
 async function getDbCatalogFallback(): Promise<AudioCatalogEntry[]> {
+  try {
+    const redisEntries = await getDistributedJson<AudioCatalogEntry[]>("global:audio_catalog_entries");
+    if (Array.isArray(redisEntries) && redisEntries.length > 0) {
+      return redisEntries;
+    }
+  } catch {}
+
   try {
     const catalogFile = path.join(CACHE_DIR, "audio_catalog.json");
     if (fs.existsSync(catalogFile)) {
