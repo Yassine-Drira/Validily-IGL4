@@ -17,7 +17,10 @@ import {
   Crown,
   Megaphone,
   ShieldCheck,
+  User,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { StudentProfileModal } from "@/components/profile/student-profile-modal";
 import { SystemNotification, CheerType } from "@/types/database";
 import {
   getMyNotifications,
@@ -62,6 +65,7 @@ function getCheerMeta(type?: CheerType) {
         icon: Droplets,
         bg: "bg-blue-50 border-blue-200 text-blue-600",
         badge: "bg-blue-100 text-blue-700",
+        iconColor: "text-blue-600",
         emoji: "💧",
       };
     case "fire":
@@ -69,6 +73,7 @@ function getCheerMeta(type?: CheerType) {
         icon: Flame,
         bg: "bg-amber-50 border-amber-200 text-amber-600",
         badge: "bg-amber-100 text-amber-800",
+        iconColor: "text-amber-600",
         emoji: "🔥",
       };
     case "muscle":
@@ -76,6 +81,7 @@ function getCheerMeta(type?: CheerType) {
         icon: Zap,
         bg: "bg-purple-50 border-purple-200 text-purple-600",
         badge: "bg-purple-100 text-purple-700",
+        iconColor: "text-purple-600",
         emoji: "💪",
       };
     case "clap":
@@ -84,6 +90,7 @@ function getCheerMeta(type?: CheerType) {
         icon: Award,
         bg: "bg-emerald-50 border-emerald-200 text-emerald-600",
         badge: "bg-emerald-100 text-emerald-800",
+        iconColor: "text-emerald-600",
         emoji: "👏",
       };
   }
@@ -125,6 +132,7 @@ export function NotificationBell({ user }: NotificationBellProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [filterUnreadOnly, setFilterUnreadOnly] = useState(false);
+  const [profileToViewId, setProfileToViewId] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const fetchNotifications = useCallback(async () => {
@@ -355,6 +363,10 @@ export function NotificationBell({ user }: NotificationBellProps) {
                     key={item.id}
                     onClick={() => {
                       if (!item.is_read) handleMarkAsRead(item.id);
+                      if (item.sender_id) {
+                        setProfileToViewId(item.sender_id);
+                        setIsOpen(false);
+                      }
                     }}
                     className={`p-3.5 transition-colors cursor-pointer group flex items-start space-x-3 ${
                       item.is_read
@@ -365,7 +377,18 @@ export function NotificationBell({ user }: NotificationBellProps) {
                     }`}
                   >
                     {/* Icon or Avatar */}
-                    <div className="relative shrink-0">
+                    <div
+                      className="relative shrink-0 cursor-pointer"
+                      onClick={(e) => {
+                        if (item.sender_id) {
+                          e.stopPropagation();
+                          if (!item.is_read) handleMarkAsRead(item.id);
+                          setProfileToViewId(item.sender_id);
+                          setIsOpen(false);
+                        }
+                      }}
+                      title={item.sender_id ? "Consulter le profil de l'étudiant" : undefined}
+                    >
                       {item.sender_avatar_url ? (
                         <img
                           src={item.sender_avatar_url}
@@ -379,8 +402,13 @@ export function NotificationBell({ user }: NotificationBellProps) {
                           <IconComponent className="w-4 h-4" />
                         </div>
                       )}
-                      <span className="absolute -bottom-1 -right-1 text-xs">
-                        {meta.emoji}
+                      <span
+                        className={cn(
+                          "absolute -bottom-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center border border-white shadow-2xs",
+                          meta.badge || "bg-emerald-100"
+                        )}
+                      >
+                        <IconComponent className={cn("w-2.5 h-2.5", (meta as any).iconColor || "text-emerald-700")} />
                       </span>
                     </div>
 
@@ -411,7 +439,21 @@ export function NotificationBell({ user }: NotificationBellProps) {
                       </p>
 
                       <div className="flex items-center justify-between pt-1">
-                        {item.link ? (
+                        {item.sender_id ? (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (!item.is_read) handleMarkAsRead(item.id);
+                              setProfileToViewId(item.sender_id || null);
+                              setIsOpen(false);
+                            }}
+                            className="inline-flex items-center space-x-1 text-[11px] font-semibold text-[#2855D9] hover:underline cursor-pointer"
+                          >
+                            <User className="w-3 h-3 text-[#2855D9]" />
+                            <span>Voir le profil &amp; bosquet</span>
+                          </button>
+                        ) : item.link ? (
                           <Link
                             href={item.link}
                             onClick={(e) => {
@@ -473,6 +515,13 @@ export function NotificationBell({ user }: NotificationBellProps) {
           </div>
         </div>
       )}
+
+      {/* Public Student Profile Modal accessed from Notification click */}
+      <StudentProfileModal
+        studentId={profileToViewId}
+        isOpen={Boolean(profileToViewId)}
+        onClose={() => setProfileToViewId(null)}
+      />
     </div>
   );
 }

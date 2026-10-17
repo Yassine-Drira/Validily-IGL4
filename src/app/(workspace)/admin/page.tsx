@@ -16,6 +16,7 @@ import { listAllCatalogEntries } from "@/lib/actions/audio-catalog-actions";
 import { listVipEntitlements } from "@/lib/actions/vip-actions";
 import { getLivePresenceList } from "@/lib/actions/presence-actions";
 import { getAnalyticsOverview } from "@/lib/actions/analytics-actions";
+import { listStudentsPerformanceAction } from "@/lib/actions/profile-actions";
 
 import { ShieldAlert, Lock } from "lucide-react";
 
@@ -42,6 +43,7 @@ export default async function AdminPage() {
     vipRes,
     presenceRes,
     analyticsRes,
+    studentsRes,
   ] = await Promise.all([
     getSemesters(),
     getSubjects(),
@@ -52,6 +54,7 @@ export default async function AdminPage() {
     listVipEntitlements(),
     getLivePresenceList(),
     getAnalyticsOverview("7d"),
+    listStudentsPerformanceAction(),
   ]);
 
   const auditLogs = getRecentAuditLogs(50);
@@ -74,6 +77,7 @@ export default async function AdminPage() {
         initialPresenceUsers={presenceRes.users || []}
         initialTotalActiveUsers={presenceRes.totalActive || 0}
         initialAnalytics={analyticsRes.overview || null}
+        initialStudentsPerformance={studentsRes.students || []}
       />
     </div>
   );

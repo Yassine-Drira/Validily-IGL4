@@ -6,6 +6,7 @@ import { getCommunityForests, getMyForest, sendClassmateCheer } from "@/lib/acti
 import { MemberForestSummary, ForestEntry } from "@/types/database";
 import { TreeSvg, SPECIES_METADATA } from "@/components/forest/tree-models";
 import { ForestCanvas } from "@/components/forest/forest-canvas";
+import { useSearchParams } from "next/navigation";
 import {
   Users,
   Trees,
@@ -20,19 +21,33 @@ import {
   Lock,
   Shield,
   Heart,
+  User,
+  Award,
+  Flame,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { StudentProfileModal } from "@/components/profile/student-profile-modal";
 
 export default function CommunityForestPage() {
+  const searchParams = useSearchParams();
+  const studentParam = searchParams ? searchParams.get("student") : null;
+
   const [members, setMembers] = useState<MemberForestSummary[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [selectedMember, setSelectedMember] = useState<MemberForestSummary | null>(null);
+  const [profileModalUserId, setProfileModalUserId] = useState<string | null>(studentParam || null);
   const [peerTrees, setPeerTrees] = useState<ForestEntry[] | null>(null);
   const [isLoadingPeer, setIsLoadingPeer] = useState<boolean>(false);
   const [cheerFeedback, setCheerFeedback] = useState<string>("");
   const [isCheering, setIsCheering] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (studentParam) {
+      setProfileModalUserId(studentParam);
+    }
+  }, [studentParam]);
 
   const fetchMembers = async () => {
     setIsLoading(true);
@@ -193,13 +208,26 @@ export default function CommunityForestPage() {
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={() => setSelectedMember(null)}
-                className="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold bg-[#F4F6FA] hover:bg-[#E4E8F0] text-[#182235] transition-colors cursor-pointer shrink-0"
-              >
-                Fermer
-              </button>
+              <div className="flex items-center space-x-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setProfileModalUserId(selectedMember.userId);
+                    setSelectedMember(null);
+                  }}
+                  className="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold bg-[#2855D9] hover:bg-[#1E43B2] text-white transition-colors cursor-pointer flex items-center space-x-1.5 shadow-2xs"
+                >
+                  <User className="w-3.5 h-3.5" />
+                  <span>Profil &amp; Accomplissements</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedMember(null)}
+                  className="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold bg-[#F4F6FA] hover:bg-[#E4E8F0] text-[#182235] transition-colors cursor-pointer shrink-0"
+                >
+                  Fermer
+                </button>
+              </div>
             </div>
 
             {/* Read-only interactive landscape */}
@@ -447,15 +475,36 @@ export default function CommunityForestPage() {
                     )}
                   </div>
 
-                  <span className="text-[11px] font-semibold text-[#2855D9] group-hover:underline">
-                    Explorer le bosquet →
-                  </span>
+                  <div className="flex items-center space-x-3">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setProfileModalUserId(member.userId);
+                      }}
+                      className="text-[11px] font-semibold text-[#2855D9] hover:underline flex items-center space-x-1 cursor-pointer"
+                    >
+                      <User className="w-3 h-3" />
+                      <span>Profil &amp; badges</span>
+                    </button>
+                    <span className="text-[11px] font-semibold text-[#68748A] group-hover:text-[#2855D9] flex items-center space-x-0.5">
+                      <span>Bosquet</span>
+                      <ChevronRight className="w-3 h-3" />
+                    </span>
+                  </div>
                 </div>
               </div>
             );
           })}
         </div>
       )}
+
+      {/* Comprehensive Student Profile Modal */}
+      <StudentProfileModal
+        studentId={profileModalUserId}
+        isOpen={Boolean(profileModalUserId)}
+        onClose={() => setProfileModalUserId(null)}
+      />
     </div>
   );
 }

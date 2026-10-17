@@ -1716,21 +1716,28 @@ export async function sendClassmateCheer(input: {
     }
 
     const cheerLabels: Record<string, string> = {
-      water: "💧 Arrosage bienveillant envoyé",
-      clap: "👏 Félicitations pour la session envoyées",
-      fire: "🔥 Encouragement d'assiduité envoyé",
-      muscle: "💪 Force & persévérance transmises",
+      water: "a arrosé votre bosquet",
+      clap: "a salué votre session d'étude",
+      fire: "a encouragé votre régularité",
+      muscle: "vous transmet de la force pour vos révisions",
     };
 
     const cheerTitles: Record<string, string> = {
-      water: "💧 Arrosage de bosquet reçu !",
-      clap: "👏 Félicitations pour ta session !",
-      fire: "🔥 Boost d'assiduité reçu !",
-      muscle: "💪 Force & motivation partagées !",
+      water: "Arrosage de bosquet reçu",
+      clap: "Session d'étude saluée",
+      fire: "Boost d'assiduité reçu",
+      muscle: "Soutien & motivation reçus",
+    };
+
+    const cheerFeedbacks: Record<string, string> = {
+      water: "Arrosage bienveillant envoyé",
+      clap: "Félicitations transmises",
+      fire: "Boost d'assiduité envoyé",
+      muscle: "Force transmise",
     };
 
     const recipientLabel = input.recipientName || "votre camarade";
-    const feedbackMsg = `${cheerLabels[input.cheerType] || "Encouragement envoyé"} à ${recipientLabel} !`;
+    const feedbackMsg = `${cheerFeedbacks[input.cheerType] || "Encouragement envoyé"} à ${recipientLabel} !`;
 
     const configured = await isDbConfigured();
     if (configured) {
@@ -1761,9 +1768,9 @@ export async function sendClassmateCheer(input: {
           senderAvatarUrl: requester.avatarUrl || null,
           type: "cheer",
           cheerType: input.cheerType,
-          title: cheerTitles[input.cheerType] || "Encouragement reçu !",
-          content: `${requester.name || "Un camarade"} vous a envoyé : ${cheerLabels[input.cheerType]} !`,
-          link: "/forest",
+          title: cheerTitles[input.cheerType] || "Encouragement reçu",
+          content: `${requester.name || "Un camarade"} ${cheerLabels[input.cheerType] || "vous a envoyé un encouragement d'étude"}.`,
+          link: `/forest/community?student=${requester.id}`,
         });
       }
     } catch {

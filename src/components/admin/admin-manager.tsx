@@ -30,6 +30,7 @@ import {
   Crown,
   BarChart3,
   Volume2,
+  GraduationCap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -61,6 +62,8 @@ import { AdminAudioCatalog } from "./admin-audio-catalog";
 import { AdminVipManager } from "./admin-vip-manager";
 import { AdminPresenceView } from "./admin-presence-view";
 import { AdminAnalyticsView } from "./admin-analytics-view";
+import { AdminStudentsView } from "./admin-students-view";
+import { StudentPerformanceOverview } from "@/lib/actions/profile-actions";
 
 interface AdminManagerProps {
   initialSemesters: Semester[];
@@ -76,6 +79,7 @@ interface AdminManagerProps {
   initialPresenceUsers?: Array<UserPresence & { isRecent: boolean; timeAgoSeconds: number }>;
   initialTotalActiveUsers?: number;
   initialAnalytics?: AnalyticsOverview | null;
+  initialStudentsPerformance?: StudentPerformanceOverview[];
 }
 
 export function AdminManager({
@@ -92,9 +96,10 @@ export function AdminManager({
   initialPresenceUsers = [],
   initialTotalActiveUsers = 0,
   initialAnalytics = null,
+  initialStudentsPerformance = [],
 }: AdminManagerProps) {
   const [activeTab, setActiveTab] = useState<
-    "curriculum" | "delegation" | "vip" | "audio" | "presence" | "analytics" | "audit"
+    "curriculum" | "delegation" | "students" | "vip" | "audio" | "presence" | "analytics" | "audit"
   >("curriculum");
   const [semesters, setSemesters] = useState<Semester[]>(initialSemesters);
   const [subjects, setSubjects] = useState<Subject[]>(initialSubjects);
@@ -504,6 +509,19 @@ export function AdminManager({
         >
           <Users className="w-3.5 h-3.5" />
           <span>Délégation Admin ({users.length})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("students")}
+          className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition-all cursor-pointer shrink-0 ${
+            activeTab === "students"
+              ? "bg-indigo-600 text-white shadow-2xs"
+              : "text-[#68748A] hover:bg-[#F4F6FA]"
+          }`}
+        >
+          <GraduationCap className="w-3.5 h-3.5" />
+          <span>Étudiants & Suivi ({initialStudentsPerformance.length})</span>
         </button>
 
         <button
@@ -922,6 +940,11 @@ export function AdminManager({
       {/* TAB 7: SITE ANALYTICS */}
       {activeTab === "analytics" && (
         <AdminAnalyticsView initialOverview={initialAnalytics} />
+      )}
+
+      {/* TAB 8: STUDENTS PERFORMANCE & ACHIEVEMENTS */}
+      {activeTab === "students" && (
+        <AdminStudentsView initialStudents={initialStudentsPerformance} />
       )}
 
       {/* MODAL: CREATE OR EDIT SUBJECT WITH ICON & COLOR PICKER */}
