@@ -611,20 +611,41 @@ export function PersonalAnalyticsDashboard({
       {/* 2. Visuals Center: Multi-Dimensional Dynamic Charts (Donut + Spline Curve + KPIs) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
         {/* Left: Dynamic Donut Chart (4 cols) */}
-        <div className="lg:col-span-4 bg-[#FAFBFD] border border-[#E4E8F0] rounded-2xl p-5 flex flex-col justify-between">
+        <div className="lg:col-span-4 bg-white border border-[#E4E8F0] rounded-2xl p-5 shadow-xs flex flex-col justify-between hover:border-[#D0D7E5] transition-all">
+          {/* Header & View Switcher */}
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] font-bold text-[#68748A] uppercase tracking-wider">
-              {donutView === "goal" ? "Objectif Journalier" : "Répartition par Matière"}
-            </span>
+            <div className="flex items-center space-x-2">
+              <div
+                className={cn(
+                  "w-6 h-6 rounded-lg flex items-center justify-center transition-colors border",
+                  donutView === "goal"
+                    ? isGoalReached
+                      ? "bg-emerald-50 text-emerald-600 border-emerald-200/70"
+                      : "bg-blue-50 text-[#2855D9] border-blue-200/70"
+                    : "bg-indigo-50 text-indigo-600 border-indigo-200/70"
+                )}
+              >
+                {donutView === "goal" ? (
+                  <Target className="w-3.5 h-3.5" />
+                ) : (
+                  <PieChart className="w-3.5 h-3.5" />
+                )}
+              </div>
+              <span className="text-[11px] font-bold text-[#111A2E] uppercase tracking-wider font-mono">
+                {donutView === "goal" ? "Objectif Journalier" : "Répartition par Matière"}
+              </span>
+            </div>
 
             {/* Toggle Donut View */}
-            <div className="flex items-center bg-[#EAEFF8] p-0.5 rounded-lg border border-[#D5E0F2]">
+            <div className="flex items-center bg-[#F1F4F9] p-0.5 rounded-lg border border-[#E2E8F0]">
               <button
                 type="button"
                 onClick={() => setDonutView("goal")}
                 className={cn(
-                  "px-2 py-0.5 rounded-md text-[10px] font-semibold transition-all cursor-pointer",
-                  donutView === "goal" ? "bg-white text-[#2855D9] shadow-2xs font-bold" : "text-[#68748A]"
+                  "px-2.5 py-1 rounded-md text-[10px] font-semibold transition-all cursor-pointer",
+                  donutView === "goal"
+                    ? "bg-white text-[#2855D9] shadow-2xs font-bold"
+                    : "text-[#68748A] hover:text-[#111A2E]"
                 )}
                 title="Afficher l'anneau d'accomplissement de votre objectif du jour"
               >
@@ -634,8 +655,10 @@ export function PersonalAnalyticsDashboard({
                 type="button"
                 onClick={() => setDonutView("subjects")}
                 className={cn(
-                  "px-2 py-0.5 rounded-md text-[10px] font-semibold transition-all cursor-pointer",
-                  donutView === "subjects" ? "bg-white text-[#2855D9] shadow-2xs font-bold" : "text-[#68748A]"
+                  "px-2.5 py-1 rounded-md text-[10px] font-semibold transition-all cursor-pointer",
+                  donutView === "subjects"
+                    ? "bg-white text-[#2855D9] shadow-2xs font-bold"
+                    : "text-[#68748A] hover:text-[#111A2E]"
                 )}
                 title="Afficher la ventilation réelle de vos quiz par matière"
               >
@@ -645,10 +668,21 @@ export function PersonalAnalyticsDashboard({
           </div>
 
           {/* SVG Donut Ring */}
-          <div className="relative w-44 h-44 mx-auto my-2 flex items-center justify-center">
+          <div className="relative w-48 h-48 sm:w-52 sm:h-52 mx-auto my-2.5 flex items-center justify-center">
             <svg className="w-full h-full -rotate-90 drop-shadow-2xs" viewBox="0 0 100 100">
+              <defs>
+                <linearGradient id="goalProgressGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#10B981" />
+                  <stop offset="100%" stopColor="#059669" />
+                </linearGradient>
+                <linearGradient id="primaryProgressGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#3B82F6" />
+                  <stop offset="100%" stopColor="#1D4ED8" />
+                </linearGradient>
+              </defs>
+
               {/* Background Track */}
-              <circle cx="50" cy="50" r="40" stroke="#EEF2F6" strokeWidth="11" fill="none" />
+              <circle cx="50" cy="50" r="40" stroke="#F1F4F9" strokeWidth="9" fill="none" />
 
               {donutView === "goal" ? (
                 /* Mode 1: Daily Focus Goal Ring */
@@ -656,8 +690,8 @@ export function PersonalAnalyticsDashboard({
                   cx="50"
                   cy="50"
                   r="40"
-                  stroke={isGoalReached ? "#10B981" : "#2855D9"}
-                  strokeWidth="11"
+                  stroke={isGoalReached ? "url(#goalProgressGradient)" : "url(#primaryProgressGradient)"}
+                  strokeWidth="9"
                   strokeDasharray={`${donutGoalDash} ${circleCircumference}`}
                   strokeDashoffset="0"
                   strokeLinecap="round"
@@ -674,7 +708,7 @@ export function PersonalAnalyticsDashboard({
                       cy="50"
                       r="40"
                       stroke={slice.color}
-                      strokeWidth="11"
+                      strokeWidth="9"
                       strokeDasharray={`${slice.dash} ${circleCircumference}`}
                       strokeDashoffset={slice.offset}
                       fill="none"
@@ -687,7 +721,7 @@ export function PersonalAnalyticsDashboard({
                     cy="50"
                     r="40"
                     stroke="#CBD5E1"
-                    strokeWidth="11"
+                    strokeWidth="9"
                     strokeDasharray="10 5"
                     fill="none"
                   />
@@ -695,53 +729,64 @@ export function PersonalAnalyticsDashboard({
               )}
             </svg>
 
-            {/* Inner Center Label (Clickable) */}
-            <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-2">
+            {/* Inner Center Label (Clickable & Symmetrically Padded) */}
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-3 select-none">
               {donutView === "goal" ? (
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(true)}
-                  className="flex flex-col items-center justify-center cursor-pointer group hover:scale-105 transition-transform"
+                  className="flex flex-col items-center justify-center cursor-pointer group hover:scale-[1.03] transition-transform w-full max-w-[130px]"
                   title="Cliquer pour ouvrir le Focus Hub"
                 >
-                  <span className="text-2xl font-black font-mono text-[#111A2E] group-hover:text-[#2855D9] transition-colors tracking-tight font-tabular">
-                    {formattedTodayFocus}
-                  </span>
-                  <span className="text-[10px] font-semibold text-[#68748A] mt-0.5">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-[#68748A]">
                     Focus Aujourd&apos;hui
                   </span>
-                  <span
+                  <span className="text-2xl sm:text-[26px] font-black font-mono text-[#111A2E] group-hover:text-[#2855D9] transition-colors tracking-tight font-tabular leading-tight my-0.5">
+                    {formattedTodayFocus}
+                  </span>
+                  <div
                     className={cn(
-                      "text-[10px] font-mono mt-0.5",
+                      "inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold border transition-all mt-0.5 shadow-2xs",
                       isGoalExceeded
-                        ? "text-emerald-700 font-extrabold"
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-200/80"
                         : isGoalReached
-                        ? "text-emerald-600 font-bold"
-                        : "text-[#2855D9] font-bold"
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-200/80"
+                        : "bg-blue-50 text-[#2855D9] border-blue-200/80"
                     )}
                   >
-                    {isGoalExceeded
-                      ? `${rawGoalPercent}% (Cible dépassée !)`
-                      : isGoalReached
-                      ? `${rawGoalPercent}% atteint (${goals.dailyFocusMinutes}m)`
-                      : `${rawGoalPercent}% de ${goals.dailyFocusMinutes}m`}
-                  </span>
+                    {isGoalExceeded ? (
+                      <>
+                        <Sparkles className="w-2.5 h-2.5 text-emerald-600 shrink-0" />
+                        <span>{rawGoalPercent}%</span>
+                        <span className="text-[9px] font-sans font-medium text-emerald-600">atteint</span>
+                      </>
+                    ) : isGoalReached ? (
+                      <>
+                        <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600 shrink-0" />
+                        <span>100%</span>
+                      </>
+                    ) : (
+                      <span>{rawGoalPercent}%</span>
+                    )}
+                  </div>
                 </button>
               ) : (
                 <Link
                   href="/quizzes"
-                  className="flex flex-col items-center justify-center cursor-pointer group hover:scale-105 transition-transform"
+                  className="flex flex-col items-center justify-center cursor-pointer group hover:scale-[1.03] transition-transform w-full max-w-[130px]"
                   title="Accéder aux quiz"
                 >
-                  <span className="text-2xl font-black font-mono text-[#111A2E] group-hover:text-[#2855D9] transition-colors tracking-tight font-tabular">
-                    {userAttempts.length}
-                  </span>
-                  <span className="text-[10px] font-semibold text-[#68748A] mt-0.5">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-[#68748A]">
                     Quiz Enregistrés
                   </span>
-                  <span className="text-[10px] font-mono text-[#2855D9] font-bold mt-0.5">
-                    {subjectDistribution.length} matière(s)
+                  <span className="text-2xl sm:text-[26px] font-black font-mono text-[#111A2E] group-hover:text-[#2855D9] transition-colors tracking-tight font-tabular leading-tight my-0.5">
+                    {userAttempts.length}
                   </span>
+                  <div className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-slate-100 text-[#475569] border border-slate-200 mt-0.5 shadow-2xs">
+                    <span>
+                      {subjectDistribution.length} matière{subjectDistribution.length > 1 ? "s" : ""}
+                    </span>
+                  </div>
                 </Link>
               )}
             </div>
@@ -752,36 +797,54 @@ export function PersonalAnalyticsDashboard({
             {donutView === "goal" ? (
               <div
                 onClick={() => setIsModalOpen(true)}
-                className="flex items-center justify-between text-[11px] cursor-pointer hover:bg-slate-50 p-1 rounded-lg transition-colors"
-                title="Cliquer pour configurer dans le Focus Hub"
+                className="flex items-center justify-between text-xs cursor-pointer hover:bg-[#F8FAFC] p-2 rounded-xl transition-all group border border-transparent hover:border-[#E2E8F0]"
+                title="Cliquer pour configurer l'objectif dans le Focus Hub"
               >
-                <div className="flex items-center space-x-1.5">
+                <div className="flex items-center space-x-2.5 min-w-0">
                   <span
                     className={cn(
-                      "w-2 h-2 rounded-full",
+                      "w-2.5 h-2.5 rounded-full shrink-0 transition-transform group-hover:scale-110",
                       isGoalExceeded
-                        ? "bg-emerald-600 animate-pulse"
+                        ? "bg-emerald-500 ring-4 ring-emerald-100"
                         : isGoalReached
-                        ? "bg-emerald-500"
-                        : "bg-[#2855D9]"
+                        ? "bg-emerald-500 ring-4 ring-emerald-100"
+                        : "bg-[#2855D9] ring-4 ring-blue-100"
                     )}
                   />
-                  <span
-                    className={cn(
-                      "text-[11px]",
-                      isGoalExceeded ? "text-emerald-700 font-semibold" : "text-[#68748A]"
-                    )}
-                  >
-                    {isGoalExceeded
-                      ? `Objectif dépassé (+${formatSeconds(surplusFocusSeconds)})`
-                      : isGoalReached
-                      ? "Objectif validé"
-                      : `Reste : ${formatSeconds(remainingFocusSeconds)}`}
+                  <div className="flex flex-col min-w-0">
+                    <span
+                      className={cn(
+                        "text-[11px] font-bold truncate",
+                        isGoalExceeded
+                          ? "text-emerald-700"
+                          : isGoalReached
+                          ? "text-emerald-700"
+                          : "text-[#182235]"
+                      )}
+                    >
+                      {isGoalExceeded
+                        ? `Objectif dépassé (+${formatSeconds(surplusFocusSeconds)})`
+                        : isGoalReached
+                        ? "Objectif journalier atteint !"
+                        : `Temps restant : ${formatSeconds(remainingFocusSeconds)}`}
+                    </span>
+                    <span className="text-[10px] text-[#68748A]">
+                      {isGoalExceeded
+                        ? "Rythme excellent aujourd'hui"
+                        : isGoalReached
+                        ? "Séance validée avec succès"
+                        : "Continuez sur cette lancée"}
+                    </span>
+                  </div>
+                </div>
+                <div className="text-right shrink-0 ml-3">
+                  <span className="text-[9px] text-[#94A3B8] uppercase font-mono tracking-wider block">
+                    Cible
+                  </span>
+                  <span className="font-mono font-bold text-xs text-[#111A2E]">
+                    {goals.dailyFocusMinutes}m
                   </span>
                 </div>
-                <span className="font-mono font-bold text-[#111A2E]">
-                  Cible : {goals.dailyFocusMinutes}m
-                </span>
               </div>
             ) : (
               <div className="space-y-1.5 max-h-20 overflow-y-auto scrollbar-thin pr-1">
@@ -793,8 +856,13 @@ export function PersonalAnalyticsDashboard({
                         className="flex items-center space-x-1.5 min-w-0 hover:text-[#2855D9] transition-colors"
                         title={`Consulter le cours et ressources de ${sub.name}`}
                       >
-                        <span className="w-2 h-2 rounded-full shrink-0 group-hover:scale-125 transition-transform" style={{ backgroundColor: sub.color }} />
-                        <span className="text-[#182235] group-hover:text-[#2855D9] truncate font-medium">{sub.name}</span>
+                        <span
+                          className="w-2 h-2 rounded-full shrink-0 group-hover:scale-125 transition-transform"
+                          style={{ backgroundColor: sub.color }}
+                        />
+                        <span className="text-[#182235] group-hover:text-[#2855D9] truncate font-medium">
+                          {sub.name}
+                        </span>
                       </Link>
                       <span className="font-mono text-[#68748A] font-semibold text-[10px] shrink-0 ml-2">
                         {sub.count} ({sub.percent}%)
