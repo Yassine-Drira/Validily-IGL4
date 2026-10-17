@@ -36,6 +36,7 @@ import { updateResourceVisibility, deleteResource } from "@/lib/actions/resource
 import { updateNote, deleteNote } from "@/lib/actions/note-actions";
 import { updateUserProfile, removeUserAvatar } from "@/lib/actions/profile-actions";
 import { DeleteConfirmModal } from "@/components/ui/delete-confirm-modal";
+import { VipBadge } from "@/components/ui/vip-badge";
 
 interface StudentPrivateWorkspaceProps {
   user: {
@@ -45,6 +46,7 @@ interface StudentPrivateWorkspaceProps {
     avatar_url?: string | null;
   } | null;
   isGuest: boolean;
+  isVip?: boolean;
   quizAttempts: any[];
   mistakes: any[];
   privateNotes: any[];
@@ -58,6 +60,7 @@ interface StudentPrivateWorkspaceProps {
 export function StudentPrivateWorkspace({
   user,
   isGuest,
+  isVip = false,
   quizAttempts: initialQuizAttempts,
   mistakes: initialMistakes,
   privateNotes: initialPrivateNotes,
@@ -343,6 +346,11 @@ export function StudentPrivateWorkspace({
                 {user?.display_name ? user.display_name.slice(0, 2).toUpperCase() : isGuest ? "INV" : "ET"}
               </div>
             )}
+            {isVip && (
+              <div className="absolute -top-1.5 -right-1.5 z-10">
+                <VipBadge variant="avatar-badge" />
+              </div>
+            )}
             <button
               type="button"
               onClick={() => setActiveTab("profile")}
@@ -357,6 +365,9 @@ export function StudentPrivateWorkspace({
               <h1 className="text-xl font-serif font-bold text-[#111A2E] tracking-tight">
                 {user?.display_name || (isGuest ? "Étudiant Invité" : "Espace Étudiant")}
               </h1>
+              {isVip && (
+                <VipBadge variant="full" />
+              )}
               <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-[#FAFAF7] border border-[#E4E8F0] text-[#68748A]">
                 {isGuest ? "Session Locale" : "IGL4 - Promo 2026"}
               </span>

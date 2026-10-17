@@ -53,7 +53,18 @@ export function InteractiveHtmlRunner({
         const total = Number(event.data.total) || 20;
         setSelfScore(score);
         setTotalScore(total);
-        setSubmitSuccess(`Score capturé automatiquement depuis l'atelier : ${score} / ${total}`);
+        const percent = Math.round((score / (total || 1)) * 100);
+        const timeInfo = event.data.timeSpentSeconds
+          ? ` • Durée : ${Math.floor(event.data.timeSpentSeconds / 60)}m ${event.data.timeSpentSeconds % 60}s`
+          : "";
+        setSubmitSuccess(
+          `Score capturé depuis l'atelier : ${score} / ${total} (${percent}%)${timeInfo}`
+        );
+      } else if (event.data && event.data.type === "VALIDILY_QUIZ_PROGRESS") {
+        const total = Number(event.data.total) || 20;
+        const scoreSoFar = Number(event.data.scoreSoFar) || 0;
+        setSelfScore(scoreSoFar);
+        setTotalScore(total);
       }
     };
 

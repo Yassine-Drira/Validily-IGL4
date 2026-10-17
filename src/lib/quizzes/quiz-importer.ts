@@ -31,15 +31,49 @@ export interface ParsedQuizPackage {
 /**
  * Extracts title from HTML content (<title>...</title>)
  */
-export function extractHtmlMetadata(html: string): { title: string; description?: string } {
+export function extractHtmlMetadata(html: string): {
+  title: string;
+  description?: string;
+  difficulty?: "beginner" | "intermediate" | "advanced";
+  subject?: string;
+  totalQuestions?: number;
+  targetDurationMinutes?: number;
+} {
   const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
   const title = titleMatch ? titleMatch[1].trim() : "Atelier de Révision Interactif";
 
-  const descMatch = html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']+)["']/i) ||
-                    html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*name=["']description["']/i);
+  const descMatch =
+    html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']+)["']/i) ||
+    html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*name=["']description["']/i);
   const description = descMatch ? descMatch[1].trim() : undefined;
 
-  return { title, description };
+  const diffMatch =
+    html.match(/<meta[^>]*name=["']difficulty["'][^>]*content=["']([^"']+)["']/i) ||
+    html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*name=["']difficulty["']/i);
+  let difficulty: "beginner" | "intermediate" | "advanced" | undefined;
+  if (diffMatch) {
+    const rawDiff = diffMatch[1].trim().toLowerCase();
+    if (rawDiff === "beginner" || rawDiff === "facile" || rawDiff === "debutant") difficulty = "beginner";
+    else if (rawDiff === "advanced" || rawDiff === "difficile" || rawDiff === "avance") difficulty = "advanced";
+    else difficulty = "intermediate";
+  }
+
+  const subjMatch =
+    html.match(/<meta[^>]*name=["']subject["'][^>]*content=["']([^"']+)["']/i) ||
+    html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*name=["']subject["']/i);
+  const subject = subjMatch ? subjMatch[1].trim() : undefined;
+
+  const countMatch =
+    html.match(/<meta[^>]*name=["']total-questions["'][^>]*content=["']([^"']+)["']/i) ||
+    html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*name=["']total-questions["']/i);
+  const totalQuestions = countMatch ? parseInt(countMatch[1].trim(), 10) : undefined;
+
+  const durMatch =
+    html.match(/<meta[^>]*name=["']target-duration["'][^>]*content=["']([^"']+)["']/i) ||
+    html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*name=["']target-duration["']/i);
+  const targetDurationMinutes = durMatch ? parseInt(durMatch[1].trim(), 10) : undefined;
+
+  return { title, description, difficulty, subject, totalQuestions, targetDurationMinutes };
 }
 
 /**
@@ -97,14 +131,23 @@ export const SANDBOX_STORAGE_SHIM = `
     }
   }
 
-  // Provide a bridge helper for completion events
-  window.reportValidilyScore = function(score, total) {
+  // Provide a bridge helper for completion events with rich telemetry
+  window.reportValidilyScore = function(score, total, extra) {
     if (window.parent && window.parent !== window) {
-      window.parent.postMessage({
+      var payload = {
         type: 'VALIDILY_QUIZ_COMPLETED',
         score: Number(score),
-        total: Number(total || 20)
-      }, '*');
+        total: Number(total || 20),
+        percentage: Math.round((Number(score) / (Number(total) || 1)) * 100)
+      };
+      if (extra && typeof extra === 'object') {
+        if (extra.timeSpentSeconds) payload.timeSpentSeconds = Number(extra.timeSpentSeconds);
+        if (extra.mistakesCount !== undefined) payload.mistakesCount = Number(extra.mistakesCount);
+        if (extra.flashcardsReviewed !== undefined) payload.flashcardsReviewed = Number(extra.flashcardsReviewed);
+        if (extra.exercisesCompleted !== undefined) payload.exercisesCompleted = Number(extra.exercisesCompleted);
+        if (extra.details) payload.details = extra.details;
+      }
+      window.parent.postMessage(payload, '*');
     }
   };
 })();
@@ -316,7 +359,7 @@ export function detectAndParseQuizImport(rawContent: string, filename?: string):
       title: meta.title,
       description: meta.description || "Atelier interactif complet importé (flashcards, QCM avec minuteur, guides).",
       htmlContent: injectSandboxShim(trimmed),
-      difficulty: "intermediate",
+      difficulty: meta.difficulty || "intermediate",
     };
   }
 

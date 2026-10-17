@@ -7,6 +7,8 @@ export interface AuthenticatedActor {
   role: "admin" | "student" | "visitor";
   name?: string;
   avatarUrl?: string | null;
+  isTemporaryAdmin?: boolean;
+  temporaryExpiresAt?: string | null;
 }
 
 // In-memory test context for local adversarial tests
@@ -135,12 +137,17 @@ export const getRequesterUser = cache(async function getRequesterUser(): Promise
       }
     }
 
+    const isTemporaryAdmin = role === "admin" && Boolean(user.user_metadata?.temporary_admin_expires_at);
+    const temporaryExpiresAt = isTemporaryAdmin ? (user.user_metadata?.temporary_admin_expires_at || null) : null;
+
     return {
       id: user.id,
       email: user.email,
       role,
       name,
       avatarUrl,
+      isTemporaryAdmin,
+      temporaryExpiresAt,
     };
   } catch (err) {
     console.error("Failed to authenticate requester session:", err);
@@ -210,6 +217,8 @@ export const isUserAdmin = cache(async function isUserAdmin(userId: string): Pro
 export async function assertAdmin(): Promise<{
   authorized: boolean;
   user?: AuthenticatedActor;
+  isTemporary?: boolean;
+  isPermanent?: boolean;
   error?: string;
 }> {
   const user = await getRequesterUser();
@@ -228,7 +237,34 @@ export async function assertAdmin(): Promise<{
     };
   }
 
-  return { authorized: true, user };
+  const isTemporary = Boolean(user.isTemporaryAdmin);
+  const isPermanent = !isTemporary;
+
+  return { authorized: true, user, isTemporary, isPermanent };
+}
+
+/**
+ * Server-side gate asserting the caller possesses permanent (master) administrative rights.
+ * Temporary / delegated admins are strictly blocked from sensitive operations like role modifications.
+ */
+export async function assertPermanentAdmin(): Promise<{
+  authorized: boolean;
+  user?: AuthenticatedActor;
+  error?: string;
+}> {
+  const adminCheck = await assertAdmin();
+  if (!adminCheck.authorized || !adminCheck.user) {
+    return adminCheck;
+  }
+
+  if (adminCheck.isTemporary || adminCheck.user.isTemporaryAdmin) {
+    return {
+      authorized: false,
+      error: "Action non autorisée : les administrateurs temporaires ne sont pas autorisés à modifier, prolonger ou révoquer les rôles.",
+    };
+  }
+
+  return { authorized: true, user: adminCheck.user };
 }
 
 /**

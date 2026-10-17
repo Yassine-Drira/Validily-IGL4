@@ -13,6 +13,8 @@ import {
   abandonFocusSession,
   getMyForest,
   getCommunityForests,
+  updateForestPreferences,
+  getForestPreferences,
 } from "../src/lib/actions/forest-actions.ts";
 
 test("Forest Lifecycle: Database migration file exists with complete schema and security policies", () => {
@@ -106,4 +108,58 @@ test("Forest Lifecycle: Privacy allowlist in community forests excludes sensitiv
     assert.equal("session_label" in member, false, "Session notes must never be exposed");
     assert.ok(typeof member.healthyTreeCount === "number");
   }
+});
+
+test("Forest Lifecycle: Visibility preference (private vs members vs public) persists in DB/fallback and affects permissions", async () => {
+  const userId = "test-privacy-user-009";
+  setTestUser({
+    id: userId,
+    email: "private-student@validily.tn",
+    role: "student",
+    name: "Étudiant Discret",
+  });
+
+  // 1. Initially defaults to "members"
+  const initialPrefs = await getForestPreferences(userId);
+  assert.equal(initialPrefs.visibility, "members");
+
+  // 2. Set to strictly "private"
+  const updateResPrivate = await updateForestPreferences({ visibility: "private" });
+  assert.equal(updateResPrivate.success, true);
+
+  // 3. Confirm persistence via getForestPreferences
+  const savedPrivatePrefs = await getForestPreferences(userId);
+  assert.equal(savedPrivatePrefs.visibility, "private");
+
+  // 4. Confirm persistence via getMyForest
+  const myForest = await getMyForest();
+  assert.equal(myForest.preferences?.visibility, "private");
+
+  // 5. Another peer inspects this user's forest -> must be blocked / private
+  setTestUser({
+    id: "test-peer-user-999",
+    email: "peer@validily.tn",
+    role: "student",
+    name: "Camarade Curieux",
+  });
+
+  const peerForestView = await getMyForest(userId);
+  assert.equal(peerForestView.preferences?.visibility, "private");
+  assert.equal(peerForestView.trees.length, 0, "Private forest must hide trees from peers");
+
+  // 6. Switch preference to "public"
+  setTestUser({
+    id: userId,
+    email: "private-student@validily.tn",
+    role: "student",
+    name: "Étudiant Discret",
+  });
+  const updateResPublic = await updateForestPreferences({ visibility: "public" });
+  assert.equal(updateResPublic.success, true);
+
+  const savedPublicPrefs = await getForestPreferences(userId);
+  assert.equal(savedPublicPrefs.visibility, "public");
+
+  const myPublicForest = await getMyForest();
+  assert.equal(myPublicForest.preferences?.visibility, "public");
 });

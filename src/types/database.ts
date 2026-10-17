@@ -363,3 +363,25 @@ export interface UserStudyGoals {
   updated_at?: string;
 }
 
+// -----------------------------------------------------------------------------
+// System Notifications & Social Interaction Types
+// -----------------------------------------------------------------------------
+
+export type NotificationType = "cheer" | "system" | "study" | "achievement" | "announcement" | "role_assignment";
+export type CheerType = "water" | "clap" | "fire" | "muscle";
+
+export interface SystemNotification {
+  id: string;
+  recipient_id: string;
+  sender_id?: string;
+  sender_name?: string;
+  sender_avatar_url?: string | null;
+  type: NotificationType;
+  cheer_type?: CheerType;
+  title: string;
+  content: string;
+  is_read: boolean;
+  link?: string;
+  created_at: string;
+}
+

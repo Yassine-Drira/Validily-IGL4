@@ -22,12 +22,15 @@ import {
   RefreshCw,
 } from "lucide-react";
 
+import { EmptyGroveTumbleweeds } from "./empty-grove-tumbleweeds";
+
 interface ForestCanvasProps {
   entries: ForestEntry[];
   readOnly?: boolean;
   className?: string;
   initialSeason?: SeasonTheme;
   isLoading?: boolean;
+  ownerName?: string;
 }
 
 const GRID_SIZE = 6;
@@ -92,6 +95,7 @@ export function ForestCanvas({
   className = "",
   initialSeason = "summer",
   isLoading = false,
+  ownerName,
 }: ForestCanvasProps) {
   const { setIsModalOpen } = useFocusTimer();
 
@@ -839,11 +843,21 @@ export function ForestCanvas({
               const isHovered = hoveredEntry?.id === entry.id;
               const meta = SPECIES_METADATA[entry.tree_species] || SPECIES_METADATA.cedar;
 
-              const durationMin = entry.session?.actual_duration_seconds
-                ? Math.round(entry.session.actual_duration_seconds / 60)
-                : entry.session?.target_duration_seconds
-                ? Math.round(entry.session.target_duration_seconds / 60)
-                : 25;
+              const isDead = entry.tree_status === "leafless";
+              const actualSec = entry.session?.actual_duration_seconds;
+              const targetSec = entry.session?.target_duration_seconds || 1500;
+
+              let durationText = "";
+              if (isDead) {
+                if (typeof actualSec === "number" && actualSec > 0) {
+                  durationText = actualSec < 60 ? `${actualSec}s` : `${Math.floor(actualSec / 60)} min`;
+                } else {
+                  durationText = "< 1 min";
+                }
+              } else {
+                const effectiveSec = typeof actualSec === "number" && actualSec > 0 ? actualSec : targetSec;
+                durationText = `${Math.round(effectiveSec / 60)} min`;
+              }
 
               return (
                 <div
@@ -864,7 +878,7 @@ export function ForestCanvas({
                   onMouseLeave={() => setHoveredEntry(null)}
                   tabIndex={0}
                   role="button"
-                  aria-label={`Arbre ${entry.tree_species} (${meta.name}), session de ${durationMin} minutes`}
+                  aria-label={`Arbre ${entry.tree_species} (${meta.name}), ${isDead ? "interrompu après" : "session de"} ${durationText}`}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
                       e.preventDefault();
@@ -907,7 +921,7 @@ export function ForestCanvas({
                           <div className="text-[11px] font-bold text-white flex items-center space-x-1">
                             <span>{entry.tree_status === "healthy" ? meta.name : "Arbre Défeuillé"}</span>
                             <span className="text-amber-300 font-mono text-[10px]">
-                              • {durationMin} min
+                              • {durationText} {isDead ? "(interrompu)" : ""}
                             </span>
                           </div>
                           {entry.session?.session_label && (
@@ -935,25 +949,27 @@ export function ForestCanvas({
           </div>
         )}
 
-        {/* F. Empty State — Welcoming Focal Island with Seedling Altar (Fixed to responsive viewport) */}
+        {/* F. Empty State — Peer with Animated Tumbleweeds vs Owner Onboarding Altar */}
         {!isLoading && entries.length === 0 && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center p-4 sm:p-6 text-center pointer-events-none z-30">
-            <div className="p-5 sm:p-8 max-w-[92vw] sm:max-w-md w-full bg-black/65 backdrop-blur-xl rounded-3xl border border-white/15 text-white shadow-2xl space-y-3.5 sm:space-y-4 animate-in fade-in zoom-in-95 duration-300 pointer-events-auto">
-              <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-2xl sm:rounded-3xl bg-gradient-to-br from-emerald-400/20 to-teal-500/20 border border-emerald-400/40 flex items-center justify-center mx-auto text-emerald-300 shadow-lg">
-                <Sprout className="w-6 h-6 sm:w-8 sm:h-8 text-emerald-400 animate-bounce" />
-              </div>
+          readOnly ? (
+            <EmptyGroveTumbleweeds ownerName={ownerName} />
+          ) : (
+            <div className="absolute inset-0 flex flex-col items-center justify-center p-4 sm:p-6 text-center pointer-events-none z-30">
+              <div className="p-5 sm:p-8 max-w-[92vw] sm:max-w-md w-full bg-black/65 backdrop-blur-xl rounded-3xl border border-white/15 text-white shadow-2xl space-y-3.5 sm:space-y-4 animate-in fade-in zoom-in-95 duration-300 pointer-events-auto">
+                <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-2xl sm:rounded-3xl bg-gradient-to-br from-emerald-400/20 to-teal-500/20 border border-emerald-400/40 flex items-center justify-center mx-auto text-emerald-300 shadow-lg">
+                  <Sprout className="w-6 h-6 sm:w-8 sm:h-8 text-emerald-400 animate-bounce" />
+                </div>
 
-              <div>
-                <h3 className="text-base sm:text-lg font-extrabold text-white tracking-tight">
-                  Votre Île Isométrique Attend Sa Première Pousse
-                </h3>
-                <p className="text-[11px] sm:text-xs text-white/75 mt-1 sm:mt-1.5 leading-relaxed">
-                  Chaque session Pomodoro accomplie sans distraction plantera un arbre illustré
-                  sur cette île flottante. Lancez votre première session pour enrichir votre diorama.
-                </p>
-              </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-extrabold text-white tracking-tight">
+                    Votre Île Isométrique Attend Sa Première Pousse
+                  </h3>
+                  <p className="text-[11px] sm:text-xs text-white/75 mt-1 sm:mt-1.5 leading-relaxed">
+                    Chaque session Pomodoro accomplie sans distraction plantera un arbre illustré
+                    sur cette île flottante. Lancez votre première session pour enrichir votre diorama.
+                  </p>
+                </div>
 
-              {!readOnly && (
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(true)}
@@ -962,9 +978,9 @@ export function ForestCanvas({
                   <Play className="w-3.5 h-3.5 sm:w-4 sm:h-4 fill-current" />
                   <span>Lancer Ma Première Session Focus</span>
                 </button>
-              )}
+              </div>
             </div>
-          </div>
+          )
         )}
       </div>
 

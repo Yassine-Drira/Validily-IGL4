@@ -9,12 +9,38 @@ import type {
   ForestVisibility,
 } from "../../types/database";
 
+async function getNotificationModule() {
+  try {
+    return await import("./notification-actions");
+  } catch {
+    try {
+      const p = "./notification-actions.ts";
+      return await import(/* @vite-ignore */ p);
+    } catch {
+      return null;
+    }
+  }
+}
+
 async function getAuthModule() {
   try {
     return await import("../auth/authorization");
   } catch {
     try {
       const p = "../auth/authorization.ts";
+      return await import(/* @vite-ignore */ p);
+    } catch {
+      return null;
+    }
+  }
+}
+
+async function getAnalyticsModule() {
+  try {
+    return await import("./analytics-actions");
+  } catch {
+    try {
+      const p = "./analytics-actions.ts";
       return await import(/* @vite-ignore */ p);
     } catch {
       return null;
@@ -72,6 +98,7 @@ function isTableMissingError(err: any): boolean {
     msg.includes("does not exist") ||
     msg.includes("could not find the table") ||
     err.code === "PGRST204" ||
+    err.code === "PGRST205" ||
     err.code === "42P01"
   );
 }
@@ -350,7 +377,9 @@ export async function completeFocusSession(
       localForestEntries.set(mockTree.id, mockTree);
       if (localSession) {
         localSession.status = "completed";
+        localSession.actual_duration_seconds = localSession.actual_duration_seconds || localSession.target_duration_seconds || 1500;
         localSession.completed_at = new Date().toISOString();
+        mockTree.session = { ...localSession };
       }
 
       // Persist healthy tree to Supabase DB system record
@@ -390,6 +419,12 @@ export async function completeFocusSession(
         const posY = Math.round(Math.sin(angle) * radius * 100) / 100;
         const scale = Math.round((0.92 + Math.random() * 0.16) * 100) / 100;
 
+        if (localSession) {
+          localSession.status = "completed";
+          localSession.actual_duration_seconds = localSession.actual_duration_seconds || localSession.target_duration_seconds || 1500;
+          localSession.completed_at = new Date().toISOString();
+        }
+
         const mockTree: ForestEntry = {
           id: `tree-${Date.now()}`,
           session_id: sessionId,
@@ -401,6 +436,7 @@ export async function completeFocusSession(
           scale_factor: scale,
           earned_at: new Date().toISOString(),
           created_at: new Date().toISOString(),
+          session: localSession ? { ...localSession } : undefined,
         };
         localForestEntries.set(mockTree.id, mockTree);
 
@@ -502,13 +538,53 @@ export async function completeFocusSession(
 
     if (treeErr || !newTree) {
       console.error("completeFocusSession tree insertion error:", treeErr);
-      return { success: false, error: "Erreur lors de la plantation de l'arbre." };
+      const fallbackTree: ForestEntry = {
+        id: `tree-${Date.now()}`,
+        session_id: sessionId,
+        user_id: requester.id,
+        tree_status: "healthy",
+        tree_species: session.tree_species || "cedar",
+        position_x: posX,
+        position_y: posY,
+        scale_factor: scale,
+        earned_at: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+        session: session
+          ? {
+              ...session,
+              actual_duration_seconds: eligibleSeconds,
+              status: "completed",
+              completed_at: new Date().toISOString(),
+            }
+          : undefined,
+      };
+      localForestEntries.set(fallbackTree.id, fallbackTree);
+      const dbTrees = await getDbForestFallback(requester.id);
+      const mergedUserTrees = [
+        fallbackTree,
+        ...dbTrees.filter((t) => t.id !== fallbackTree.id && t.session_id !== sessionId),
+      ];
+      await saveDbForestFallback(requester.id, mergedUserTrees);
+
+      await safeRevalidate("/forest");
+      await safeRevalidate("/");
+
+      return { success: true, tree: fallbackTree };
     }
 
     // Persist healthy tree to Supabase DB system record
     const dbTrees = await getDbForestFallback(requester.id);
+    const treeToSave: ForestEntry = {
+      ...newTree,
+      session: session ? {
+        ...session,
+        actual_duration_seconds: eligibleSeconds,
+        status: "completed",
+        completed_at: new Date().toISOString(),
+      } : undefined,
+    };
     const mergedUserTrees = [
-      newTree,
+      treeToSave,
       ...dbTrees.filter((t) => t.id !== newTree.id && t.session_id !== sessionId),
     ];
     await saveDbForestFallback(requester.id, mergedUserTrees);
@@ -692,7 +768,8 @@ export async function resumeFocusSession(sessionId: string): Promise<{
  */
 export async function abandonFocusSession(
   sessionId: string,
-  reason?: string
+  reason?: string,
+  actualDurationSeconds?: number
 ): Promise<{
   success: boolean;
   status: "cancelled" | "interrupted";
@@ -712,7 +789,11 @@ export async function abandonFocusSession(
 
     const configured = await isDbConfigured();
 
-    const createLocalDeadTree = (species: TreeSpecies = "cedar", sessionObj?: any): ForestEntry => {
+    const createLocalDeadTree = (
+      species: TreeSpecies = "cedar",
+      sessionObj?: any,
+      exactActualSeconds?: number
+    ): ForestEntry => {
       const userTrees = Array.from(localForestEntries.values()).filter((t) => t.user_id === requester.id);
       const treeIndex = userTrees.length;
       const angle = treeIndex * 2.3999632;
@@ -720,6 +801,11 @@ export async function abandonFocusSession(
       const posX = Math.round(Math.cos(angle) * radius * 100) / 100;
       const posY = Math.round(Math.sin(angle) * radius * 100) / 100;
       const scale = Math.round((0.88 + Math.random() * 0.14) * 100) / 100;
+
+      const actualSec =
+        typeof exactActualSeconds === "number" && exactActualSeconds >= 0
+          ? exactActualSeconds
+          : sessionObj?.actual_duration_seconds ?? 0;
 
       const mockDeadTree: ForestEntry = {
         id: `dead-tree-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
@@ -732,7 +818,20 @@ export async function abandonFocusSession(
         scale_factor: scale,
         earned_at: new Date().toISOString(),
         created_at: new Date().toISOString(),
-        session: sessionObj || undefined,
+        session: sessionObj
+          ? {
+              ...sessionObj,
+              status: "interrupted",
+              actual_duration_seconds: actualSec,
+            }
+          : ({
+              id: sessionId,
+              user_id: requester.id,
+              target_duration_seconds: 1500,
+              actual_duration_seconds: actualSec,
+              status: "interrupted",
+              tree_species: species,
+            } as any),
       };
       localForestEntries.set(mockDeadTree.id, mockDeadTree);
       return mockDeadTree;
@@ -753,12 +852,20 @@ export async function abandonFocusSession(
         }
       }
 
-      const deadTree = createLocalDeadTree(localSession?.tree_species || "cedar", localSession);
       if (localSession) {
         localSession.status = "interrupted";
         localSession.interrupted_at = new Date().toISOString();
         localSession.interruption_reason = reason || "Session interrompue volontairement";
+        if (typeof actualDurationSeconds === "number" && actualDurationSeconds >= 0) {
+          localSession.actual_duration_seconds = actualDurationSeconds;
+        }
       }
+
+      const deadTree = createLocalDeadTree(
+        localSession?.tree_species || "cedar",
+        localSession,
+        actualDurationSeconds
+      );
 
       // Persist dead tree penalty to Supabase DB system record
       const dbTrees = await getDbForestFallback(requester.id);
@@ -775,7 +882,7 @@ export async function abandonFocusSession(
 
     const serviceSupabase = await getAdminClient();
     if (!serviceSupabase) {
-      const deadTree = createLocalDeadTree("cedar");
+      const deadTree = createLocalDeadTree("cedar", undefined, actualDurationSeconds);
       const dbTrees = await getDbForestFallback(requester.id);
       const mergedUserTrees = [
         deadTree,
@@ -794,7 +901,19 @@ export async function abandonFocusSession(
 
     if (fetchErr || !session) {
       const localSession = localFocusSessions.get(sessionId);
-      const deadTree = createLocalDeadTree(localSession?.tree_species || "cedar", localSession);
+      if (localSession) {
+        localSession.status = "interrupted";
+        localSession.interrupted_at = new Date().toISOString();
+        localSession.interruption_reason = reason || "Session interrompue volontairement";
+        if (typeof actualDurationSeconds === "number" && actualDurationSeconds >= 0) {
+          localSession.actual_duration_seconds = actualDurationSeconds;
+        }
+      }
+      const deadTree = createLocalDeadTree(
+        localSession?.tree_species || "cedar",
+        localSession,
+        actualDurationSeconds
+      );
       const dbTrees = await getDbForestFallback(requester.id);
       const mergedUserTrees = [
         deadTree,
@@ -825,7 +944,11 @@ export async function abandonFocusSession(
     const startedAt = new Date(session.started_at).getTime();
     const elapsedSeconds = Math.floor((Date.now() - startedAt) / 1000);
     const totalPaused = session.total_paused_seconds || 0;
-    const actualSeconds = Math.max(0, elapsedSeconds - totalPaused);
+    const computedActualSeconds = Math.max(0, elapsedSeconds - totalPaused);
+    const finalActualSeconds =
+      typeof actualDurationSeconds === "number" && actualDurationSeconds >= 0
+        ? actualDurationSeconds
+        : computedActualSeconds;
 
     // Strict Anti-Bypass Rule: Any abandoned or paused work session immediately results in a dead tree.
     // Legacy bypass check (elapsedSeconds <= 120) eliminated to enforce Pomodoro integrity and prevent pausing exploits.
@@ -845,7 +968,7 @@ export async function abandonFocusSession(
       .from("focus_sessions")
       .update({
         status: "interrupted",
-        actual_duration_seconds: elapsedSeconds,
+        actual_duration_seconds: finalActualSeconds,
         interrupted_at: new Date().toISOString(),
         interruption_reason: reason || "Session interrompue volontairement",
         updated_at: new Date().toISOString(),
@@ -867,9 +990,36 @@ export async function abandonFocusSession(
       .select()
       .single();
 
+    const fullDeadTree: ForestEntry = {
+      ...(deadTree || {
+        id: `dead-tree-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        session_id: sessionId,
+        user_id: requester.id,
+        tree_status: "leafless",
+        tree_species: session.tree_species || "cedar",
+        position_x: posX,
+        position_y: posY,
+        scale_factor: scale,
+        earned_at: new Date().toISOString(),
+      }),
+      session: {
+        id: session.id,
+        user_id: requester.id,
+        target_duration_seconds: session.target_duration_seconds || 1500,
+        actual_duration_seconds: finalActualSeconds,
+        status: "interrupted",
+        session_label: session.session_label,
+        tree_species: session.tree_species,
+      } as any,
+    };
+
     if (deadTreeErr || !deadTree) {
       console.error("abandonFocusSession dead tree error:", deadTreeErr);
-      const fallbackDeadTree = createLocalDeadTree(session.tree_species || "cedar", session);
+      const fallbackDeadTree = createLocalDeadTree(
+        session.tree_species || "cedar",
+        session,
+        finalActualSeconds
+      );
       const dbTrees = await getDbForestFallback(requester.id);
       const mergedUserTrees = [
         fallbackDeadTree,
@@ -884,15 +1034,15 @@ export async function abandonFocusSession(
     // Persist dead tree penalty to Supabase DB system record
     const dbTrees = await getDbForestFallback(requester.id);
     const mergedUserTrees = [
-      deadTree,
-      ...dbTrees.filter((t) => t.id !== deadTree.id && t.session_id !== sessionId),
+      fullDeadTree,
+      ...dbTrees.filter((t) => t.id !== fullDeadTree.id && t.session_id !== sessionId),
     ];
     await saveDbForestFallback(requester.id, mergedUserTrees);
 
     await safeRevalidate("/forest");
     await safeRevalidate("/");
 
-    return { success: true, status: "interrupted", tree: deadTree || null };
+    return { success: true, status: "interrupted", tree: fullDeadTree };
   } catch (err: any) {
     console.error("abandonFocusSession exception:", err);
     return { success: false, status: "cancelled", error: err.message };
@@ -939,42 +1089,6 @@ export async function getMyForest(targetUserId?: string): Promise<{
 
     const isSelf = !targetUserId || targetUserId === requester?.id;
 
-    // Starter Cohort virtual member handling for peer inspection
-    if (!isSelf && effectiveUserId.startsWith("starter-")) {
-      const member = getStarterCohortMembers().find((m) => m.userId === effectiveUserId);
-      if (member) {
-        const synthesized: ForestEntry[] = [];
-        for (let i = 0; i < member.healthyTreeCount; i++) {
-          const angle = i * 2.399963229728653;
-          const radius = 28 * Math.sqrt(i + 1);
-          const sp = member.recentSpecies[i % member.recentSpecies.length] || "cedar";
-          synthesized.push({
-            id: `starter-tree-${member.userId}-${i}`,
-            session_id: `starter-session-${i}`,
-            user_id: member.userId,
-            tree_status: "healthy",
-            tree_species: sp,
-            position_x: Math.round(Math.cos(angle) * radius),
-            position_y: Math.round(Math.sin(angle) * radius),
-            scale_factor: 1,
-            earned_at: new Date(Date.now() - (i + 1) * 3600000 * 4).toISOString(),
-            created_at: new Date(Date.now() - (i + 1) * 3600000 * 4).toISOString(),
-          });
-        }
-        return {
-          authenticated: !!requester?.id,
-          trees: synthesized,
-          preferences: { ...DEFAULT_PREFERENCES, user_id: member.userId, visibility: "members" },
-          stats: {
-            healthyCount: member.healthyTreeCount,
-            leaflessCount: member.leaflessTreeCount,
-            totalFocusedMinutes: member.totalFocusedMinutes,
-            currentStreak: 1,
-          },
-        };
-      }
-    }
-
     const dbFallbackTrees = await getDbForestFallback(effectiveUserId);
     for (const dt of dbFallbackTrees) {
       if (!localForestEntries.has(dt.id)) {
@@ -985,21 +1099,47 @@ export async function getMyForest(targetUserId?: string): Promise<{
     const localTrees = Array.from(localForestEntries.values()).filter(
       (t) =>
         t.user_id === effectiveUserId ||
-        (isSelf && ((requester?.id && t.user_id === requester.id) || t.user_id === "guest"))
+        (isSelf && effectiveUserId === "guest" && t.user_id === "guest")
     );
 
     if (!configured) {
-      const healthyCount = localTrees.filter((t) => t.tree_status === "healthy").length;
+      const healthyTrees = localTrees.filter((t) => t.tree_status === "healthy");
+      const healthyCount = healthyTrees.length;
       const leaflessCount = localTrees.filter((t) => t.tree_status === "leafless").length;
-      const calculatedSeconds = localTrees.reduce((acc, t) => acc + (t.session?.actual_duration_seconds || t.session?.target_duration_seconds || 1500), 0);
+      const calculatedSeconds = healthyTrees.reduce(
+        (acc, t) => acc + (t.session?.actual_duration_seconds ?? t.session?.target_duration_seconds ?? 1500),
+        0
+      );
+      let dbDailyMinutes = 0;
+      let todayDailyMinutes = 0;
+      try {
+        const analyticsMod = await getAnalyticsModule();
+        if (analyticsMod) {
+          const hist = await analyticsMod.getUserDailyFocusHistory(effectiveUserId);
+          const todayStr = new Date().toISOString().split("T")[0];
+          for (const [date, rec] of Object.entries(hist as Record<string, any>)) {
+            const m = rec.totalMinutes || Math.floor((rec.totalSeconds || 0) / 60);
+            dbDailyMinutes += m;
+            if (date === todayStr) todayDailyMinutes = Math.max(todayDailyMinutes, m);
+          }
+        }
+      } catch {}
+
+      const totalFocusedMinutes = Math.max(Math.floor(calculatedSeconds / 60), dbDailyMinutes, todayDailyMinutes);
+      const fallbackPref =
+        (await getDbForestPreferences(effectiveUserId)) ||
+        localForestPreferences.get(effectiveUserId) || {
+          ...DEFAULT_PREFERENCES,
+          user_id: effectiveUserId,
+        };
       return {
         authenticated: !!requester?.id,
         trees: localTrees,
-        preferences: { ...DEFAULT_PREFERENCES, user_id: effectiveUserId },
+        preferences: fallbackPref,
         stats: {
           healthyCount,
           leaflessCount,
-          totalFocusedMinutes: Math.floor(calculatedSeconds / 60),
+          totalFocusedMinutes,
           currentStreak: healthyCount > 0 ? 1 : 0,
         },
       };
@@ -1007,16 +1147,43 @@ export async function getMyForest(targetUserId?: string): Promise<{
 
     const serviceSupabase = await getAdminClient();
     if (!serviceSupabase) {
-      const healthyCount = localTrees.filter((t) => t.tree_status === "healthy").length;
+      const healthyTrees = localTrees.filter((t) => t.tree_status === "healthy");
+      const healthyCount = healthyTrees.length;
       const leaflessCount = localTrees.filter((t) => t.tree_status === "leafless").length;
+      const calculatedSeconds = healthyTrees.reduce(
+        (acc, t) => acc + (t.session?.actual_duration_seconds ?? t.session?.target_duration_seconds ?? 1500),
+        0
+      );
+      let dbDailyMinutes = 0;
+      let todayDailyMinutes = 0;
+      try {
+        const analyticsMod = await getAnalyticsModule();
+        if (analyticsMod) {
+          const hist = await analyticsMod.getUserDailyFocusHistory(effectiveUserId);
+          const todayStr = new Date().toISOString().split("T")[0];
+          for (const [date, rec] of Object.entries(hist as Record<string, any>)) {
+            const m = rec.totalMinutes || Math.floor((rec.totalSeconds || 0) / 60);
+            dbDailyMinutes += m;
+            if (date === todayStr) todayDailyMinutes = Math.max(todayDailyMinutes, m);
+          }
+        }
+      } catch {}
+
+      const totalFocusedMinutes = Math.max(Math.floor(calculatedSeconds / 60), dbDailyMinutes, todayDailyMinutes);
+      const fallbackPref =
+        (await getDbForestPreferences(effectiveUserId)) ||
+        localForestPreferences.get(effectiveUserId) || {
+          ...DEFAULT_PREFERENCES,
+          user_id: effectiveUserId,
+        };
       return {
         authenticated: !!requester?.id,
         trees: localTrees,
-        preferences: { ...DEFAULT_PREFERENCES, user_id: effectiveUserId },
+        preferences: fallbackPref,
         stats: {
           healthyCount,
           leaflessCount,
-          totalFocusedMinutes: 0,
+          totalFocusedMinutes,
           currentStreak: healthyCount > 0 ? 1 : 0,
         },
       };
@@ -1112,32 +1279,128 @@ export async function getMyForest(targetUserId?: string): Promise<{
       }
     }
 
+    // Ensure all trees (especially interrupted leafless trees) have valid session objects
+    trees = trees.map((t) => {
+      if (t.tree_status === "leafless" && !t.session) {
+        return {
+          ...t,
+          session: {
+            id: t.session_id,
+            user_id: t.user_id,
+            target_duration_seconds: 1500,
+            actual_duration_seconds: 0,
+            status: "interrupted",
+            tree_species: t.tree_species,
+          } as any,
+        };
+      }
+      return t;
+    });
+
     // Keep DB fallback synced
     if (trees.length > 0 && dbTrees.length < trees.length) {
       await saveDbForestFallback(effectiveUserId, trees);
     }
 
-    const preferences: ForestPreferences = prefsRes.data || {
-      ...DEFAULT_PREFERENCES,
-      user_id: effectiveUserId,
-    };
+    let preferences: ForestPreferences | null =
+      prefsRes?.data && prefsRes.data.visibility ? (prefsRes.data as ForestPreferences) : null;
 
-    const healthyCount = trees.filter((t) => t.tree_status === "healthy").length;
+    if (!preferences || !preferences.visibility) {
+      const fallbackPref =
+        (await getDbForestPreferences(effectiveUserId)) ||
+        localForestPreferences.get(effectiveUserId);
+      if (fallbackPref?.visibility) {
+        preferences = fallbackPref;
+      }
+    }
+
+    if (!preferences) {
+      preferences = {
+        ...DEFAULT_PREFERENCES,
+        user_id: effectiveUserId,
+      };
+    } else {
+      localForestPreferences.set(effectiveUserId, preferences);
+    }
+
+    // Auto-heal / back-populate to forest_preferences table if missing from main table
+    if (!prefsRes?.data?.visibility && preferences?.visibility) {
+      try {
+        await serviceSupabase.from("forest_preferences").upsert(
+          {
+            user_id: effectiveUserId,
+            visibility: preferences.visibility,
+            default_tree_species: preferences.default_tree_species || "cedar",
+            allow_classmate_cheers: preferences.allow_classmate_cheers ?? true,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "user_id" }
+        );
+      } catch {}
+    }
+
+    const healthyTrees = trees.filter((t) => t.tree_status === "healthy");
+    const healthyCount = healthyTrees.length;
     const leaflessCount = trees.filter((t) => t.tree_status === "leafless").length;
 
-    const calculatedSeconds = (sessionsRes?.data && sessionsRes.data.length > 0)
-      ? sessionsRes.data.reduce((acc: number, s: any) => acc + (s.actual_duration_seconds || 0), 0)
-      : trees.reduce((acc: number, t: ForestEntry) => acc + (t.session?.actual_duration_seconds || t.session?.target_duration_seconds || 1500), 0);
-    const totalFocusedMinutes = Math.floor(calculatedSeconds / 60);
+    // 1. Seconds from healthy trees strictly (dead trees NEVER contribute 1500s!)
+    const healthyTreesSeconds = healthyTrees.reduce((acc: number, t: ForestEntry) => {
+      const sec = t.session?.actual_duration_seconds ?? t.session?.target_duration_seconds ?? 1500;
+      return acc + (typeof sec === "number" && sec > 0 ? sec : 1500);
+    }, 0);
+    const healthyTreesMinutes = Math.floor(healthyTreesSeconds / 60);
 
-    // Calculate daily streak
-    const activeDates = Array.from(
-      new Set(
-        trees
-          .filter((t) => t.tree_status === "healthy")
-          .map((t) => t.earned_at.split("T")[0])
-      )
-    ).sort().reverse();
+    // 2. Seconds from completed sessions table if present in DB
+    const sessionsSeconds = (sessionsRes?.data && sessionsRes.data.length > 0)
+      ? sessionsRes.data.reduce((acc: number, s: any) => acc + (s.actual_duration_seconds || 0), 0)
+      : 0;
+    const sessionsMinutes = Math.floor(sessionsSeconds / 60);
+
+    // 3. User Daily Focus records (persistent DB truth from __validily_user_daily_focus__)
+    let dbDailyMinutes = 0;
+    let todayDailyMinutes = 0;
+    const activeDailyDatesSet = new Set<string>();
+
+    try {
+      const analyticsMod = await getAnalyticsModule();
+      if (analyticsMod) {
+        const history = await analyticsMod.getUserDailyFocusHistory(effectiveUserId);
+        const todayStr = new Date().toISOString().split("T")[0];
+        if (history && typeof history === "object") {
+          for (const [date, rec] of Object.entries(history as Record<string, any>)) {
+            const m = rec.totalMinutes || Math.floor((rec.totalSeconds || 0) / 60);
+            dbDailyMinutes += m;
+            if (date === todayStr) {
+              todayDailyMinutes = Math.max(todayDailyMinutes, m);
+            }
+            if (rec.totalSeconds > 0 || rec.totalMinutes > 0) {
+              activeDailyDatesSet.add(date);
+            }
+          }
+        }
+      }
+    } catch {}
+
+    // Strict mathematical invariant: total accumulation MUST be at least the daily sum,
+    // at least today's focus, and at least healthy tree minutes!
+    const totalFocusedMinutes = Math.max(
+      healthyTreesMinutes,
+      dbDailyMinutes,
+      todayDailyMinutes,
+      sessionsMinutes
+    );
+
+    // Calculate daily streak combining healthy trees AND verified daily study sessions
+    healthyTrees.forEach((t) => {
+      const raw = t.earned_at || t.created_at;
+      if (!raw) return;
+      const d = new Date(raw);
+      if (!isNaN(d.getTime())) {
+        activeDailyDatesSet.add(d.toISOString().split("T")[0]);
+      }
+    });
+
+    const activeDates = Array.from(activeDailyDatesSet).sort().reverse();
 
     let currentStreak = 0;
     if (activeDates.length > 0) {
@@ -1188,46 +1451,8 @@ export async function getMyForest(targetUserId?: string): Promise<{
   }
 }
 
-function getStarterCohortMembers(): MemberForestSummary[] {
-  return [
-    {
-      userId: "starter-amen-igl4",
-      displayName: "Amen (Étudiant IGL4)",
-      avatarUrl: null,
-      healthyTreeCount: 3,
-      leaflessTreeCount: 0,
-      totalFocusedMinutes: 75,
-      recentSpecies: ["cedar", "sakura"],
-      lastFocusedAt: new Date(Date.now() - 3600000 * 2).toISOString(),
-      visibility: "members",
-    },
-    {
-      userId: "starter-sarah-igl4",
-      displayName: "Sarah K. (IGL4)",
-      avatarUrl: null,
-      healthyTreeCount: 4,
-      leaflessTreeCount: 1,
-      totalFocusedMinutes: 100,
-      recentSpecies: ["pine", "sakura", "oak"],
-      lastFocusedAt: new Date(Date.now() - 3600000 * 6).toISOString(),
-      visibility: "members",
-    },
-    {
-      userId: "starter-karim-igl4",
-      displayName: "Karim M. (IGL4)",
-      avatarUrl: null,
-      healthyTreeCount: 2,
-      leaflessTreeCount: 0,
-      totalFocusedMinutes: 50,
-      recentSpecies: ["cedar", "willow"],
-      lastFocusedAt: new Date(Date.now() - 3600000 * 14).toISOString(),
-      visibility: "members",
-    },
-  ];
-}
-
 /**
- * 5. Retrieve social community forest summaries (Authenticated, Privacy-Safe)
+ * 5. Retrieve social community forest summaries (Authenticated, Privacy-Safe, Pure Real Data)
  */
 export async function getCommunityForests(): Promise<MemberForestSummary[]> {
   try {
@@ -1237,7 +1462,6 @@ export async function getCommunityForests(): Promise<MemberForestSummary[]> {
       return [];
     }
 
-    const starterCohort = getStarterCohortMembers();
     const configured = await isDbConfigured();
     const serviceSupabase = configured ? await getAdminClient() : null;
 
@@ -1366,15 +1590,23 @@ export async function getCommunityForests(): Promise<MemberForestSummary[]> {
       }
     }
 
-    // 5. Build summary objects for all visible registered profiles
+    // 5. Build summary objects for all visible registered profiles dynamically
     const dbMembers: MemberForestSummary[] = visibleProfiles.map((p) => {
       const pref = prefsMap.get(p.id);
       const userTrees = allTreesByUser.get(p.id) || [];
-      const healthyTreeCount = userTrees.filter((t) => t.tree_status === "healthy").length;
+      const healthyTrees = userTrees.filter((t) => t.tree_status === "healthy");
+      const healthyTreeCount = healthyTrees.length;
       const leaflessTreeCount = userTrees.filter((t) => t.tree_status === "leafless").length;
 
+      // Calculate actual verified focus minutes dynamically from session records or defaults
+      const totalFocusedSeconds = healthyTrees.reduce((acc, t) => {
+        const sec = t.session?.actual_duration_seconds || t.session?.target_duration_seconds || 1500;
+        return acc + (typeof sec === "number" && sec > 0 ? sec : 1500);
+      }, 0);
+      const totalFocusedMinutes = Math.floor(totalFocusedSeconds / 60);
+
       const recentSpecies = Array.from(
-        new Set(userTrees.map((t) => t.tree_species as TreeSpecies))
+        new Set(healthyTrees.map((t) => t.tree_species as TreeSpecies))
       ).slice(0, 4);
 
       const defaultSpecies = (pref?.default_tree_species as TreeSpecies) || "cedar";
@@ -1385,24 +1617,14 @@ export async function getCommunityForests(): Promise<MemberForestSummary[]> {
         avatarUrl: p.avatar_url || null,
         healthyTreeCount,
         leaflessTreeCount,
-        totalFocusedMinutes: healthyTreeCount * 25,
+        totalFocusedMinutes,
         recentSpecies: recentSpecies.length > 0 ? recentSpecies : [defaultSpecies],
         lastFocusedAt: userTrees[0]?.earned_at || null,
         visibility: (pref?.visibility || "members") as ForestVisibility,
       };
     });
 
-    // Merge with starter cohort (deduplicating by userId) to ensure a vibrant active promo
-    const seen = new Set(dbMembers.map((m) => m.userId));
-    const merged = [...dbMembers];
-    for (const starter of starterCohort) {
-      if (!seen.has(starter.userId)) {
-        seen.add(starter.userId);
-        merged.push(starter);
-      }
-    }
-
-    return merged.sort((a, b) => {
+    return dbMembers.sort((a, b) => {
       if (b.healthyTreeCount !== a.healthyTreeCount) {
         return b.healthyTreeCount - a.healthyTreeCount;
       }
@@ -1412,7 +1634,60 @@ export async function getCommunityForests(): Promise<MemberForestSummary[]> {
     });
   } catch (err) {
     console.error("getCommunityForests error:", err);
-    return getStarterCohortMembers();
+    return [];
+  }
+}
+
+/**
+ * Reset all forest progress across all users and caches (Maintenance)
+ */
+export async function resetAllForestProgressAction(): Promise<{
+  success: boolean;
+  message: string;
+  error?: string;
+}> {
+  try {
+    const authMod = await getAuthModule();
+    const requester = await authMod?.getRequesterUser();
+    if (!requester || !requester.id) {
+      return { success: false, message: "", error: "Non authentifié." };
+    }
+
+    // 1. Clear in-memory maps
+    localFocusSessions.clear();
+    localForestEntries.clear();
+    localForestPreferences.clear();
+
+    // 2. Clear DB records if configured
+    const configured = await isDbConfigured();
+    if (configured) {
+      const serviceSupabase = await getAdminClient();
+      if (serviceSupabase) {
+        try {
+          await serviceSupabase.from("forest_entries").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+        } catch {}
+        try {
+          await serviceSupabase.from("focus_sessions").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+        } catch {}
+        try {
+          await serviceSupabase.from("forest_cheers").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+        } catch {}
+        try {
+          await serviceSupabase.from("notes").delete().eq("title", "__validily_forest_trees__");
+        } catch {}
+        try {
+          await serviceSupabase.from("notes").delete().eq("title", "__validily_forest_preferences__");
+        } catch {}
+      }
+    }
+
+    await safeRevalidate("/forest");
+    await safeRevalidate("/forest/community");
+    await safeRevalidate("/");
+
+    return { success: true, message: "Progression forestière réinitialisée pour tous les utilisateurs." };
+  } catch (err: any) {
+    return { success: false, message: "", error: err?.message || "Erreur de réinitialisation." };
   }
 }
 
@@ -1447,6 +1722,13 @@ export async function sendClassmateCheer(input: {
       muscle: "💪 Force & persévérance transmises",
     };
 
+    const cheerTitles: Record<string, string> = {
+      water: "💧 Arrosage de bosquet reçu !",
+      clap: "👏 Félicitations pour ta session !",
+      fire: "🔥 Boost d'assiduité reçu !",
+      muscle: "💪 Force & motivation partagées !",
+    };
+
     const recipientLabel = input.recipientName || "votre camarade";
     const feedbackMsg = `${cheerLabels[input.cheerType] || "Encouragement envoyé"} à ${recipientLabel} !`;
 
@@ -1466,6 +1748,26 @@ export async function sendClassmateCheer(input: {
           // Graceful fallback if forest_cheers table not in DB
         }
       }
+    }
+
+    // Dispatch real-time persistent system notification for recipient
+    try {
+      const notifMod = await getNotificationModule();
+      if (notifMod?.createNotification) {
+        await notifMod.createNotification({
+          recipientId: input.recipientId,
+          senderId: requester.id,
+          senderName: requester.name || "Un camarade",
+          senderAvatarUrl: requester.avatarUrl || null,
+          type: "cheer",
+          cheerType: input.cheerType,
+          title: cheerTitles[input.cheerType] || "Encouragement reçu !",
+          content: `${requester.name || "Un camarade"} vous a envoyé : ${cheerLabels[input.cheerType]} !`,
+          link: "/forest",
+        });
+      }
+    } catch {
+      // Graceful error isolation
     }
 
     return {
@@ -1541,4 +1843,37 @@ export async function updateForestPreferences(input: {
   } catch (err: any) {
     return { success: false, error: err?.message || "Erreur lors de la mise à jour des préférences." };
   }
+}
+
+/**
+ * 8. Retrieve user's forest visibility preferences with multi-layer persistence
+ */
+export async function getForestPreferences(userId?: string): Promise<ForestPreferences> {
+  const authMod = await getAuthModule();
+  const requester = await authMod?.getRequesterUser();
+  const targetId = userId || requester?.id;
+  if (!targetId) return DEFAULT_PREFERENCES;
+
+  try {
+    const serviceSupabase = await getAdminClient();
+    if (serviceSupabase) {
+      const { data } = await serviceSupabase
+        .from("forest_preferences")
+        .select("*")
+        .eq("user_id", targetId)
+        .maybeSingle();
+      if (data?.visibility) {
+        localForestPreferences.set(targetId, data as ForestPreferences);
+        return data as ForestPreferences;
+      }
+    }
+  } catch {}
+
+  const fallback =
+    (await getDbForestPreferences(targetId)) || localForestPreferences.get(targetId);
+  if (fallback?.visibility) {
+    localForestPreferences.set(targetId, fallback);
+    return fallback;
+  }
+  return { ...DEFAULT_PREFERENCES, user_id: targetId };
 }

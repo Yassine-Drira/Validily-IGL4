@@ -108,7 +108,8 @@ test("Anti-Bypass Focus Session & Dead Tree Integrity: State Machine pause suspe
     "FocusProvider must implement dedicated pauseTimer and resumeTimer"
   );
   assert.ok(
-    fpContent.includes("abandonFocusSession(sid, reason || \"Abandon manuel par l'étudiant\")"),
+    fpContent.includes("abandonFocusSession(sid, reason || \"Abandon manuel par l'étudiant\")") ||
+      fpContent.includes("abandonFocusSession(sid, reason || \"Abandon manuel par l'étudiant\", eligibleSeconds)"),
     "giveUpSession must call abandonFocusSession on server"
   );
 

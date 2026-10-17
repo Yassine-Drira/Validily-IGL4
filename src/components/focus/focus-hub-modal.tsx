@@ -46,6 +46,7 @@ import { parseAndValidateYouTubeUrl } from "@/lib/audio/youtube-parser";
 
 export function FocusHubModal() {
   const {
+    userId,
     mode,
     timeLeft,
     isRunning,
@@ -120,10 +121,11 @@ export function FocusHubModal() {
   }, [isModalOpen, setIsModalOpen]);
 
   const loadAudioData = async () => {
+    const userAudioCacheKey = `validily_custom_audio_cache_${userId || "guest"}`;
     // Rehydrate from client cache first for zero-flash display
     try {
       if (typeof window !== "undefined") {
-        const cached = localStorage.getItem("validily_custom_audio_cache");
+        const cached = localStorage.getItem(userAudioCacheKey);
         if (cached) {
           const parsed = JSON.parse(cached);
           if (Array.isArray(parsed) && parsed.length > 0) {
@@ -144,7 +146,7 @@ export function FocusHubModal() {
         setCustomEntries(customRes.entries);
         try {
           if (typeof window !== "undefined") {
-            localStorage.setItem("validily_custom_audio_cache", JSON.stringify(customRes.entries));
+            localStorage.setItem(userAudioCacheKey, JSON.stringify(customRes.entries));
           }
         } catch {}
         setAudioQuota({
@@ -154,6 +156,10 @@ export function FocusHubModal() {
           isVip: customRes.isVip,
           isAdmin: customRes.isAdmin,
         });
+
+        if (activeAudioType === "custom" && !activeCustomAudio && customRes.entries.length > 0) {
+          setActiveCustomAudio(customRes.entries[0]);
+        }
       }
 
       if (catalogRes.success) {
@@ -208,7 +214,7 @@ export function FocusHubModal() {
           const next = [newEntry, ...prev.filter((e) => e.id !== newEntry.id)];
           try {
             if (typeof window !== "undefined") {
-              localStorage.setItem("validily_custom_audio_cache", JSON.stringify(next));
+              localStorage.setItem(`validily_custom_audio_cache_${userId || "guest"}`, JSON.stringify(next));
             }
           } catch {}
           return next;
@@ -240,7 +246,7 @@ export function FocusHubModal() {
           const next = prev.filter((s) => s.id !== id);
           try {
             if (typeof window !== "undefined") {
-              localStorage.setItem("validily_custom_audio_cache", JSON.stringify(next));
+              localStorage.setItem(`validily_custom_audio_cache_${userId || "guest"}`, JSON.stringify(next));
             }
           } catch {}
           return next;

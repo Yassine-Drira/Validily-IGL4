@@ -9,7 +9,7 @@ import {
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { getStudentQuizAttempts, getStudentMistakes } from "@/lib/actions/quiz-actions";
 import { getMyForest } from "@/lib/actions/forest-actions";
-import { getUserStudyGoals } from "@/lib/actions/analytics-actions";
+import { getUserStudyGoals, getUserDailyFocusHistory } from "@/lib/actions/analytics-actions";
 import { ResourceCard } from "@/components/academic/resource-card";
 import { InteractiveFlowSelector } from "@/components/academic/interactive-flow-selector";
 import { PersonalAnalyticsDashboard } from "@/components/workspace/personal-analytics-dashboard";
@@ -97,36 +97,60 @@ export default async function HomePage() {
     return { dateStr, dayLabel, count };
   });
 
-  // Real 7-day focus minutes from completed DB sessions
+  // Unified study streak: combines Quizzes + Focus Pomodoro sessions + Daily focus records
+  const allActiveDatesSet = new Set<string>();
+  userAttempts.forEach((a) => {
+    if (a.completed_at) allActiveDatesSet.add(a.completed_at.split("T")[0]);
+  });
+
+  // Real 7-day focus minutes from completed DB sessions & daily focus records
   const dailyFocusMap: { [dateStr: string]: number } = {};
   last7Days.forEach((d) => {
     dailyFocusMap[d.dateStr] = 0;
   });
 
-  if (userForestData?.trees) {
-    userForestData.trees.forEach((t: any) => {
-      if (t.tree_status === "healthy" && t.earned_at) {
-        const dateStr = t.earned_at.split("T")[0];
+  if (currentUser?.id) {
+    try {
+      const dbFocusHistory = await getUserDailyFocusHistory(currentUser.id);
+      Object.entries(dbFocusHistory).forEach(([dateStr, record]) => {
         if (dailyFocusMap[dateStr] !== undefined) {
-          const durationSec =
-            t.session?.actual_duration_seconds ||
-            t.session?.target_duration_seconds ||
-            1500;
-          dailyFocusMap[dateStr] += Math.floor(durationSec / 60);
+          const mins = Math.floor(record.totalSeconds / 60);
+          dailyFocusMap[dateStr] = Math.max(dailyFocusMap[dateStr], mins);
         }
+        if (record.totalSeconds > 0) {
+          allActiveDatesSet.add(dateStr);
+        }
+      });
+    } catch {}
+  }
+
+  // Reconcile healthy trees duration per day with DB daily records (prevents double counting)
+  if (userForestData?.trees) {
+    const treesDailySeconds: { [dateStr: string]: number } = {};
+    userForestData.trees.forEach((t: any) => {
+      const raw = t.earned_at || t.created_at;
+      if (t.tree_status === "healthy" && raw) {
+        const dateStr = raw.split("T")[0];
+        const durationSec =
+          t.session?.actual_duration_seconds ??
+          t.session?.target_duration_seconds ??
+          1500;
+        treesDailySeconds[dateStr] = (treesDailySeconds[dateStr] || 0) + (durationSec > 0 ? durationSec : 1500);
+      }
+    });
+
+    Object.entries(treesDailySeconds).forEach(([dateStr, totalSec]) => {
+      if (dailyFocusMap[dateStr] !== undefined) {
+        const treeMins = Math.floor(totalSec / 60);
+        dailyFocusMap[dateStr] = Math.max(dailyFocusMap[dateStr], treeMins);
       }
     });
   }
-
-  // Unified study streak: combines Quizzes + Focus Pomodoro sessions
-  const allActiveDatesSet = new Set<string>();
-  userAttempts.forEach((a) => {
-    if (a.completed_at) allActiveDatesSet.add(a.completed_at.split("T")[0]);
-  });
   if (userForestData?.trees) {
     userForestData.trees.forEach((t: any) => {
-      if (t.tree_status === "healthy" && t.earned_at) {
-        allActiveDatesSet.add(t.earned_at.split("T")[0]);
+      const raw = t.earned_at || t.created_at;
+      if (t.tree_status === "healthy" && raw) {
+        allActiveDatesSet.add(raw.split("T")[0]);
       }
     });
   }

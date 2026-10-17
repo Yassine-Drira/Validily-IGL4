@@ -14,6 +14,14 @@ export default function GlobalError({
 }) {
   useEffect(() => {
     console.error("Global application boundary caught error:", error);
+    // If a chunk failed to load (e.g. app was rebuilt while browser tab was open), auto-reload to fetch fresh chunk manifest
+    if (
+      error?.name === "ChunkLoadError" ||
+      error?.message?.includes("ChunkLoadError") ||
+      error?.message?.includes("Failed to load chunk")
+    ) {
+      window.location.reload();
+    }
   }, [error]);
 
   return (

@@ -16,6 +16,7 @@ import {
   Sparkles,
   Shield,
   HelpCircle,
+  Lock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { VipEntitlement } from "@/types/database";
@@ -27,12 +28,14 @@ interface AdminVipManagerProps {
   initialEntitlements: VipEntitlement[];
   managedUsers: ManagedUser[];
   onNotify?: (msg: string, isError?: boolean) => void;
+  isTemporaryAdmin?: boolean;
 }
 
 export function AdminVipManager({
   initialEntitlements,
   managedUsers,
   onNotify,
+  isTemporaryAdmin = false,
 }: AdminVipManagerProps) {
   const [entitlements, setEntitlements] = useState<VipEntitlement[]>(initialEntitlements);
   const [searchQuery, setSearchQuery] = useState("");
@@ -166,10 +169,17 @@ export function AdminVipManager({
             </p>
           </div>
 
-          <Button size="sm" variant="primary" onClick={openGrantModal}>
-            <Plus className="w-3.5 h-3.5 mr-1" />
-            <span>Accorder un Accès VIP</span>
-          </Button>
+          {isTemporaryAdmin ? (
+            <div className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl border border-amber-200 bg-amber-50/70 text-amber-900 text-xs font-semibold select-none">
+              <Lock className="w-3.5 h-3.5 text-amber-600" />
+              <span>Attribution VIP réservée à l&apos;admin principal</span>
+            </div>
+          ) : (
+            <Button size="sm" variant="primary" onClick={openGrantModal}>
+              <Plus className="w-3.5 h-3.5 mr-1" />
+              <span>Accorder un Accès VIP</span>
+            </Button>
+          )}
         </div>
 
         {/* Security Notice Box */}
@@ -305,15 +315,22 @@ export function AdminVipManager({
 
                       <td className="py-3.5 px-4 text-right">
                         {effectiveStatus === "active" && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setEntitlementToRevoke(ent)}
-                            className="text-xs text-rose-600 hover:bg-rose-50 hover:border-rose-200 h-7 px-2.5"
-                          >
-                            <UserX className="w-3 h-3 mr-1" />
-                            <span>Révoquer</span>
-                          </Button>
+                          isTemporaryAdmin ? (
+                            <span className="inline-flex items-center space-x-1 text-[11px] text-[#94A3B8] font-mono">
+                              <Lock className="w-3 h-3 text-slate-400" />
+                              <span>Réservé Admin Permanent</span>
+                            </span>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setEntitlementToRevoke(ent)}
+                              className="text-xs text-rose-600 hover:bg-rose-50 hover:border-rose-200 h-7 px-2.5"
+                            >
+                              <UserX className="w-3 h-3 mr-1" />
+                              <span>Révoquer</span>
+                            </Button>
+                          )
                         )}
                       </td>
                     </tr>

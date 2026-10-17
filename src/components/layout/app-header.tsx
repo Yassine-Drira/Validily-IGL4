@@ -10,12 +10,18 @@ import { createClient } from "@/lib/supabase/client";
 import { flushAuthCookiesClient } from "@/lib/auth/cookie-utils";
 import { serverLogoutAction } from "@/lib/auth/logout-action";
 import { FocusHeaderWidget } from "@/components/focus/focus-header-widget";
+import { NotificationBell } from "@/components/notifications/notification-bell";
+
+import { VipBadge } from "@/components/ui/vip-badge";
 
 export interface HeaderUser {
   id: string;
   name: string;
   email?: string;
   avatarUrl?: string | null;
+  role?: string;
+  isVip?: boolean;
+  isTemporaryAdmin?: boolean;
 }
 
 export function AppHeader({ initialUser }: { initialUser?: HeaderUser | null }) {
@@ -147,6 +153,9 @@ export function AppHeader({ initialUser }: { initialUser?: HeaderUser | null }) 
           </Button>
         </Link>
 
+        {/* Notifications Center */}
+        {user && <NotificationBell user={user} />}
+
         {/* User Account / Dropdown */}
         {user ? (
           <div className="relative">
@@ -155,27 +164,39 @@ export function AppHeader({ initialUser }: { initialUser?: HeaderUser | null }) 
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
               className="flex items-center space-x-2 p-1.5 rounded-xl hover:bg-[#F4F6FA] transition-colors cursor-pointer"
             >
-              {user.avatarUrl ? (
-                <img
-                  src={user.avatarUrl}
-                  alt={user.name}
-                  className="w-7 h-7 rounded-lg object-cover border border-[#2855D9]/20 shadow-2xs"
-                />
-              ) : (
-                <div className="w-7 h-7 rounded-lg bg-[#EDF2FF] border border-[#2855D9]/20 text-[#2855D9] font-bold text-xs flex items-center justify-center">
-                  {user.name.slice(0, 2).toUpperCase()}
-                </div>
-              )}
+              <div className="relative">
+                {user.avatarUrl ? (
+                  <img
+                    src={user.avatarUrl}
+                    alt={user.name}
+                    className="w-7 h-7 rounded-lg object-cover border border-[#2855D9]/20 shadow-2xs"
+                  />
+                ) : (
+                  <div className="w-7 h-7 rounded-lg bg-[#EDF2FF] border border-[#2855D9]/20 text-[#2855D9] font-bold text-xs flex items-center justify-center">
+                    {user.name.slice(0, 2).toUpperCase()}
+                  </div>
+                )}
+                {user.isVip && <VipBadge variant="avatar-badge" />}
+              </div>
               <span className="text-xs font-semibold text-[#182235] hidden sm:inline max-w-[100px] truncate">
                 {user.name}
               </span>
+              {user.isVip && <VipBadge variant="compact" className="hidden md:inline-flex" />}
             </button>
 
             {isDropdownOpen && (
-              <div className="absolute right-0 mt-2 w-48 bg-white border border-[#E4E8F0] rounded-2xl shadow-xl p-2 z-50 text-xs space-y-1 animate-in fade-in duration-150">
-                <div className="px-3 py-2 border-b border-[#F1F4F9]">
-                  <div className="font-bold text-[#111A2E] truncate">{user.name}</div>
+              <div className="absolute right-0 mt-2 w-52 bg-white border border-[#E4E8F0] rounded-2xl shadow-xl p-2 z-50 text-xs space-y-1 animate-in fade-in duration-150">
+                <div className="px-3 py-2 border-b border-[#F1F4F9] space-y-1">
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="font-bold text-[#111A2E] truncate">{user.name}</span>
+                    {user.isVip && <VipBadge variant="compact" />}
+                  </div>
                   <div className="text-[11px] text-[#68748A] truncate">{user.email}</div>
+                  {user.isTemporaryAdmin && (
+                    <span className="inline-block mt-0.5 px-1.5 py-0.5 rounded text-[9px] font-mono bg-emerald-50 text-emerald-800 border border-emerald-200">
+                      👑 Admin Délégué
+                    </span>
+                  )}
                 </div>
 
                 <Link

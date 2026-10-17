@@ -265,6 +265,11 @@ export function AdminManager({
     e.preventDefault();
     if (!semName.trim() || !semYear.trim()) return;
 
+    if (currentUser?.isTemporaryAdmin) {
+      setErrorMsg("Action restreinte : la création de semestres académiques est réservée à l'administrateur principal.");
+      return;
+    }
+
     setIsSubmittingSem(true);
     setErrorMsg("");
     try {
@@ -295,6 +300,11 @@ export function AdminManager({
 
   const executeDeleteSubject = async () => {
     if (!subjectToDelete) return;
+    if (currentUser?.isTemporaryAdmin) {
+      setErrorMsg("Action restreinte : les administrateurs temporaires ne peuvent pas supprimer les matières créées par l'administrateur principal.");
+      setSubjectToDelete(null);
+      return;
+    }
     const sId = subjectToDelete.id;
     const sName = subjectToDelete.name;
 
@@ -318,6 +328,16 @@ export function AdminManager({
   const handleGrantRole = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!userToDelegate) return;
+
+    if (currentUser?.isTemporaryAdmin) {
+      setErrorMsg("Action non autorisée : les administrateurs temporaires ne peuvent ni déléguer ni modifier les rôles.");
+      return;
+    }
+
+    if (userToDelegate.id === currentUser?.id) {
+      setErrorMsg("Vous ne pouvez pas modifier ou prolonger vos propres prérogatives administratives.");
+      return;
+    }
 
     setIsDelegating(true);
     setErrorMsg("");
@@ -367,6 +387,14 @@ export function AdminManager({
 
   const executeRevokeRole = async () => {
     if (!userToRevoke) return;
+    if (currentUser?.isTemporaryAdmin) {
+      setErrorMsg("Action non autorisée : les administrateurs temporaires ne peuvent pas révoquer de rôles.");
+      return;
+    }
+    if (userToRevoke.id === currentUser?.id) {
+      setErrorMsg("Impossible de révoquer vos propres prérogatives administratives.");
+      return;
+    }
     const target = userToRevoke;
     setIsRevokingId(target.id);
     setErrorMsg("");
@@ -437,10 +465,12 @@ export function AdminManager({
         </div>
 
         <div className="flex items-center space-x-2 shrink-0">
-          <Button size="sm" variant="outline" onClick={() => setIsSemesterModalOpen(true)}>
-            <Plus className="w-3.5 h-3.5 mr-1" />
-            <span>Nouveau Semestre</span>
-          </Button>
+          {!currentUser?.isTemporaryAdmin && (
+            <Button size="sm" variant="outline" onClick={() => setIsSemesterModalOpen(true)}>
+              <Plus className="w-3.5 h-3.5 mr-1" />
+              <span>Nouveau Semestre</span>
+            </Button>
+          )}
           <Button size="sm" variant="primary" onClick={openCreateSubjectModal}>
             <Plus className="w-3.5 h-3.5 mr-1" />
             <span>Créer une Matière</span>
@@ -638,11 +668,29 @@ export function AdminManager({
                           </button>
                           <button
                             type="button"
-                            onClick={() => setSubjectToDelete(sub)}
-                            className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-semibold text-rose-600 hover:text-white hover:bg-rose-600 border border-rose-200 hover:border-rose-600 transition-colors cursor-pointer shadow-2xs"
-                            title={`Supprimer ${sub.name}`}
+                            onClick={() =>
+                              currentUser?.isTemporaryAdmin
+                                ? setErrorMsg(
+                                    "Action restreinte : les administrateurs temporaires ne peuvent pas supprimer les matières créées par l'administrateur principal."
+                                  )
+                                : setSubjectToDelete(sub)
+                            }
+                            className={`inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-semibold border transition-colors cursor-pointer shadow-2xs ${
+                              currentUser?.isTemporaryAdmin
+                                ? "text-slate-400 border-slate-200 bg-slate-50 opacity-60 cursor-not-allowed"
+                                : "text-rose-600 hover:text-white hover:bg-rose-600 border-rose-200 hover:border-rose-600"
+                            }`}
+                            title={
+                              currentUser?.isTemporaryAdmin
+                                ? "Action réservée à l'administrateur permanent"
+                                : `Supprimer ${sub.name}`
+                            }
                           >
-                            <Trash2 className="w-3 h-3" />
+                            {currentUser?.isTemporaryAdmin ? (
+                              <Lock className="w-3 h-3" />
+                            ) : (
+                              <Trash2 className="w-3 h-3" />
+                            )}
                             <span>Supprimer</span>
                           </button>
                         </td>
@@ -669,6 +717,18 @@ export function AdminManager({
             </p>
           </div>
 
+          {currentUser?.isTemporaryAdmin && (
+            <div className="p-4 rounded-xl bg-amber-50/80 border border-amber-200 text-amber-900 text-xs flex items-start space-x-3">
+              <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold">Privilèges Administrateur Délégué (Lecture Seule) :</span>
+                <p className="mt-0.5 text-amber-800 leading-relaxed">
+                  Vous êtes connecté sous mandat temporaire. Par mesure de sécurité et conformément aux règles de gouvernance, l&apos;attribution, la modification et la révocation des rôles d&apos;autres utilisateurs, ainsi que l&apos;auto-extension de vos droits et la modification des paramètres configurés par l&apos;administrateur principal, sont réservées exclusivement à l&apos;administrateur permanent.
+                </p>
+              </div>
+            </div>
+          )}
+
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead>
@@ -683,6 +743,8 @@ export function AdminManager({
               <tbody className="divide-y divide-[#E4E8F0]">
                 {users.map((u) => {
                   const isMaster = u.email === "yassinedrira3@gmail.com";
+                  const isSelf = Boolean(currentUser?.id && u.id === currentUser.id);
+                  const isCallerTemp = Boolean(currentUser?.isTemporaryAdmin);
                   return (
                     <tr key={u.id} className="hover:bg-[#FAFBFD] transition-colors">
                       <td className="py-2.5 px-3 font-semibold text-[#182235]">
@@ -691,6 +753,11 @@ export function AdminManager({
                             {u.displayName.slice(0, 2).toUpperCase()}
                           </div>
                           <span>{u.displayName}</span>
+                          {isSelf && (
+                            <span className="text-[10px] font-mono font-bold text-[#2855D9] bg-[#EDF2FF] px-1.5 py-0.2 rounded">
+                              (Vous)
+                            </span>
+                          )}
                         </div>
                       </td>
                       <td className="py-2.5 px-3 font-mono text-[#68748A]">{u.email}</td>
@@ -720,6 +787,13 @@ export function AdminManager({
                       <td className="py-2.5 px-3 text-right">
                         {isMaster ? (
                           <span className="text-[11px] text-[#68748A] italic">Protégé</span>
+                        ) : isCallerTemp ? (
+                          <span className="inline-flex items-center space-x-1 text-[11px] text-[#94A3B8] font-mono">
+                            <Lock className="w-3 h-3 text-slate-400" />
+                            <span>Lecture seule</span>
+                          </span>
+                        ) : isSelf ? (
+                          <span className="text-[11px] text-[#68748A] italic">Verrouillé</span>
                         ) : u.isTemporaryAdmin ? (
                           <button
                             type="button"
@@ -832,6 +906,7 @@ export function AdminManager({
         <AdminVipManager
           initialEntitlements={initialVipEntitlements}
           managedUsers={users}
+          isTemporaryAdmin={Boolean(currentUser?.isTemporaryAdmin)}
           onNotify={(msg, isErr) => (isErr ? setErrorMsg(msg) : setFeedbackMsg(msg))}
         />
       )}

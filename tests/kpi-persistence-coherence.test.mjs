@@ -14,6 +14,9 @@ import {
   saveUserStudyGoals,
   recordAnalyticsEvent,
   getAnalyticsOverview,
+  recordUserDailyFocus,
+  getUserDailyFocusHistory,
+  getUserTodayFocus,
 } from "../src/lib/actions/analytics-actions.ts";
 
 test("KPI & Insights Persistence: Study Goals Isolation & Persistence", async (t) => {
@@ -179,3 +182,95 @@ test("Architecture Contract: Personal Analytics & Dashboard Integration", (t) =>
     "page.tsx must pass practicedSubjectIds to PersonalAnalyticsDashboard"
   );
 });
+
+test("Daily Focus Persistence: Cross-Session Continuity, DB Storage & 24h Reset Contract", async () => {
+  const testStudent = {
+    id: "student-focus-continuity-01",
+    email: "student-focus@validily.tn",
+    role: "student",
+    name: "Étudiant Focus",
+  };
+  setTestUser(testStudent);
+
+  const todayStr = new Date().toISOString().split("T")[0];
+  const yesterdayDate = new Date();
+  yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+  const yesterdayStr = yesterdayDate.toISOString().split("T")[0];
+
+  // 1. Record yesterday's focus: 30 minutes (1800 seconds)
+  await recordUserDailyFocus({
+    dateStr: yesterdayStr,
+    totalSeconds: 1800,
+    completedPomodoros: 1,
+    userId: testStudent.id,
+  });
+
+  // 2. Record today's focus: user focuses for 10 seconds (like in user screenshot)
+  const saveRes = await recordUserDailyFocus({
+    dateStr: todayStr,
+    totalSeconds: 10,
+    completedPomodoros: 0,
+    userId: testStudent.id,
+  });
+
+  assert.equal(saveRes.success, true, "recordUserDailyFocus must succeed");
+  assert.equal(saveRes.record?.totalSeconds, 10, "Record must retain 10 seconds");
+
+  // 3. Simulate user disconnecting and connecting again in the same day (rehydration from DB)
+  const todayFocus = await getUserTodayFocus(testStudent.id);
+  assert.equal(todayFocus.totalSeconds, 10, "getUserTodayFocus must return 10s upon reconnecting in same day");
+
+  // 4. Verify 7-day history retains both yesterday and today
+  const history = await getUserDailyFocusHistory(testStudent.id);
+  assert.ok(history[yesterdayStr], "Yesterday's focus must remain preserved");
+  assert.equal(history[yesterdayStr].totalSeconds, 1800);
+  assert.ok(history[todayStr], "Today's focus must be preserved");
+  assert.equal(history[todayStr].totalSeconds, 10);
+
+  // 5. Simulate 24h rollover: future date starts at 0 while history is preserved
+  const tomorrowDate = new Date();
+  tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+  const tomorrowStr = tomorrowDate.toISOString().split("T")[0];
+
+  assert.equal(history[tomorrowStr], undefined, "Unreached day must not have unearned focus (starts at 0)");
+
+  setTestUser(null);
+});
+
+test("Achievement Badges: 12 Distinct Iconic SVG Badges & Component Integration", () => {
+  const badgeIconPath = path.resolve("src/components/forest/achievement-badge-icon.tsx");
+  assert.ok(fs.existsSync(badgeIconPath), "achievement-badge-icon.tsx must exist");
+  const badgeContent = fs.readFileSync(badgeIconPath, "utf-8");
+
+  // Verify all 12 distinct badge SVG representations
+  const requiredIds = [
+    "first_tree",
+    "grove_5",
+    "grove_15",
+    "full_island_36",
+    "grove_master_100",
+    "focus_bronze",
+    "focus_silver",
+    "focus_gold",
+    "streak_3",
+    "streak_7",
+    "botanist_explorer",
+    "master_botanist",
+  ];
+
+  requiredIds.forEach((id) => {
+    assert.ok(
+      badgeContent.includes(`id === "${id}"`),
+      `achievement-badge-icon.tsx must implement custom SVG graphics for ${id}`
+    );
+  });
+
+  // Verify forest-achievements.tsx uses AchievementBadgeIcon
+  const achievementsPath = path.resolve("src/components/forest/forest-achievements.tsx");
+  const achievementsContent = fs.readFileSync(achievementsPath, "utf-8");
+  assert.ok(
+    achievementsContent.includes("<AchievementBadgeIcon"),
+    "forest-achievements.tsx must mount AchievementBadgeIcon"
+  );
+});
+

@@ -17,6 +17,8 @@ export default async function WorkspaceLayout({
   const user = await getRequesterUser();
   const subjects = await getSubjects(undefined, user?.id);
   const isAdmin = user?.role === "admin";
+  const { getUserVipStatus } = await import("@/lib/actions/vip-actions");
+  const vip = user?.id ? await getUserVipStatus(user.id) : { isVip: false };
 
   const initialUser = user
     ? {
@@ -24,6 +26,9 @@ export default async function WorkspaceLayout({
         name: user.name || user.email?.split("@")[0] || "Étudiant",
         email: user.email,
         avatarUrl: user.avatarUrl || null,
+        role: user.role,
+        isVip: vip.isVip,
+        isTemporaryAdmin: Boolean(user.isTemporaryAdmin),
       }
     : null;
 

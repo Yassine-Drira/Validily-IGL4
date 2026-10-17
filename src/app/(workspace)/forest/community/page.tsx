@@ -62,12 +62,12 @@ export default function CommunityForestPage() {
     setIsLoadingPeer(true);
     getMyForest(selectedMember.userId)
       .then((res) => {
-        if (!cancelled && res?.trees && res.trees.length > 0) {
-          setPeerTrees(res.trees);
+        if (!cancelled) {
+          setPeerTrees(res?.trees || []);
         }
       })
       .catch(() => {
-        if (!cancelled) setPeerTrees(null);
+        if (!cancelled) setPeerTrees([]);
       })
       .finally(() => {
         if (!cancelled) setIsLoadingPeer(false);
@@ -118,35 +118,7 @@ export default function CommunityForestPage() {
     );
   }, [members, searchQuery]);
 
-  // Generate simulated read-only entries for peer view preview based on recent species
-  const peerPreviewEntries: ForestEntry[] = useMemo(() => {
-    if (!selectedMember) return [];
-    const entries: ForestEntry[] = [];
-    const count = Math.min(selectedMember.healthyTreeCount, 40);
-
-    for (let i = 0; i < count; i++) {
-      const angle = i * 2.399963229728653; // Golden angle
-      const radius = 28 * Math.sqrt(i + 1);
-      const sp = selectedMember.recentSpecies[i % selectedMember.recentSpecies.length] || "cedar";
-
-      entries.push({
-        id: `peer-tree-${i}`,
-        session_id: `peer-session-${i}`,
-        user_id: selectedMember.userId,
-        tree_status: "healthy",
-        tree_species: sp,
-        position_x: Math.round(Math.cos(angle) * radius),
-        position_y: Math.round(Math.sin(angle) * radius),
-        scale_factor: 1,
-        earned_at: new Date(Date.now() - i * 86400000).toISOString(),
-        created_at: new Date(Date.now() - i * 86400000).toISOString(),
-      });
-    }
-
-    return entries;
-  }, [selectedMember]);
-
-  const activePeerEntries = peerTrees && peerTrees.length > 0 ? peerTrees : peerPreviewEntries;
+  const activePeerEntries = peerTrees || [];
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-12 animate-in fade-in duration-300">
@@ -231,7 +203,20 @@ export default function CommunityForestPage() {
             </div>
 
             {/* Read-only interactive landscape */}
-            <ForestCanvas entries={activePeerEntries} readOnly={true} />
+            {isLoadingPeer ? (
+              <div className="h-[280px] sm:h-[340px] rounded-3xl bg-[#FAFBFD] border border-[#E4E8F0] flex flex-col items-center justify-center space-y-3">
+                <RefreshCw className="w-6 h-6 text-[#2855D9] animate-spin" />
+                <span className="text-xs text-[#68748A] font-medium">
+                  Chargement du bosquet de {selectedMember.displayName}...
+                </span>
+              </div>
+            ) : (
+              <ForestCanvas
+                entries={activePeerEntries}
+                readOnly={true}
+                ownerName={selectedMember.displayName}
+              />
+            )}
 
             {/* Encouragement & Cheers Interaction Toolbar */}
             <div className="p-3 sm:p-4 bg-gradient-to-r from-emerald-50/70 via-teal-50/60 to-blue-50/70 rounded-2xl border border-emerald-200/80 space-y-2.5">
@@ -241,6 +226,11 @@ export default function CommunityForestPage() {
                   <span className="text-xs font-bold text-[#111A2E] truncate">
                     Encourager {selectedMember.displayName} :
                   </span>
+                  {activePeerEntries.length === 0 && (
+                    <span className="text-[11px] text-[#68748A] hidden md:inline">
+                      (Arrosez son île pour faire naître sa première pousse !)
+                    </span>
+                  )}
                 </div>
                 {cheerFeedback && (
                   <span className="text-xs font-bold text-emerald-700 bg-white px-2.5 py-1 rounded-lg border border-emerald-200 shadow-2xs animate-in fade-in self-start sm:self-auto">
@@ -375,7 +365,7 @@ export default function CommunityForestPage() {
               .slice(0, 2)
               .toUpperCase();
 
-            const hours = Math.round(member.totalFocusedMinutes / 60);
+            const hours = Math.floor(member.totalFocusedMinutes / 60);
 
             return (
               <div
@@ -435,19 +425,26 @@ export default function CommunityForestPage() {
                 {/* Tree Species Thumbnails */}
                 <div className="pt-2 border-t border-[#E4E8F0] flex items-center justify-between">
                   <div className="flex items-center -space-x-2">
-                    {member.recentSpecies.slice(0, 4).map((sp, idx) => (
-                      <div
-                        key={idx}
-                        className="w-7 h-7 rounded-full bg-white border border-[#E4E8F0] shadow-2xs flex items-center justify-center overflow-hidden"
-                      >
-                        <TreeSvg
-                          species={sp}
-                          status="healthy"
-                          size={24}
-                          showMound={false}
-                        />
-                      </div>
-                    ))}
+                    {member.healthyTreeCount > 0 ? (
+                      member.recentSpecies.slice(0, 4).map((sp, idx) => (
+                        <div
+                          key={idx}
+                          className="w-7 h-7 rounded-full bg-white border border-[#E4E8F0] shadow-2xs flex items-center justify-center overflow-hidden"
+                          title={`Espèce : ${SPECIES_METADATA[sp]?.name || sp}`}
+                        >
+                          <TreeSvg
+                            species={sp}
+                            status="healthy"
+                            size={24}
+                            showMound={false}
+                          />
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-[11px] text-[#68748A] italic">
+                        Bosquet naissant
+                      </span>
+                    )}
                   </div>
 
                   <span className="text-[11px] font-semibold text-[#2855D9] group-hover:underline">

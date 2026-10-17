@@ -196,6 +196,10 @@ export async function deleteSubject(subjectId: string): Promise<{ success?: bool
       return { error: adminCheck.error || "Accès refusé. Privilèges administrateur requis." };
     }
 
+    if (adminCheck.isTemporary || adminCheck.user?.isTemporaryAdmin) {
+      return { error: "Action restreinte : la suppression des modules académiques configurés par l'administrateur principal est réservée aux administrateurs permanents." };
+    }
+
     if (!isSupabaseConfigured()) {
       return { success: true };
     }
@@ -312,6 +316,10 @@ export async function createSemester(data: {
     const adminCheck = await assertAdmin();
     if (!adminCheck.authorized) {
       return { error: adminCheck.error || "Accès refusé. Privilèges administrateur requis." };
+    }
+
+    if (adminCheck.isTemporary || adminCheck.user?.isTemporaryAdmin) {
+      return { error: "Action restreinte : la création de semestres académiques est réservée à l'administrateur principal." };
     }
 
     if (!isSupabaseConfigured()) {
@@ -442,8 +450,18 @@ export async function grantTemporaryAdminRole(params: {
       return { error: adminCheck.error || "Privilèges administrateur requis." };
     }
 
+    // 1. Strict hierarchy: Temporary/delegated admins CANNOT modify or assign roles
+    if (adminCheck.isTemporary || adminCheck.user?.isTemporaryAdmin) {
+      return { error: "Action non autorisée : les administrateurs temporaires ne peuvent ni déléguer ni modifier les rôles." };
+    }
+
     if (!params.userId) {
       return { error: "Identifiant utilisateur requis." };
+    }
+
+    // 2. Strict anti-extension: Caller cannot modify or extend their own role parameters
+    if (params.userId === adminCheck.user?.id) {
+      return { error: "Vous ne pouvez pas modifier ou prolonger vos propres prérogatives administratives." };
     }
 
     let expiresDate: Date;
@@ -459,12 +477,35 @@ export async function grantTemporaryAdminRole(params: {
     }
 
     const expiresAtIso = expiresDate.toISOString();
+
+    if (!isSupabaseConfigured()) {
+      // In offline/test mode, dispatch announcement notification and return
+      try {
+        const { createNotification } = await import("@/lib/actions/notification-actions");
+        await createNotification({
+          recipientId: params.userId,
+          senderId: adminCheck.user?.id,
+          senderName: adminCheck.user?.name || "Administrateur Principal",
+          type: "role_assignment",
+          title: "👑 Rôle Administrateur Délégué attribué",
+          content: `Félicitations ! Vous avez été nommé administrateur temporaire jusqu'au ${expiresDate.toLocaleDateString("fr-FR")}. Vous pouvez désormais gérer le catalogue de cours et les ressources.`,
+          link: "/admin",
+        });
+      } catch {}
+      return { success: true, expiresAt: expiresAtIso };
+    }
+
     const serviceSupabase = getServiceSupabase();
 
-    // 1. Update user_metadata with temporary admin expiration
+    // 3. Update user_metadata with temporary admin expiration
     const { data: userAuth, error: fetchErr } = await serviceSupabase.auth.admin.getUserById(params.userId);
     if (fetchErr || !userAuth?.user) {
       return { error: "Utilisateur introuvable." };
+    }
+
+    // Protect master admin from being altered by delegation
+    if (userAuth.user.email === "yassinedrira3@gmail.com") {
+      return { error: "Impossible de modifier les prérogatives de l'administrateur principal." };
     }
 
     const updatedMetadata = {
@@ -482,7 +523,7 @@ export async function grantTemporaryAdminRole(params: {
       return { error: authUpdateErr.message };
     }
 
-    // 2. Update profile role to admin
+    // 4. Update profile role to admin
     const { error: profileErr } = await serviceSupabase
       .from("profiles")
       .update({ role: "admin", updated_at: new Date().toISOString() })
@@ -491,6 +532,20 @@ export async function grantTemporaryAdminRole(params: {
     if (profileErr) {
       return { error: profileErr.message };
     }
+
+    // 5. Dispatch official announcement notification
+    try {
+      const { createNotification } = await import("@/lib/actions/notification-actions");
+      await createNotification({
+        recipientId: params.userId,
+        senderId: adminCheck.user?.id,
+        senderName: adminCheck.user?.name || "Administrateur Principal",
+        type: "role_assignment",
+        title: "👑 Rôle Administrateur Délégué attribué",
+        content: `Félicitations ! Vous avez été nommé administrateur temporaire jusqu'au ${expiresDate.toLocaleDateString("fr-FR")}. Vous pouvez désormais gérer le catalogue de cours et les ressources.`,
+        link: "/admin",
+      });
+    } catch {}
 
     safeRevalidate("/admin");
     return { success: true, expiresAt: expiresAtIso };
@@ -509,7 +564,33 @@ export async function revokeAdminRole(userId: string): Promise<{
       return { error: adminCheck.error || "Privilèges administrateur requis." };
     }
 
-    // Protect master admin from self-demotion
+    // 1. Strict hierarchy: Temporary/delegated admins CANNOT revoke roles
+    if (adminCheck.isTemporary || adminCheck.user?.isTemporaryAdmin) {
+      return { error: "Action non autorisée : les administrateurs temporaires ne peuvent pas révoquer de rôles." };
+    }
+
+    // 2. Protect caller from self-revocation
+    if (userId === adminCheck.user?.id) {
+      return { error: "Impossible de révoquer vos propres prérogatives administratives." };
+    }
+
+    if (!isSupabaseConfigured()) {
+      try {
+        const { createNotification } = await import("@/lib/actions/notification-actions");
+        await createNotification({
+          recipientId: userId,
+          senderId: adminCheck.user?.id,
+          senderName: adminCheck.user?.name || "Administrateur Principal",
+          type: "role_assignment",
+          title: "🛡️ Fin de mandat Administrateur",
+          content: "Votre mandat d'administrateur délégué est arrivé à son terme. Votre compte étudiant reste actif.",
+          link: "/my-space",
+        });
+      } catch {}
+      return { success: true };
+    }
+
+    // 3. Protect master admin from demotion
     const serviceSupabase = getServiceSupabase();
     const { data: userAuth } = await serviceSupabase.auth.admin.getUserById(userId);
     if (userAuth?.user?.email === "yassinedrira3@gmail.com") {
@@ -536,6 +617,20 @@ export async function revokeAdminRole(userId: string): Promise<{
     if (profileErr) {
       return { error: profileErr.message };
     }
+
+    // 4. Dispatch revocation announcement notification
+    try {
+      const { createNotification } = await import("@/lib/actions/notification-actions");
+      await createNotification({
+        recipientId: userId,
+        senderId: adminCheck.user?.id,
+        senderName: adminCheck.user?.name || "Administrateur Principal",
+        type: "role_assignment",
+        title: "🛡️ Fin de mandat Administrateur",
+        content: "Votre mandat d'administrateur délégué est arrivé à son terme. Votre compte étudiant reste actif.",
+        link: "/my-space",
+      });
+    } catch {}
 
     safeRevalidate("/admin");
     return { success: true };

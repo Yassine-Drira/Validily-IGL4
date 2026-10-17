@@ -8,12 +8,16 @@ import { cn } from "@/lib/utils";
 
 interface ForestInsightsProps {
   entries: ForestEntry[];
+  totalFocusedMinutes?: number;
+  currentStreak?: number;
   isLoading?: boolean;
   className?: string;
 }
 
 export function ForestInsights({
   entries = [],
+  totalFocusedMinutes,
+  currentStreak,
   isLoading = false,
   className = "",
 }: ForestInsightsProps) {
@@ -34,8 +38,12 @@ export function ForestInsights({
       speciesTally[e.tree_species] = (speciesTally[e.tree_species] || 0) + 1;
     });
 
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const effectiveTotalMinutes = Math.max(
+      Math.floor(totalSeconds / 60),
+      totalFocusedMinutes || 0
+    );
+    const hours = Math.floor(effectiveTotalMinutes / 60);
+    const minutes = effectiveTotalMinutes % 60;
 
     // Most planted species
     let topSpecies = "cedar";
@@ -47,20 +55,29 @@ export function ForestInsights({
       }
     });
 
-    // Calculate daily streak of healthy trees
-    const daysSet = new Set(
-      healthy.map((e) => new Date(e.earned_at || e.created_at).toISOString().split("T")[0])
-    );
-    let streak = 0;
-    const today = new Date();
-    for (let i = 0; i < 30; i++) {
-      const d = new Date(today);
-      d.setDate(d.getDate() - i);
-      const dateKey = d.toISOString().split("T")[0];
-      if (daysSet.has(dateKey)) {
-        streak++;
-      } else if (i > 0) {
-        break;
+    // Calculate daily streak of healthy trees if not supplied from server
+    let streak = currentStreak !== undefined ? currentStreak : 0;
+    if (currentStreak === undefined) {
+      const daysSet = new Set(
+        healthy
+          .map((e) => {
+            const raw = e.earned_at || e.created_at;
+            if (!raw) return null;
+            const d = new Date(raw);
+            return isNaN(d.getTime()) ? null : d.toISOString().split("T")[0];
+          })
+          .filter(Boolean) as string[]
+      );
+      const today = new Date();
+      for (let i = 0; i < 30; i++) {
+        const d = new Date(today);
+        d.setDate(d.getDate() - i);
+        const dateKey = d.toISOString().split("T")[0];
+        if (daysSet.has(dateKey)) {
+          streak++;
+        } else if (i > 0) {
+          break;
+        }
       }
     }
 
@@ -74,7 +91,7 @@ export function ForestInsights({
       topCount,
       streak,
     };
-  }, [entries]);
+  }, [entries, totalFocusedMinutes, currentStreak]);
 
   if (isLoading && entries.length === 0) {
     return (

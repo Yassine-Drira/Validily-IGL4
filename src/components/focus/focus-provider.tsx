@@ -18,7 +18,10 @@ import {
   abandonFocusSession,
   pauseFocusSession,
   resumeFocusSession,
+  getMyForest,
 } from "@/lib/actions/forest-actions";
+import { getMyCustomAudio } from "@/lib/actions/custom-audio-actions";
+import { getUserTodayFocus, recordUserDailyFocus } from "@/lib/actions/analytics-actions";
 import { FocusResultModal, FocusResultData } from "./focus-result-modal";
 
 export type TimerMode = "work" | "shortBreak" | "longBreak";
@@ -26,6 +29,7 @@ export type AudioPlaybackType = "none" | "synth" | "custom" | "catalog";
 export type SessionState = "idle" | "running" | "paused";
 
 interface FocusContextType {
+  userId: string | null;
   mode: TimerMode;
   timeLeft: number;
   isRunning: boolean;
@@ -113,6 +117,11 @@ export function FocusProvider({
 
   const endTimeRef = useRef<number | null>(null);
   const activeSessionIdRef = useRef<string | null>(null);
+  const totalFocusSecondsTodayRef = useRef<number>(totalFocusSecondsToday);
+
+  useEffect(() => {
+    totalFocusSecondsTodayRef.current = totalFocusSecondsToday;
+  }, [totalFocusSecondsToday]);
 
   useEffect(() => {
     activeSessionIdRef.current = activeSessionId;
@@ -131,6 +140,31 @@ export function FocusProvider({
           localStorage.removeItem(`validily_audio_${key}_${uid}`);
         } else {
           localStorage.setItem(`validily_audio_${key}_${uid}`, value);
+        }
+      } catch {
+        // LocalStorage fallback
+      }
+    },
+    [uid]
+  );
+
+  // Persistent Active Timer State Helper (Continuity across reloads/navigation)
+  const persistActiveTimerState = useCallback(
+    (timerData: {
+      mode: TimerMode;
+      timeLeft: number;
+      endTime: number | null;
+      isRunning: boolean;
+      isPaused: boolean;
+      activeSessionId: string | null;
+      treeSpecies: TreeSpecies;
+      workDuration: number;
+    } | null) => {
+      try {
+        if (!timerData || (!timerData.isRunning && !timerData.isPaused)) {
+          localStorage.removeItem(`validily_active_timer_${uid}`);
+        } else {
+          localStorage.setItem(`validily_active_timer_${uid}`, JSON.stringify(timerData));
         }
       } catch {
         // LocalStorage fallback
@@ -191,6 +225,41 @@ export function FocusProvider({
         setIsSoundMuted(m);
         soundEngine.setMuted(m);
       }
+
+      // Rehydrate in-progress active timer if page was refreshed during session
+      const savedTimer = localStorage.getItem(`validily_active_timer_${uid}`);
+      if (savedTimer) {
+        try {
+          const parsed = JSON.parse(savedTimer);
+          if (parsed && parsed.mode) {
+            setModeState(parsed.mode);
+            if (parsed.treeSpecies) setTreeSpeciesState(parsed.treeSpecies);
+            if (parsed.workDuration) setWorkDuration(parsed.workDuration);
+            if (parsed.activeSessionId) {
+              setActiveSessionId(parsed.activeSessionId);
+              activeSessionIdRef.current = parsed.activeSessionId;
+            }
+            if (parsed.isRunning && parsed.endTime) {
+              const remaining = Math.max(0, Math.round((parsed.endTime - Date.now()) / 1000));
+              if (remaining > 0) {
+                setTimeLeft(remaining);
+                setIsRunning(true);
+                setIsPaused(false);
+                endTimeRef.current = parsed.endTime;
+              } else {
+                setTimeLeft(0);
+                setIsRunning(false);
+                setIsPaused(false);
+                localStorage.removeItem(`validily_active_timer_${uid}`);
+              }
+            } else if (parsed.isPaused) {
+              setTimeLeft(parsed.timeLeft || DEFAULT_WORK);
+              setIsRunning(false);
+              setIsPaused(true);
+            }
+          }
+        } catch {}
+      }
     } catch {
       // LocalStorage access fallback
     }
@@ -217,6 +286,68 @@ export function FocusProvider({
         setTotalFocusSecondsToday(0);
       }
 
+      // Query server DB today focus to guarantee seamless continuity even after logout / session reconnect
+      getUserTodayFocus(user.id)
+        .then((dbToday) => {
+          if (dbToday && (dbToday.totalSeconds > 0 || dbToday.completedPomodoros > 0)) {
+            setTotalFocusSecondsToday((prev) => Math.max(prev, dbToday.totalSeconds));
+            setCompletedPomodoros((prev) => Math.max(prev, dbToday.completedPomodoros));
+            persistDailyStats(dbToday.completedPomodoros, dbToday.totalSeconds, false);
+          }
+        })
+        .catch(() => {});
+
+      // Query server getMyForest to guarantee seamless continuity across sessions and devices
+      getMyForest(user.id)
+        .then((res) => {
+          if (res?.trees) {
+            const todayHealthyTrees = res.trees.filter((t) => {
+              if (t.tree_status !== "healthy") return false;
+              const raw = t.earned_at || t.created_at;
+              if (!raw) return false;
+              const d = new Date(raw);
+              return (
+                !isNaN(d.getTime()) &&
+                (d.toISOString().split("T")[0] === today || d.toLocaleDateString("en-CA") === today)
+              );
+            });
+            const serverSeconds = todayHealthyTrees.reduce(
+              (acc, t) =>
+                acc +
+                (t.session?.actual_duration_seconds ||
+                  t.session?.target_duration_seconds ||
+                  1500),
+              0
+            );
+            if (todayHealthyTrees.length > 0 || serverSeconds > 0) {
+              setCompletedPomodoros((prev) => Math.max(prev, todayHealthyTrees.length));
+              setTotalFocusSecondsToday((prev) => Math.max(prev, serverSeconds));
+              persistDailyStats(
+                todayHealthyTrees.length,
+                serverSeconds,
+                true
+              );
+            }
+          }
+        })
+        .catch(() => {});
+
+      // Query server getMyCustomAudio to ensure custom videos/audio library is maintained across sessions
+      getMyCustomAudio()
+        .then((res) => {
+          if (res.success && res.entries.length > 0) {
+            const currentSaved = localStorage.getItem(`validily_audio_custom_${uid}`);
+            if (!currentSaved) {
+              const savedType = localStorage.getItem(`validily_audio_type_${uid}`);
+              if (savedType === "custom") {
+                setActiveCustomAudioState(res.entries[0]);
+                persistAudioPreference("custom", JSON.stringify(res.entries[0]));
+              }
+            }
+          }
+        })
+        .catch(() => {});
+
       // 3. Work Duration Preference
       const savedDuration = localStorage.getItem(`validily_work_duration_${user.id}`);
       if (savedDuration) {
@@ -238,11 +369,11 @@ export function FocusProvider({
     } catch {
       // LocalStorage fallback
     }
-  }, [user, uid]);
+  }, [user, uid, persistActiveTimerState, persistAudioPreference]);
 
-  // Save daily stats helper (strictly scoped to active user)
+  // Save daily stats helper (strictly scoped to active user & persisted to DB)
   const persistDailyStats = useCallback(
-    (pomodoros: number, seconds: number) => {
+    (pomodoros: number, seconds: number, syncToDb = true) => {
       if (!user?.id) return;
       try {
         const today = new Date().toISOString().split("T")[0];
@@ -254,6 +385,14 @@ export function FocusProvider({
             totalFocusMinutes: Math.floor(seconds / 60),
           })
         );
+        if (syncToDb) {
+          recordUserDailyFocus({
+            dateStr: today,
+            totalSeconds: seconds,
+            completedPomodoros: pomodoros,
+            userId: user.id,
+          }).catch(() => {});
+        }
       } catch {
         // LocalStorage fallback
       }
@@ -302,17 +441,31 @@ export function FocusProvider({
 
       // Accumulate real-time focus seconds continuously in work mode
       if (mode === "work") {
-        setTotalFocusSecondsToday((prevSec) => {
-          const nextSec = prevSec + 1;
-          if (nextSec % 10 === 0) {
-            persistDailyStats(completedPomodoros, nextSec);
-          }
-          return nextSec;
-        });
+        const nextSec = totalFocusSecondsTodayRef.current + 1;
+        totalFocusSecondsTodayRef.current = nextSec;
+        setTotalFocusSecondsToday(nextSec);
+
+        if (nextSec % 15 === 0) {
+          persistDailyStats(completedPomodoros, nextSec);
+        }
+
+        if (remaining % 5 === 0) {
+          persistActiveTimerState({
+            mode,
+            timeLeft: remaining,
+            endTime: endTimeRef.current,
+            isRunning: true,
+            isPaused: false,
+            activeSessionId: activeSessionIdRef.current,
+            treeSpecies,
+            workDuration,
+          });
+        }
       }
 
       if (remaining <= 0) {
         clearInterval(interval);
+        persistActiveTimerState(null);
         setIsRunning(false);
         setIsPaused(false);
         soundEngine.playChime();
@@ -339,7 +492,7 @@ export function FocusProvider({
               };
 
               try {
-                const keys = [`validily_forest_trees_${userId || "guest"}`, "validily_forest_trees_guest"];
+                const keys = userId ? [`validily_forest_trees_${userId}`] : ["validily_forest_trees_guest"];
                 for (const key of keys) {
                   const raw = localStorage.getItem(key);
                   const list: ForestEntry[] = raw ? JSON.parse(raw) : [];
@@ -368,9 +521,10 @@ export function FocusProvider({
 
           setCompletedPomodoros((p) => {
             const nextCount = p + 1;
-            setTotalFocusSecondsToday((sec) => {
-              persistDailyStats(nextCount, sec);
-              return sec;
+            setTotalFocusSecondsToday((prevSec) => {
+              const nextSec = prevSec + workDuration;
+              persistDailyStats(nextCount, nextSec);
+              return nextSec;
             });
             // Transition to break
             const nextMode = nextCount % 4 === 0 ? "longBreak" : "shortBreak";
@@ -408,6 +562,17 @@ export function FocusProvider({
     endTimeRef.current = null;
     soundEngine.stop();
 
+    persistActiveTimerState({
+      mode,
+      timeLeft,
+      endTime: null,
+      isRunning: false,
+      isPaused: true,
+      activeSessionId: activeSessionIdRef.current,
+      treeSpecies,
+      workDuration,
+    });
+
     if (mode === "work" && activeSessionIdRef.current) {
       try {
         await pauseFocusSession(activeSessionIdRef.current);
@@ -415,14 +580,26 @@ export function FocusProvider({
         // Safe offline fallback
       }
     }
-  }, [isRunning, mode]);
+  }, [isRunning, mode, timeLeft, treeSpecies, workDuration, persistActiveTimerState]);
 
   // Resume Paused Timer (accumulates paused duration on server and restarts audio)
   const resumeTimer = useCallback(async () => {
     if (!isPaused) return;
     setIsPaused(false);
     setIsRunning(true);
-    endTimeRef.current = Date.now() + timeLeft * 1000;
+    const targetEnd = Date.now() + timeLeft * 1000;
+    endTimeRef.current = targetEnd;
+
+    persistActiveTimerState({
+      mode,
+      timeLeft,
+      endTime: targetEnd,
+      isRunning: true,
+      isPaused: false,
+      activeSessionId: activeSessionIdRef.current,
+      treeSpecies,
+      workDuration,
+    });
 
     if (activeAudioType === "synth" && soundscape !== "none" && !isSoundMuted) {
       soundEngine.start(soundscape, volume);
@@ -435,7 +612,7 @@ export function FocusProvider({
         // Safe offline fallback
       }
     }
-  }, [isPaused, timeLeft, activeAudioType, soundscape, isSoundMuted, volume, mode]);
+  }, [isPaused, timeLeft, activeAudioType, soundscape, isSoundMuted, volume, mode, treeSpecies, workDuration, persistActiveTimerState]);
 
   // Explicit session abandonment / give up action (creates dead tree penalty & opens result modal)
   const giveUpSession = useCallback(
@@ -444,15 +621,17 @@ export function FocusProvider({
       setIsPaused(false);
       endTimeRef.current = null;
       soundEngine.stop();
+      persistActiveTimerState(null);
 
       const sid = activeSessionIdRef.current || `local-${Date.now()}`;
       activeSessionIdRef.current = null;
       setActiveSessionId(null);
 
       if (mode === "work") {
+        const eligibleSeconds = Math.max(0, workDuration - timeLeft);
         let treeResult: ForestEntry | null = null;
         try {
-          const res = await abandonFocusSession(sid, reason || "Abandon manuel par l'étudiant");
+          const res = await abandonFocusSession(sid, reason || "Abandon manuel par l'étudiant", eligibleSeconds);
           if (res?.tree) {
             treeResult = res.tree;
           }
@@ -460,21 +639,32 @@ export function FocusProvider({
           // Offline / network fallback
         }
 
-        const effectiveTree: ForestEntry = treeResult || {
-          id: `dead-tree-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-          session_id: sid,
-          user_id: userId || "guest",
-          tree_status: "leafless",
-          tree_species: treeSpecies,
-          position_x: 0,
-          position_y: 0,
-          scale_factor: 1,
-          earned_at: new Date().toISOString(),
-          created_at: new Date().toISOString(),
+        const effectiveTree: ForestEntry = {
+          ...(treeResult || {
+            id: `dead-tree-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+            session_id: sid,
+            user_id: userId || "guest",
+            tree_status: "leafless",
+            tree_species: treeSpecies,
+            position_x: 0,
+            position_y: 0,
+            scale_factor: 1,
+            earned_at: new Date().toISOString(),
+            created_at: new Date().toISOString(),
+          }),
+          session: treeResult?.session || ({
+            id: sid,
+            user_id: userId || "guest",
+            target_duration_seconds: workDuration,
+            actual_duration_seconds: eligibleSeconds,
+            status: "interrupted",
+            tree_species: treeSpecies,
+            session_label: null,
+          } as any),
         };
 
         try {
-          const keys = [`validily_forest_trees_${userId || "guest"}`, "validily_forest_trees_guest"];
+          const keys = userId ? [`validily_forest_trees_${userId}`] : ["validily_forest_trees_guest"];
           for (const key of keys) {
             const raw = localStorage.getItem(key);
             const list: ForestEntry[] = raw ? JSON.parse(raw) : [];
@@ -485,7 +675,6 @@ export function FocusProvider({
           }
         } catch {}
 
-        const eligibleSeconds = Math.max(0, workDuration - timeLeft);
         setResultModalData({
           type: "failure",
           treeSpecies,
@@ -508,7 +697,7 @@ export function FocusProvider({
           : longBreakDuration;
       setTimeLeft(dur);
     },
-    [mode, workDuration, shortBreakDuration, longBreakDuration, timeLeft, treeSpecies]
+    [mode, workDuration, shortBreakDuration, longBreakDuration, timeLeft, treeSpecies, userId, persistActiveTimerState]
   );
 
   // Toggle Timer: start, pause or resume
@@ -535,7 +724,19 @@ export function FocusProvider({
     // Idle -> Running
     setIsRunning(true);
     setIsPaused(false);
-    endTimeRef.current = Date.now() + timeLeft * 1000;
+    const targetEnd = Date.now() + timeLeft * 1000;
+    endTimeRef.current = targetEnd;
+
+    persistActiveTimerState({
+      mode,
+      timeLeft,
+      endTime: targetEnd,
+      isRunning: true,
+      isPaused: false,
+      activeSessionId: activeSessionIdRef.current,
+      treeSpecies,
+      workDuration,
+    });
 
     if (activeAudioType === "synth" && soundscape !== "none" && !isSoundMuted) {
       soundEngine.start(soundscape, volume);
@@ -555,11 +756,22 @@ export function FocusProvider({
           if (res.success && res.session) {
             activeSessionIdRef.current = res.session.id;
             setActiveSessionId(res.session.id);
+            persistActiveTimerState({
+              mode,
+              timeLeft,
+              endTime: targetEnd,
+              isRunning: true,
+              isPaused: false,
+              activeSessionId: res.session.id,
+              treeSpecies,
+              workDuration,
+            });
           }
         })
         .catch(() => {});
     }
   }, [
+    user,
     userId,
     router,
     isRunning,
@@ -573,6 +785,8 @@ export function FocusProvider({
     volume,
     mode,
     treeSpecies,
+    workDuration,
+    persistActiveTimerState,
   ]);
 
   const resetTimer = useCallback(() => {
@@ -585,6 +799,7 @@ export function FocusProvider({
     setIsRunning(false);
     setIsPaused(false);
     endTimeRef.current = null;
+    persistActiveTimerState(null);
     soundEngine.stop();
     const dur =
       mode === "work"
@@ -593,7 +808,7 @@ export function FocusProvider({
         ? shortBreakDuration
         : longBreakDuration;
     setTimeLeft(dur);
-  }, [isRunning, isPaused, mode, giveUpSession, workDuration, shortBreakDuration, longBreakDuration]);
+  }, [isRunning, isPaused, mode, giveUpSession, workDuration, shortBreakDuration, longBreakDuration, persistActiveTimerState]);
 
   const setMode = useCallback(
     (newMode: TimerMode) => {
@@ -605,6 +820,7 @@ export function FocusProvider({
       setIsRunning(false);
       setIsPaused(false);
       endTimeRef.current = null;
+      persistActiveTimerState(null);
       setModeState(newMode);
       const dur =
         newMode === "work"
@@ -614,7 +830,7 @@ export function FocusProvider({
           : longBreakDuration;
       setTimeLeft(dur);
     },
-    [isRunning, isPaused, mode, giveUpSession, workDuration, shortBreakDuration, longBreakDuration]
+    [isRunning, isPaused, mode, giveUpSession, workDuration, shortBreakDuration, longBreakDuration, persistActiveTimerState]
   );
 
   const setWorkDurationMinutes = useCallback(
@@ -777,6 +993,7 @@ export function FocusProvider({
   return (
     <FocusContext.Provider
       value={{
+        userId: userId || null,
         mode,
         timeLeft,
         isRunning,
@@ -851,6 +1068,7 @@ export function FocusProvider({
 }
 
 const FALLBACK_FOCUS_CONTEXT: FocusContextType = {
+  userId: null,
   mode: "work",
   timeLeft: DEFAULT_WORK,
   isRunning: false,

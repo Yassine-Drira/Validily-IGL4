@@ -8,6 +8,7 @@ import { ForestEntry, ForestPreferences, ForestVisibility } from "@/types/databa
 import { ForestCanvas } from "@/components/forest/forest-canvas";
 import { ForestTimeline } from "@/components/forest/forest-timeline";
 import { ForestInsights } from "@/components/forest/forest-insights";
+import { ForestAchievements } from "@/components/forest/forest-achievements";
 import { useFocusTimer } from "@/components/focus/focus-provider";
 import {
   Trees,
@@ -20,6 +21,7 @@ import {
   RefreshCw,
   Sparkles,
   Shield,
+  ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -30,43 +32,33 @@ export default function ForestPage() {
   const [viewMode, setViewMode] = useState<"canvas" | "timeline">("canvas");
   const [entries, setEntries] = useState<ForestEntry[]>([]);
   const [preferences, setPreferences] = useState<ForestPreferences | null>(null);
+  const [forestStats, setForestStats] = useState<{
+    healthyCount: number;
+    leaflessCount: number;
+    totalFocusedMinutes: number;
+    currentStreak: number;
+  } | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
   const [showPrivacyModal, setShowPrivacyModal] = useState<boolean>(false);
   const [selectedVisibility, setSelectedVisibility] = useState<ForestVisibility>("members");
+  const [isSavingPrivacy, setIsSavingPrivacy] = useState<boolean>(false);
+
+  // Rehydrate visibility preference immediately from local storage on mount
+  useEffect(() => {
+    try {
+      if (typeof window !== "undefined") {
+        const cached = localStorage.getItem("validily_forest_visibility");
+        if (cached === "private" || cached === "public" || cached === "members") {
+          setSelectedVisibility(cached as ForestVisibility);
+        }
+      }
+    } catch {}
+  }, []);
 
   const fetchForest = async () => {
     setIsLoading(true);
     try {
-      // 1. Gather all client-cached trees (healthy and dead) for resilient instant display
-      const localClientTrees: ForestEntry[] = [];
-      try {
-        if (typeof window !== "undefined") {
-          for (let i = 0; i < localStorage.length; i++) {
-            const k = localStorage.key(i);
-            if (k && k.startsWith("validily_forest_trees_")) {
-              const raw = localStorage.getItem(k);
-              if (raw) {
-                const parsed = JSON.parse(raw);
-                if (Array.isArray(parsed)) {
-                  for (const item of parsed) {
-                    if (
-                      !localClientTrees.some(
-                        (t) =>
-                          t.id === item.id ||
-                          (t.session_id && item.session_id && t.session_id === item.session_id)
-                      )
-                    ) {
-                      localClientTrees.push(item);
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      } catch {}
-
       const res = await getMyForest();
       if (res) {
         setIsAuthenticated(res.authenticated);
@@ -76,31 +68,34 @@ export default function ForestPage() {
         }
 
         const serverTrees = res.trees || [];
-        const mergedMap = new Map<string, ForestEntry>();
+        setEntries(serverTrees);
 
-        for (const t of serverTrees) {
-          mergedMap.set(t.id, t);
-        }
-        for (const lt of localClientTrees) {
-          if (
-            !mergedMap.has(lt.id) &&
-            !Array.from(mergedMap.values()).some(
-              (st) => st.session_id && lt.session_id && st.session_id === lt.session_id
-            )
-          ) {
-            mergedMap.set(lt.id, lt);
+        // Keep local storage strictly synchronized for this authenticated user only
+        try {
+          if (typeof window !== "undefined") {
+            const uid = res.preferences?.user_id;
+            if (uid) {
+              localStorage.setItem(`validily_forest_trees_${uid}`, JSON.stringify(serverTrees));
+            }
           }
-        }
+        } catch {}
 
-        const finalTrees = Array.from(mergedMap.values());
-        setEntries(finalTrees);
+        if (res.stats) {
+          setForestStats(res.stats);
+        }
 
         if (res.preferences) {
           setPreferences(res.preferences);
           setSelectedVisibility(res.preferences.visibility);
+          try {
+            if (typeof window !== "undefined") {
+              localStorage.setItem("validily_forest_visibility", res.preferences.visibility);
+              if (res.preferences.user_id) {
+                localStorage.setItem(`validily_forest_visibility_${res.preferences.user_id}`, res.preferences.visibility);
+              }
+            }
+          } catch {}
         }
-      } else if (localClientTrees.length > 0) {
-        setEntries(localClientTrees);
       }
     } catch {
       // Local / Offline fallback
@@ -126,14 +121,26 @@ export default function ForestPage() {
 
   const handleSaveVisibility = async (vis: ForestVisibility) => {
     setSelectedVisibility(vis);
+    setIsSavingPrivacy(true);
+    if (preferences) {
+      setPreferences({ ...preferences, visibility: vis });
+    }
     try {
+      if (typeof window !== "undefined") {
+        localStorage.setItem("validily_forest_visibility", vis);
+        if (preferences?.user_id) {
+          localStorage.setItem(`validily_forest_visibility_${preferences.user_id}`, vis);
+        }
+      }
       await updateForestPreferences({ visibility: vis });
-      if (preferences) {
-        setPreferences({ ...preferences, visibility: vis });
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("validily_forest_updated"));
       }
       setShowPrivacyModal(false);
     } catch {
-      // Handle error
+      // Fallback
+    } finally {
+      setIsSavingPrivacy(false);
     }
   };
 
@@ -300,7 +307,12 @@ export default function ForestPage() {
       </div>
 
       {/* 2. Forest Insights Summary Cards */}
-      <ForestInsights entries={entries} isLoading={isLoading} />
+      <ForestInsights
+        entries={entries}
+        totalFocusedMinutes={forestStats?.totalFocusedMinutes}
+        currentStreak={forestStats?.currentStreak}
+        isLoading={isLoading}
+      />
 
       {/* 3. Main View Switcher & Container */}
       <div className="space-y-3">
@@ -353,6 +365,13 @@ export default function ForestPage() {
           <ForestTimeline entries={entries} />
         )}
       </div>
+
+      {/* 4. Forest Achievements & Milestones */}
+      <ForestAchievements
+        entries={entries}
+        streak={forestStats?.currentStreak}
+        totalFocusedMinutes={forestStats?.totalFocusedMinutes}
+      />
 
       {/* 4. Privacy Configuration Modal */}
       {showPrivacyModal && (
@@ -443,13 +462,26 @@ export default function ForestPage() {
               </button>
             </div>
 
-            <div className="flex justify-end pt-2">
+            <div className="flex items-center justify-between pt-3 border-t border-[#F1F5F9]">
+              <div className="flex items-center space-x-1.5 text-[11px] text-[#64748B]">
+                {isSavingPrivacy ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 text-[#2855D9] animate-spin" />
+                    <span className="text-[#2855D9] font-medium">Synchronisation en base...</span>
+                  </>
+                ) : (
+                  <>
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Préférence persistée dans votre profil</span>
+                  </>
+                )}
+              </div>
               <button
                 type="button"
                 onClick={() => setShowPrivacyModal(false)}
                 className="px-4 py-2 rounded-xl text-xs font-semibold bg-[#F4F6FA] hover:bg-[#E4E8F0] text-[#182235] transition-colors cursor-pointer"
               >
-                Annuler
+                Fermer
               </button>
             </div>
           </div>

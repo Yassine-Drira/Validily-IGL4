@@ -116,6 +116,14 @@ export async function grantVipAccess(params: {
       return { success: false, error: adminCheck.error || "Privilèges administrateur requis." };
     }
 
+    // 1. Strict hierarchy: Temporary/delegated admins CANNOT modify or assign VIP roles
+    if (adminCheck.isTemporary || adminCheck.user?.isTemporaryAdmin) {
+      return {
+        success: false,
+        error: "Action non autorisée : les administrateurs temporaires ne sont pas autorisés à attribuer le statut VIP.",
+      };
+    }
+
     if (!params.targetUserId) {
       return { success: false, error: "Identifiant utilisateur cible obligatoire." };
     }
@@ -160,6 +168,21 @@ export async function grantVipAccess(params: {
           reason: params.reason,
         },
       });
+
+      // Dispatch VIP role announcement notification
+      try {
+        const { createNotification } = await import("@/lib/actions/notification-actions");
+        await createNotification({
+          recipientId: params.targetUserId,
+          senderId: granterId,
+          senderName: adminUser?.name || "Administrateur Principal",
+          type: "role_assignment",
+          title: "✨ Statut VIP Vérifié accordé",
+          content: `Félicitations ! Vous bénéficiez désormais du badge VIP Vérifié avec quota étendu de soundscapes personnalisés jusqu'au ${expiresAt.toLocaleDateString("fr-FR")}.`,
+          link: "/my-space",
+        });
+      } catch {}
+
       return { success: true, entitlement: newEntitlement };
     }
 
@@ -216,6 +239,20 @@ export async function grantVipAccess(params: {
       },
     });
 
+    // Dispatch VIP role announcement notification
+    try {
+      const { createNotification } = await import("@/lib/actions/notification-actions");
+      await createNotification({
+        recipientId: params.targetUserId,
+        senderId: granterId,
+        senderName: adminUser?.name || "Administrateur Principal",
+        type: "role_assignment",
+        title: "✨ Statut VIP Vérifié accordé",
+        content: `Félicitations ! Votre compte bénéficie désormais du badge VIP Vérifié avec quota étendu de soundscapes personnalisés jusqu'au ${expiresAt.toLocaleDateString("fr-FR")}.`,
+        link: "/my-space",
+      });
+    } catch {}
+
     safeRevalidate("/admin");
 
     return { success: true, entitlement: data as VipEntitlement };
@@ -235,6 +272,14 @@ export async function revokeVipAccess(entitlementId: string): Promise<{
     const adminCheck = await assertAdmin();
     if (!adminCheck.authorized) {
       return { success: false, error: adminCheck.error || "Privilèges administrateur requis." };
+    }
+
+    // 1. Strict hierarchy: Temporary/delegated admins CANNOT revoke VIP roles
+    if (adminCheck.isTemporary || adminCheck.user?.isTemporaryAdmin) {
+      return {
+        success: false,
+        error: "Action non autorisée : les administrateurs temporaires ne peuvent pas révoquer le statut VIP.",
+      };
     }
 
     const adminUser = await getRequesterUser();

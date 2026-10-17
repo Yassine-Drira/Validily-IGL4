@@ -27,11 +27,37 @@ export function TreeDetailModal({ entry, season = "summer", onClose }: TreeDetai
     minute: "2-digit",
   });
 
-  const durationMinutes = entry.session?.actual_duration_seconds
-    ? Math.round(entry.session.actual_duration_seconds / 60)
-    : entry.session?.target_duration_seconds
-    ? Math.round(entry.session.target_duration_seconds / 60)
-    : 25;
+  const actualSec = entry.session?.actual_duration_seconds;
+  const targetSec = entry.session?.target_duration_seconds || 1500;
+  const targetMins = Math.round(targetSec / 60);
+
+  let durationLabel = "";
+  let durationValue = "";
+  let durationShort = "";
+  if (isDead) {
+    durationLabel = "Focus avant abandon";
+    if (typeof actualSec === "number" && actualSec > 0) {
+      if (actualSec < 60) {
+        durationShort = `${actualSec}s`;
+        durationValue = `${actualSec} secondes (sur ${targetMins} min prévues)`;
+      } else {
+        const mins = Math.floor(actualSec / 60);
+        const rem = actualSec % 60;
+        durationShort = rem > 0 ? `${mins}m ${rem}s` : `${mins} min`;
+        durationValue = rem > 0
+          ? `${mins}m ${rem}s (sur ${targetMins} min prévues)`
+          : `${mins} minutes (sur ${targetMins} min prévues)`;
+      }
+    } else {
+      durationShort = "< 1 min";
+      durationValue = "< 1 minute (interrompu avant terme)";
+    }
+  } else {
+    durationLabel = "Durée certifiée";
+    const effectiveSec = typeof actualSec === "number" && actualSec > 0 ? actualSec : targetSec;
+    durationShort = `${Math.round(effectiveSec / 60)} min`;
+    durationValue = `${Math.round(effectiveSec / 60)} minutes`;
+  }
 
   const seasonalTrait = meta.seasonalTraits?.[season] || meta.description;
 
@@ -75,7 +101,7 @@ export function TreeDetailModal({ entry, season = "summer", onClose }: TreeDetai
             {isDead ? "Arbre Défeuillé" : meta.name}
           </h3>
           <p className="text-xs text-[#68748A] italic">
-            {isDead ? "Session interrompue (> 2m)" : meta.latinName}
+            {isDead ? `Session interrompue après ${durationShort}` : meta.latinName}
           </p>
 
           {!isDead && (
@@ -101,10 +127,10 @@ export function TreeDetailModal({ entry, season = "summer", onClose }: TreeDetai
           <div className="flex items-center justify-between">
             <span className="text-[#68748A] flex items-center space-x-1.5">
               <Clock className="w-3.5 h-3.5" />
-              <span>Durée certifiée</span>
+              <span>{durationLabel}</span>
             </span>
             <span className="font-mono font-bold text-[#2855D9]">
-              {durationMinutes} minutes
+              {durationValue}
             </span>
           </div>
 
@@ -125,7 +151,7 @@ export function TreeDetailModal({ entry, season = "summer", onClose }: TreeDetai
                   : "bg-emerald-50 text-emerald-800 border-emerald-200"
               )}
             >
-              {isDead ? "Interrompue (> 2m)" : "Validée à 100%"}
+              {isDead ? "Interrompue avant la fin" : "Validée à 100%"}
             </span>
           </div>
 

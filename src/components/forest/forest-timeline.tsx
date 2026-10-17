@@ -24,9 +24,11 @@ export function ForestTimeline({ entries = [], className = "" }: ForestTimelineP
   const [statusFilter, setStatusFilter] = useState<"all" | "healthy" | "leafless">("all");
 
   const filteredEntries = useMemo(() => {
-    let list = [...entries].sort(
-      (a, b) => new Date(b.earned_at || b.created_at).getTime() - new Date(a.earned_at || a.created_at).getTime()
-    );
+    let list = [...entries].sort((a, b) => {
+      const timeB = new Date(b.earned_at || b.created_at || 0).getTime();
+      const timeA = new Date(a.earned_at || a.created_at || 0).getTime();
+      return (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);
+    });
     if (statusFilter === "healthy") {
       list = list.filter((e) => e.tree_status === "healthy");
     } else if (statusFilter === "leafless") {
@@ -92,11 +94,28 @@ export function ForestTimeline({ entries = [], className = "" }: ForestTimelineP
               hour: "2-digit",
               minute: "2-digit",
             });
-            const duration = entry.session?.actual_duration_seconds
-              ? Math.round(entry.session.actual_duration_seconds / 60)
-              : entry.session?.target_duration_seconds
-              ? Math.round(entry.session.target_duration_seconds / 60)
-              : 25;
+            const actualSec = entry.session?.actual_duration_seconds;
+            const targetSec = entry.session?.target_duration_seconds || 1500;
+
+            let durationDisplay = "";
+            if (isDead) {
+              // Interrupted session: strictly reflect actual elapsed time before abandon (e.g. 3 min), NEVER full planned 25 min!
+              if (typeof actualSec === "number" && actualSec > 0) {
+                if (actualSec < 60) {
+                  durationDisplay = `${actualSec}s`;
+                } else {
+                  const mins = Math.floor(actualSec / 60);
+                  const remSecs = actualSec % 60;
+                  durationDisplay = remSecs > 0 ? `${mins}m ${remSecs}s` : `${mins} min`;
+                }
+              } else {
+                durationDisplay = "< 1 min";
+              }
+            } else {
+              // Healthy completed session
+              const effectiveSec = typeof actualSec === "number" && actualSec > 0 ? actualSec : targetSec;
+              durationDisplay = `${Math.round(effectiveSec / 60)} min`;
+            }
 
             return (
               <div
@@ -149,7 +168,7 @@ export function ForestTimeline({ entries = [], className = "" }: ForestTimelineP
                       </span>
                       <span className="flex items-center space-x-1">
                         <Clock className="w-3 h-3 text-[#2855D9]" />
-                        <span className="text-[#182235] font-semibold">{duration} min</span>
+                        <span className="text-[#182235] font-semibold">{durationDisplay}</span>
                       </span>
                     </div>
                   </div>

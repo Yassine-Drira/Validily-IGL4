@@ -478,13 +478,43 @@ export async function updateCustomAudio(
     const serviceSupabase = getServiceSupabase();
 
     // Verify ownership
-    const { data: existing } = await serviceSupabase
+    const { data: existing, error: fetchErr } = await serviceSupabase
       .from("custom_audio_entries")
       .select("user_id")
       .eq("id", entryId)
       .maybeSingle();
 
+    if (fetchErr && isTableMissingError(fetchErr)) {
+      const fallbackList = await getDbCustomAudioFallback(user.id);
+      const entry = fallbackList.find((e) => e.id === entryId) || localCustomAudioEntries.get(entryId);
+      if (!entry) {
+        return { success: false, error: "Son introuvable." };
+      }
+      if (entry.user_id !== user.id && !isAdmin) {
+        return { success: false, error: "Accès non autorisé à ce son." };
+      }
+      entry.title = cleanTitle.slice(0, 80);
+      entry.updated_at = now;
+      localCustomAudioEntries.set(entry.id, entry);
+      const updatedList = [entry, ...fallbackList.filter((e) => e.id !== entry.id)];
+      await saveDbCustomAudioFallback(user.id, updatedList);
+      return { success: true, entry };
+    }
+
     if (!existing) {
+      const fallbackList = await getDbCustomAudioFallback(user.id);
+      const entry = fallbackList.find((e) => e.id === entryId) || localCustomAudioEntries.get(entryId);
+      if (entry) {
+        if (entry.user_id !== user.id && !isAdmin) {
+          return { success: false, error: "Accès non autorisé à ce son." };
+        }
+        entry.title = cleanTitle.slice(0, 80);
+        entry.updated_at = now;
+        localCustomAudioEntries.set(entry.id, entry);
+        const updatedList = [entry, ...fallbackList.filter((e) => e.id !== entry.id)];
+        await saveDbCustomAudioFallback(user.id, updatedList);
+        return { success: true, entry };
+      }
       return { success: false, error: "Son introuvable." };
     }
 
@@ -504,17 +534,27 @@ export async function updateCustomAudio(
 
     if (error) {
       if (isTableMissingError(error)) {
-        const entry = localCustomAudioEntries.get(entryId);
+        const fallbackList = await getDbCustomAudioFallback(user.id);
+        const entry = fallbackList.find((e) => e.id === entryId) || localCustomAudioEntries.get(entryId);
         if (entry) {
           entry.title = cleanTitle.slice(0, 80);
           entry.updated_at = now;
+          localCustomAudioEntries.set(entry.id, entry);
+          const updatedList = [entry, ...fallbackList.filter((e) => e.id !== entry.id)];
+          await saveDbCustomAudioFallback(user.id, updatedList);
           return { success: true, entry };
         }
       }
       return { success: false, error: error.message };
     }
 
-    return { success: true, entry: updated as CustomAudioEntry };
+    const updatedEntry = updated as CustomAudioEntry;
+    localCustomAudioEntries.set(updatedEntry.id, updatedEntry);
+    const fallbackList = await getDbCustomAudioFallback(user.id);
+    const updatedList = [updatedEntry, ...fallbackList.filter((e) => e.id !== updatedEntry.id)];
+    await saveDbCustomAudioFallback(user.id, updatedList);
+
+    return { success: true, entry: updatedEntry };
   } catch (err: any) {
     return { success: false, error: err?.message || "Erreur de mise à jour." };
   }

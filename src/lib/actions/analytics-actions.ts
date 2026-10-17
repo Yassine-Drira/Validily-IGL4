@@ -62,10 +62,20 @@ async function getPresenceModule() {
   }
 }
 
+async function safeRevalidate(path: string) {
+  try {
+    const cacheMod = await import("next/cache");
+    cacheMod.revalidatePath?.(path);
+  } catch {
+    // Outside active Next.js request context or running in isolated test runner
+  }
+}
+
 // In-memory store for offline/local-first testing & schema cache fallback (bound to globalThis)
 const globalAnalyticsState = globalThis as unknown as {
   __localAnalyticsEvents?: AnalyticsEvent[];
   __localUserGoals?: Map<string, UserStudyGoals>;
+  __localDailyFocusRecords?: Map<string, Record<string, { totalSeconds: number; completedPomodoros: number; updatedAt: string }>>;
 };
 if (!globalAnalyticsState.__localAnalyticsEvents) {
   globalAnalyticsState.__localAnalyticsEvents = [];
@@ -73,8 +83,12 @@ if (!globalAnalyticsState.__localAnalyticsEvents) {
 if (!globalAnalyticsState.__localUserGoals) {
   globalAnalyticsState.__localUserGoals = new Map();
 }
+if (!globalAnalyticsState.__localDailyFocusRecords) {
+  globalAnalyticsState.__localDailyFocusRecords = new Map();
+}
 const localAnalyticsEvents = globalAnalyticsState.__localAnalyticsEvents;
 const localUserGoals = globalAnalyticsState.__localUserGoals;
+const localDailyFocusRecords = globalAnalyticsState.__localDailyFocusRecords;
 
 function seedBaselineAnalytics(): AnalyticsEvent[] {
   const now = Date.now();
@@ -278,6 +292,175 @@ export async function saveUserStudyGoals(
       goals: DEFAULT_GOALS,
       error: err?.message || "Erreur de sauvegarde des objectifs.",
     };
+  }
+}
+
+/**
+ * Daily Focus Persistence: Persist accumulated focus mode seconds for current user per day
+ */
+export async function recordUserDailyFocus(input: {
+  dateStr?: string;
+  totalSeconds: number;
+  completedPomodoros?: number;
+  userId?: string;
+}): Promise<{
+  success: boolean;
+  record?: { totalSeconds: number; completedPomodoros: number; totalMinutes: number };
+  error?: string;
+}> {
+  try {
+    const authMod = await getAuthModule();
+    const requester = authMod ? await authMod.getRequesterUser() : null;
+    const effectiveUserId = input.userId || requester?.id;
+    if (!effectiveUserId) {
+      return { success: false, error: "Non authentifié" };
+    }
+
+    const todayStr = input.dateStr || new Date().toISOString().split("T")[0];
+    const userHistory = localDailyFocusRecords.get(effectiveUserId) || {};
+
+    const existingToday = userHistory[todayStr] || {
+      totalSeconds: 0,
+      completedPomodoros: 0,
+      updatedAt: new Date().toISOString(),
+    };
+
+    const nextSeconds = Math.max(existingToday.totalSeconds, Math.max(0, input.totalSeconds));
+    const nextPomodoros = Math.max(existingToday.completedPomodoros, Math.max(0, input.completedPomodoros || 0));
+
+    const updatedRecord = {
+      totalSeconds: nextSeconds,
+      completedPomodoros: nextPomodoros,
+      updatedAt: new Date().toISOString(),
+    };
+
+    userHistory[todayStr] = updatedRecord;
+    localDailyFocusRecords.set(effectiveUserId, userHistory);
+
+    const serviceSupabase = await getAdminClient();
+    if (serviceSupabase) {
+      const { data: existing } = await serviceSupabase
+        .from("notes")
+        .select("id, content")
+        .eq("user_id", effectiveUserId)
+        .eq("title", "__validily_user_daily_focus__")
+        .maybeSingle();
+
+      if (existing?.id) {
+        let mergedFromDb: Record<string, any> = {};
+        try {
+          if (existing.content) mergedFromDb = JSON.parse(existing.content);
+        } catch {}
+        mergedFromDb[todayStr] = updatedRecord;
+
+        await serviceSupabase
+          .from("notes")
+          .update({
+            content: JSON.stringify(mergedFromDb),
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", existing.id);
+      } else {
+        await serviceSupabase.from("notes").insert({
+          user_id: effectiveUserId,
+          title: "__validily_user_daily_focus__",
+          content: JSON.stringify(userHistory),
+          tags: ["system_daily_focus"],
+          visibility: "private",
+        });
+      }
+    }
+
+    return {
+      success: true,
+      record: {
+        totalSeconds: nextSeconds,
+        completedPomodoros: nextPomodoros,
+        totalMinutes: Math.floor(nextSeconds / 60),
+      },
+    };
+  } catch (err: any) {
+    return { success: false, error: err?.message || "Erreur de sauvegarde focus" };
+  }
+}
+
+/**
+ * Retrieve user's full daily focus history (date -> { totalSeconds, completedPomodoros, totalMinutes })
+ */
+export async function getUserDailyFocusHistory(
+  userId?: string
+): Promise<Record<string, { totalSeconds: number; completedPomodoros: number; totalMinutes: number }>> {
+  try {
+    const authMod = await getAuthModule();
+    const requester = authMod ? await authMod.getRequesterUser() : null;
+    const effectiveUserId = userId || requester?.id;
+    if (!effectiveUserId) return {};
+
+    const inMem = localDailyFocusRecords.get(effectiveUserId);
+    const result: Record<string, { totalSeconds: number; completedPomodoros: number; totalMinutes: number }> = {};
+
+    if (inMem) {
+      for (const [date, rec] of Object.entries(inMem)) {
+        result[date] = {
+          totalSeconds: rec.totalSeconds,
+          completedPomodoros: rec.completedPomodoros,
+          totalMinutes: Math.floor(rec.totalSeconds / 60),
+        };
+      }
+    }
+
+    const serviceSupabase = await getAdminClient();
+    if (serviceSupabase) {
+      const { data } = await serviceSupabase
+        .from("notes")
+        .select("content")
+        .eq("user_id", effectiveUserId)
+        .eq("title", "__validily_user_daily_focus__")
+        .maybeSingle();
+
+      if (data?.content) {
+        try {
+          const parsed = JSON.parse(data.content);
+          if (parsed && typeof parsed === "object") {
+            for (const [date, rec] of Object.entries(parsed as Record<string, any>)) {
+              const sec = rec.totalSeconds || (rec.totalMinutes ? rec.totalMinutes * 60 : 0) || 0;
+              const pom = rec.completedPomodoros || 0;
+              if (!result[date] || sec > result[date].totalSeconds) {
+                result[date] = {
+                  totalSeconds: sec,
+                  completedPomodoros: pom,
+                  totalMinutes: Math.floor(sec / 60),
+                };
+              }
+            }
+          }
+        } catch {}
+      }
+    }
+
+    return result;
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Fast helper to get current day focus seconds & pomodoros (strictly scoped to today's date)
+ * Automatically 0 for new days, ensuring clean daily reset after 24h
+ */
+export async function getUserTodayFocus(
+  userId?: string
+): Promise<{ totalSeconds: number; completedPomodoros: number; totalMinutes: number }> {
+  try {
+    const today = new Date().toISOString().split("T")[0];
+    const history = await getUserDailyFocusHistory(userId);
+    const todayRec = history[today];
+    if (todayRec) {
+      return todayRec;
+    }
+    return { totalSeconds: 0, completedPomodoros: 0, totalMinutes: 0 };
+  } catch {
+    return { totalSeconds: 0, completedPomodoros: 0, totalMinutes: 0 };
   }
 }
 

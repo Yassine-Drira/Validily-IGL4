@@ -219,12 +219,14 @@ export function PersonalAnalyticsDashboard({
   const todayFocusMinutes = Math.floor(effectiveTodayFocusSeconds / 60);
   const formattedTodayFocus = formatSeconds(effectiveTodayFocusSeconds);
 
-  // Goal Progress (100% Dynamic)
+  // Goal Progress (100% Dynamic & Continuous Past Goal Reached)
   const targetFocusSeconds = goals.dailyFocusMinutes * 60;
-  const goalProgressPercent = Math.min(
-    100,
-    Math.round((effectiveTodayFocusSeconds / targetFocusSeconds) * 100)
-  );
+  const rawGoalPercent = Math.round((effectiveTodayFocusSeconds / (targetFocusSeconds || 1)) * 100);
+  const goalProgressPercent = rawGoalPercent;
+  const visualRingPercent = Math.min(100, rawGoalPercent);
+  const isGoalReached = effectiveTodayFocusSeconds >= targetFocusSeconds;
+  const isGoalExceeded = effectiveTodayFocusSeconds > targetFocusSeconds;
+  const surplusFocusSeconds = Math.max(0, effectiveTodayFocusSeconds - targetFocusSeconds);
   const remainingFocusSeconds = Math.max(0, targetFocusSeconds - effectiveTodayFocusSeconds);
 
   // --- Real Subject Breakdown (Zero Hardcoding) ---
@@ -273,7 +275,7 @@ export function PersonalAnalyticsDashboard({
 
   // --- SVG Donut Calculations (100% Dynamic) ---
   const circleCircumference = 251.32; // 2 * pi * 40
-  const donutGoalDash = (goalProgressPercent / 100) * circleCircumference;
+  const donutGoalDash = (visualRingPercent / 100) * circleCircumference;
 
   // Multi-slice donut calculations for subject breakdown
   const subjectSlices = useMemo(() => {
@@ -293,18 +295,24 @@ export function PersonalAnalyticsDashboard({
 
   // --- 7-Day Hybrid Velocity Curve (100% Dynamic) ---
   const curveDataPoints = useMemo(() => {
+    const todayIso = new Date().toISOString().split("T")[0];
     return last7Days.map((d) => {
-      const focusVal = dailyFocusMap[d.dateStr] || 0;
+      const isToday = d.dateStr === todayIso;
+      const baseSec = (dailyFocusMap[d.dateStr] || 0) * 60;
+      const daySec = isToday ? Math.max(effectiveTodayFocusSeconds, baseSec) : baseSec;
+      const focusMins = Math.floor(daySec / 60);
+      const focusVal = focusMins > 0 ? focusMins : daySec > 0 ? Math.round((daySec / 60) * 10) / 10 : 0;
       const quizVal = d.count || 0;
       const activeVal = curveMetric === "focus" ? focusVal : quizVal;
       return {
         ...d,
-        focusMinutes: focusVal,
+        focusSeconds: daySec,
+        focusMinutes: focusMins,
         quizCount: quizVal,
         val: activeVal,
       };
     });
-  }, [last7Days, dailyFocusMap, curveMetric]);
+  }, [last7Days, dailyFocusMap, curveMetric, effectiveTodayFocusSeconds]);
 
   const maxCurveVal = Math.max(1, ...curveDataPoints.map((p) => p.val));
 
@@ -648,7 +656,7 @@ export function PersonalAnalyticsDashboard({
                   cx="50"
                   cy="50"
                   r="40"
-                  stroke={goalProgressPercent >= 100 ? "#10B981" : "#2855D9"}
+                  stroke={isGoalReached ? "#10B981" : "#2855D9"}
                   strokeWidth="11"
                   strokeDasharray={`${donutGoalDash} ${circleCircumference}`}
                   strokeDashoffset="0"
@@ -704,11 +712,19 @@ export function PersonalAnalyticsDashboard({
                   </span>
                   <span
                     className={cn(
-                      "text-[10px] font-mono font-bold mt-0.5",
-                      goalProgressPercent >= 100 ? "text-emerald-600" : "text-[#2855D9]"
+                      "text-[10px] font-mono mt-0.5",
+                      isGoalExceeded
+                        ? "text-emerald-700 font-extrabold"
+                        : isGoalReached
+                        ? "text-emerald-600 font-bold"
+                        : "text-[#2855D9] font-bold"
                     )}
                   >
-                    {goalProgressPercent}% de {goals.dailyFocusMinutes}m
+                    {isGoalExceeded
+                      ? `${rawGoalPercent}% (Cible dépassée !)`
+                      : isGoalReached
+                      ? `${rawGoalPercent}% atteint (${goals.dailyFocusMinutes}m)`
+                      : `${rawGoalPercent}% de ${goals.dailyFocusMinutes}m`}
                   </span>
                 </button>
               ) : (
@@ -740,9 +756,27 @@ export function PersonalAnalyticsDashboard({
                 title="Cliquer pour configurer dans le Focus Hub"
               >
                 <div className="flex items-center space-x-1.5">
-                  <span className={cn("w-2 h-2 rounded-full", goalProgressPercent >= 100 ? "bg-emerald-500" : "bg-[#2855D9]")} />
-                  <span className="text-[#68748A]">
-                    {goalProgressPercent >= 100 ? "Objectif validé" : `Reste : ${formatSeconds(remainingFocusSeconds)}`}
+                  <span
+                    className={cn(
+                      "w-2 h-2 rounded-full",
+                      isGoalExceeded
+                        ? "bg-emerald-600 animate-pulse"
+                        : isGoalReached
+                        ? "bg-emerald-500"
+                        : "bg-[#2855D9]"
+                    )}
+                  />
+                  <span
+                    className={cn(
+                      "text-[11px]",
+                      isGoalExceeded ? "text-emerald-700 font-semibold" : "text-[#68748A]"
+                    )}
+                  >
+                    {isGoalExceeded
+                      ? `Objectif dépassé (+${formatSeconds(surplusFocusSeconds)})`
+                      : isGoalReached
+                      ? "Objectif validé"
+                      : `Reste : ${formatSeconds(remainingFocusSeconds)}`}
                   </span>
                 </div>
                 <span className="font-mono font-bold text-[#111A2E]">
@@ -785,9 +819,18 @@ export function PersonalAnalyticsDashboard({
                 Courbe d&apos;Activité Dynamique (7 Jours)
               </span>
               <span className="text-[11px] text-[#111A2E] font-medium">
-                {curveMetric === "focus"
-                  ? `${Math.round(Object.values(dailyFocusMap).reduce((a, b) => a + b, 0))} min au total cette semaine`
-                  : `${weeklyQuizzesCompleted} quiz réalisés cette semaine`}
+                {curveMetric === "focus" ? (
+                  (() => {
+                    const totalSec = curveDataPoints.reduce((acc, p) => acc + (p.focusSeconds || 0), 0);
+                    return totalSec >= 60
+                      ? `${Math.round(totalSec / 60)} min au total cette semaine`
+                      : totalSec > 0
+                      ? `${formatSeconds(totalSec)} au total cette semaine`
+                      : "0 min au total cette semaine";
+                  })()
+                ) : (
+                  `${weeklyQuizzesCompleted} quiz réalisés cette semaine`
+                )}
               </span>
             </div>
 
@@ -872,7 +915,7 @@ export function PersonalAnalyticsDashboard({
                 <div className="font-bold text-[#93C5FD]">
                   {svgCurvePoints[hoveredDayIndex].dayLabel} ({svgCurvePoints[hoveredDayIndex].dateStr})
                 </div>
-                <div>⏱️ Focus : {svgCurvePoints[hoveredDayIndex].focusMinutes} min</div>
+                <div>⏱️ Focus : {svgCurvePoints[hoveredDayIndex].focusSeconds > 0 ? formatSeconds(svgCurvePoints[hoveredDayIndex].focusSeconds) : "0 min"}</div>
                 <div>🎯 Quiz : {svgCurvePoints[hoveredDayIndex].quizCount} complété(s)</div>
               </div>
             )}
@@ -897,7 +940,13 @@ export function PersonalAnalyticsDashboard({
                   {d.dayLabel}
                 </span>
                 <span className="text-[9px] font-mono text-[#68748A]">
-                  {curveMetric === "focus" ? `${d.focusMinutes}m` : d.quizCount}
+                  {curveMetric === "focus"
+                    ? d.focusMinutes > 0
+                      ? `${d.focusMinutes}m`
+                      : d.focusSeconds > 0
+                      ? `${d.focusSeconds}s`
+                      : "0m"
+                    : d.quizCount}
                 </span>
               </button>
             ))}
@@ -917,7 +966,18 @@ export function PersonalAnalyticsDashboard({
               >
                 Objectif Quotidien
               </button>
-              <span className="font-mono text-[#2855D9] font-bold">{goalProgressPercent}%</span>
+              <span
+                className={cn(
+                  "font-mono font-bold",
+                  isGoalExceeded
+                    ? "text-emerald-700"
+                    : isGoalReached
+                    ? "text-emerald-600"
+                    : "text-[#2855D9]"
+                )}
+              >
+                {rawGoalPercent}%
+              </span>
             </div>
             <div
               onClick={() => setIsModalOpen(true)}
@@ -925,21 +985,28 @@ export function PersonalAnalyticsDashboard({
               title="Cliquer pour configurer votre temps dans le Focus Hub"
             >
               <div
-                style={{ width: `${goalProgressPercent}%` }}
+                style={{ width: `${Math.min(100, rawGoalPercent)}%` }}
                 className={cn(
                   "h-full rounded-full transition-all duration-500",
-                  goalProgressPercent >= 100
+                  isGoalExceeded
+                    ? "bg-gradient-to-r from-emerald-500 to-teal-500"
+                    : isGoalReached
                     ? "bg-emerald-500"
-                    : goalProgressPercent >= 50
+                    : rawGoalPercent >= 50
                     ? "bg-[#2855D9]"
                     : "bg-amber-500"
                 )}
               />
             </div>
             <p className="text-[11px] text-[#68748A]">
-              {goalProgressPercent >= 100 ? (
+              {isGoalExceeded ? (
                 <span className="text-emerald-700 font-semibold flex items-center space-x-1">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <Sparkles className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  <span>Objectif validé (+{formatSeconds(surplusFocusSeconds)} en surplus !)</span>
+                </span>
+              ) : isGoalReached ? (
+                <span className="text-emerald-700 font-semibold flex items-center space-x-1">
+                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
                   <span>Objectif validé aujourd&apos;hui !</span>
                 </span>
               ) : (

@@ -6,12 +6,14 @@ import { StudentPrivateWorkspace } from "@/components/workspace/student-private-
 import { getStudentQuizAttempts, getStudentMistakes } from "@/lib/actions/quiz-actions";
 import { getBookmarks } from "@/lib/supabase/repository";
 import { getRecentAuditLogs } from "@/lib/audit/audit-logger";
+import { getUserVipStatus } from "@/lib/actions/vip-actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function MySpacePage() {
   let user: any = null;
   let isGuest = true;
+  let isVip = false;
   let privateNotes: any[] = [];
   let privateResources: any[] = [];
   let sharedResources: any[] = [];
@@ -80,6 +82,12 @@ export default async function MySpacePage() {
         recentActivity = getRecentAuditLogs(30).filter(
           (log: any) => log.actor_id === authUser.id || log.metadata?.user_id === authUser.id
         );
+
+        // 6. VIP Entitlement & Verified Badge status
+        try {
+          const vipRes = await getUserVipStatus(authUser.id);
+          isVip = Boolean(vipRes.isVip);
+        } catch {}
       }
     } catch (err: any) {
     if (err?.digest?.startsWith("NEXT_REDIRECT")) {
@@ -94,6 +102,7 @@ export default async function MySpacePage() {
       <StudentPrivateWorkspace
         user={user}
         isGuest={isGuest}
+        isVip={isVip}
         quizAttempts={quizAttempts}
         mistakes={mistakes}
         privateNotes={privateNotes}

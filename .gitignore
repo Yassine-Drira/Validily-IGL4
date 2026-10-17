@@ -46,4 +46,6 @@ next-env.d.ts
 scripts/agent-bridge.mjs
 supabase/.temp/
 template-prompt-html-quiz.md
+scratch/
+
 
