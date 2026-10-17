@@ -1,5 +1,7 @@
 "use server";
 
+import fs from "fs";
+import path from "path";
 import { revalidatePath } from "next/cache";
 import { getServiceSupabase } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/supabase/server";
@@ -7,8 +9,57 @@ import { ResourceVote, ResourceVoteSummary, ResourceVoteValue } from "@/types/da
 import { getRequesterUser, checkResourceAccess } from "@/lib/auth/authorization";
 import { getResourceById, getResourceVotes, invalidateRepositoryCache } from "@/lib/supabase/repository";
 
-// Local in-memory store for instantaneous offline/test resilience
-const localVotesStore = new Map<string, ResourceVote>();
+// Global in-memory cache surviving Next.js HMR
+const globalVoteState = globalThis as unknown as {
+  __localVotesStore?: Map<string, ResourceVote>;
+};
+if (!globalVoteState.__localVotesStore) {
+  globalVoteState.__localVotesStore = new Map();
+}
+const localVotesStore = globalVoteState.__localVotesStore;
+
+// Local file resilience directory
+const CACHE_DIR = path.join(process.cwd(), ".validily-cache");
+const VOTES_CACHE_FILE = path.join(CACHE_DIR, "resource_votes.json");
+
+function readDiskVotesCache(): ResourceVote[] {
+  try {
+    if (fs.existsSync(VOTES_CACHE_FILE)) {
+      const raw = fs.readFileSync(VOTES_CACHE_FILE, "utf8");
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch {}
+  return [];
+}
+
+function writeDiskVotesCache(votes: ResourceVote[]): void {
+  try {
+    if (!fs.existsSync(CACHE_DIR)) {
+      fs.mkdirSync(CACHE_DIR, { recursive: true });
+    }
+    fs.writeFileSync(VOTES_CACHE_FILE, JSON.stringify(votes, null, 2), "utf8");
+  } catch {}
+}
+
+async function getValidSystemUserId(serviceSupabase: any): Promise<string> {
+  try {
+    const { data: users } = await serviceSupabase
+      .from("profiles")
+      .select("id")
+      .limit(1);
+    if (users && users.length > 0 && users[0].id) {
+      return users[0].id;
+    }
+  } catch {}
+  try {
+    const { data: authData } = await serviceSupabase.auth.admin.listUsers({ page: 1, perPage: 1 });
+    if (authData?.users?.[0]?.id) {
+      return authData.users[0].id;
+    }
+  } catch {}
+  return "d0000000-0000-0000-0000-000000000001";
+}
 
 function safeRevalidate(path: string) {
   try {
@@ -17,65 +68,60 @@ function safeRevalidate(path: string) {
     // Outside active Next.js request context
   }
   try {
-    invalidateRepositoryCache();
+    invalidateRepositoryCache("resources");
   } catch {}
 }
 
 /**
- * Fallback loader from DB notes if resource_votes table is not migrated yet
+ * Fallback loader from disk cache and DB notes
  */
-async function getDbVotesFallback(): Promise<ResourceVote[]> {
-  try {
-    const serviceSupabase = getServiceSupabase();
-    if (!serviceSupabase) return Array.from(localVotesStore.values());
+export async function getDbVotesFallback(): Promise<ResourceVote[]> {
+  // 1. Try disk cache first
+  const diskVotes = readDiskVotesCache();
+  if (diskVotes.length > 0) {
+    diskVotes.forEach((v) => localVotesStore.set(`${v.user_id}:${v.resource_id}`, v));
+  }
 
-    const { data } = await serviceSupabase
-      .from("notes")
-      .select("content")
-      .eq("title", "__validily_resource_votes__")
-      .maybeSingle();
-
-    if (data?.content) {
-      const parsed = JSON.parse(data.content);
-      if (Array.isArray(parsed)) return parsed as ResourceVote[];
-    }
-  } catch {}
   return Array.from(localVotesStore.values());
 }
 
-async function saveDbVotesFallback(votes: ResourceVote[]): Promise<void> {
-  try {
-    const serviceSupabase = getServiceSupabase();
-    if (!serviceSupabase) return;
+export async function saveDbVotesFallback(votes: ResourceVote[]): Promise<void> {
+  // 1. Update in-memory
+  localVotesStore.clear();
+  votes.forEach((v) => localVotesStore.set(`${v.user_id}:${v.resource_id}`, v));
 
-    const { data: existing } = await serviceSupabase
-      .from("notes")
-      .select("id")
-      .eq("title", "__validily_resource_votes__")
-      .maybeSingle();
+  // 2. Write to disk cache
+  writeDiskVotesCache(votes);
 
-    const json = JSON.stringify(votes);
-
-    if (existing?.id) {
-      await serviceSupabase
-        .from("notes")
-        .update({ content: json, updated_at: new Date().toISOString() })
-        .eq("id", existing.id);
-    } else {
-      await serviceSupabase.from("notes").insert({
-        user_id: "00000000-0000-0000-0000-000000000000",
-        title: "__validily_resource_votes__",
-        content: json,
-        tags: ["system_votes_registry"],
-        visibility: "public",
-      });
+  // Compute aggregated per-resource breakdown (how many clicked up and down)
+  const countsMap: Record<string, { upvotes: number; downvotes: number; score: number }> = {};
+  votes.forEach((v) => {
+    if (!countsMap[v.resource_id]) {
+      countsMap[v.resource_id] = { upvotes: 0, downvotes: 0, score: 0 };
     }
+    if (v.vote_value === 1) countsMap[v.resource_id].upvotes++;
+    else if (v.vote_value === -1) countsMap[v.resource_id].downvotes++;
+    countsMap[v.resource_id].score =
+      countsMap[v.resource_id].upvotes - countsMap[v.resource_id].downvotes;
+  });
+
+  try {
+    const countsFile = path.join(CACHE_DIR, "resource_vote_counts.json");
+    if (!fs.existsSync(CACHE_DIR)) {
+      fs.mkdirSync(CACHE_DIR, { recursive: true });
+    }
+    fs.writeFileSync(countsFile, JSON.stringify(countsMap, null, 2), "utf8");
   } catch {}
 }
 
 /**
- * Cast, toggle, or remove a vote on an academic resource.
- * Value: 1 (Upvote), -1 (Downvote), 0 (Remove Vote).
+ * Cast, toggle, or remove a vote on an academic resource (Reddit-style mechanism).
+ * Value: 1 (Upvote), -1 (Downvote), 0 (Remove Vote / Unvote).
+ *
+ * Behavior:
+ * - Public resources share score and aggregate votes across all users.
+ * - Changing resource visibility (public <-> private) preserves all votes intact in the database.
+ * - Clicking the same direction again toggles off (value: 0).
  */
 export async function voteResourceAction(input: {
   resourceId: string;
@@ -104,7 +150,7 @@ export async function voteResourceAction(input: {
     }
 
     // 1. Authoritative access control: user must have permission to access the resource
-    const resource = await getResourceById(resourceId);
+    const resource = await getResourceById(resourceId, requester.id);
     if (!resource) {
       return { success: false, score: 0, upvotes: 0, downvotes: 0, userVote: 0, error: "Ressource introuvable." };
     }
@@ -117,21 +163,22 @@ export async function voteResourceAction(input: {
     const serviceSupabase = getServiceSupabase();
     const isConfigured = isSupabaseConfigured() && !!serviceSupabase;
 
-    const voteKey = `${requester.id}:${resourceId}`;
+    let dbTableSuccess = false;
+    let upvotes = 0;
+    let downvotes = 0;
+    let score = 0;
 
     if (isConfigured) {
-      // Direct PostgreSQL Table Execution
       try {
         if (value === 0) {
-          // Remove vote
-          await serviceSupabase
+          const { error } = await serviceSupabase
             .from("resource_votes")
             .delete()
             .eq("resource_id", resourceId)
             .eq("user_id", requester.id);
+          if (error) throw error;
         } else {
-          // Upsert vote
-          await serviceSupabase
+          const { error } = await serviceSupabase
             .from("resource_votes")
             .upsert(
               {
@@ -142,87 +189,64 @@ export async function voteResourceAction(input: {
               },
               { onConflict: "user_id,resource_id" }
             );
+          if (error) throw error;
         }
 
-        // Aggregate authoritative counts from DB
-        const { data: allVotes } = await serviceSupabase
+        const { data: allVotes, error: selectErr } = await serviceSupabase
           .from("resource_votes")
           .select("vote_value")
           .eq("resource_id", resourceId);
 
-        let upvotes = 0;
-        let downvotes = 0;
+        if (selectErr) throw selectErr;
+
         if (allVotes) {
           allVotes.forEach((v: { vote_value: number }) => {
             if (v.vote_value === 1) upvotes++;
             else if (v.vote_value === -1) downvotes++;
           });
         }
-        const score = upvotes - downvotes;
-
-        // Sync denormalized counters onto resources table if available
-        try {
-          await serviceSupabase
-            .from("resources")
-            .update({
-              usefulness_score: score,
-              upvotes_count: upvotes,
-              downvotes_count: downvotes,
-            })
-            .eq("id", resourceId);
-        } catch {}
-
-        safeRevalidate(`/resources/${resourceId}`);
-        safeRevalidate("/library");
-        safeRevalidate("/subjects");
-
-        return {
-          success: true,
-          score,
-          upvotes,
-          downvotes,
-          userVote: value,
-        };
-      } catch (dbErr) {
-        console.warn("Direct resource_votes table query failed, utilizing resilient fallback:", dbErr);
+        score = upvotes - downvotes;
+        dbTableSuccess = true;
+      } catch {
+        // Direct table unavailable or missing columns: fall back to resilient multi-tier registry
       }
     }
 
-    // Resilient Fallback (In-memory + notes system)
-    const existingList = await getDbVotesFallback();
-    const filtered = existingList.filter(
-      (v) => !(v.user_id === requester.id && v.resource_id === resourceId)
-    );
+    if (!dbTableSuccess) {
+      // Resilient Multi-tier Store
+      const existingList = await getDbVotesFallback();
+      const filtered = existingList.filter(
+        (v) => !(v.user_id === requester.id && v.resource_id === resourceId)
+      );
 
-    if (value !== 0) {
-      const newVote: ResourceVote = {
-        id: `vote-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-        resource_id: resourceId,
-        user_id: requester.id,
-        vote_value: value,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-      filtered.push(newVote);
-      localVotesStore.set(voteKey, newVote);
-    } else {
-      localVotesStore.delete(voteKey);
+      if (value !== 0) {
+        const newVote: ResourceVote = {
+          id: `vote-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+          resource_id: resourceId,
+          user_id: requester.id,
+          vote_value: value,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        filtered.push(newVote);
+      }
+
+      await saveDbVotesFallback(filtered);
+
+      const resourceVotes = filtered.filter((v) => v.resource_id === resourceId);
+      upvotes = 0;
+      downvotes = 0;
+      resourceVotes.forEach((v) => {
+        if (v.vote_value === 1) upvotes++;
+        else if (v.vote_value === -1) downvotes++;
+      });
+      score = upvotes - downvotes;
     }
-
-    await saveDbVotesFallback(filtered);
-
-    // Compute score from fallback list
-    const resourceVotes = filtered.filter((v) => v.resource_id === resourceId);
-    let upvotes = 0;
-    let downvotes = 0;
-    resourceVotes.forEach((v) => {
-      if (v.vote_value === 1) upvotes++;
-      else if (v.vote_value === -1) downvotes++;
-    });
-    const score = upvotes - downvotes;
 
     safeRevalidate(`/resources/${resourceId}`);
     safeRevalidate("/library");
+    safeRevalidate("/subjects");
+    safeRevalidate("/my-space");
 
     return {
       success: true,
@@ -276,27 +300,29 @@ export async function getUserContributionsStatsAction(
     if (!targetUserId) return { totalContributions: 0, upvotesReceived: 0 };
 
     const serviceSupabase = getServiceSupabase();
+    let userResources: { id: string }[] = [];
     if (isSupabaseConfigured() && serviceSupabase) {
       try {
-        const { data: userResources } = await serviceSupabase
+        const { data } = await serviceSupabase
           .from("resources")
-          .select("id, usefulness_score, upvotes_count")
+          .select("id")
           .eq("owner_id", targetUserId)
           .eq("publication_status", "published");
-
-        if (userResources) {
-          const totalContributions = userResources.length;
-          const upvotesReceived = userResources.reduce(
-            (acc: number, r: any) => acc + (r.upvotes_count || Math.max(0, r.usefulness_score || 0)),
-            0
-          );
-          return { totalContributions, upvotesReceived };
-        }
+        if (data) userResources = data;
       } catch {}
     }
 
-    // Local in-memory estimate
-    return { totalContributions: 0, upvotesReceived: 0 };
+    const totalContributions = userResources.length;
+    if (totalContributions === 0) return { totalContributions: 0, upvotesReceived: 0 };
+
+    // Calculate upvotes received using persistent votes store
+    const userResourceIds = new Set(userResources.map((r) => r.id));
+    const allVotes = await getDbVotesFallback();
+    const upvotesReceived = allVotes.filter(
+      (v) => userResourceIds.has(v.resource_id) && v.vote_value === 1
+    ).length;
+
+    return { totalContributions, upvotesReceived };
   } catch {
     return { totalContributions: 0, upvotesReceived: 0 };
   }

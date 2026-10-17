@@ -12,11 +12,11 @@ import type {
 
 async function getDbClient(): Promise<any> {
   try {
-    const adminMod = await import("./admin");
+    const adminMod = await import("./admin").catch(() => import("./admin.ts" as any));
     return adminMod.getServiceSupabase();
   } catch {
     try {
-      const serverMod = await import("./server");
+      const serverMod = await import("./server").catch(() => import("./server.ts" as any));
       return serverMod.createClient();
     } catch {
       return null;
@@ -43,8 +43,24 @@ function setToCache<T>(key: string, data: T, ttlMs: number = 30000): void {
   repoMemoryCache.set(key, { data, expiry: Date.now() + ttlMs });
 }
 
-export function invalidateRepositoryCache(): void {
-  repoMemoryCache.clear();
+export function invalidateRepositoryCache(targetPattern?: string): void {
+  if (targetPattern === "all") {
+    repoMemoryCache.clear();
+    return;
+  }
+  if (!targetPattern) {
+    for (const key of repoMemoryCache.keys()) {
+      if (key !== "semesters_all" && key !== "categories_all") {
+        repoMemoryCache.delete(key);
+      }
+    }
+    return;
+  }
+  for (const key of repoMemoryCache.keys()) {
+    if (key.includes(targetPattern) || key.startsWith(targetPattern)) {
+      repoMemoryCache.delete(key);
+    }
+  }
 }
 
 export async function getSemesters(): Promise<Semester[]> {
@@ -286,36 +302,72 @@ export async function getResourceVotes(
       }
     }
 
-    // Fallback if table doesn't exist yet or offline
-    if (supabase) {
-      const { data } = await supabase
-        .from("notes")
-        .select("content")
-        .eq("title", "__validily_resource_votes__")
-        .maybeSingle();
+    // Fallback if table doesn't exist yet or offline: disk cache, notes, global memory
+    let fallbackVotes: any[] = [];
 
-      if (data?.content) {
-        const parsed = JSON.parse(data.content);
-        if (Array.isArray(parsed)) {
-          parsed.forEach((v: any) => {
-            const entry = result[v.resource_id];
-            if (!entry) return;
-            if (v.vote_value === 1) entry.upvotes++;
-            else if (v.vote_value === -1) entry.downvotes++;
-
-            if (userId && v.user_id === userId) {
-              entry.userVote = v.vote_value;
-            }
-          });
-          Object.values(result).forEach((summary) => {
-            summary.score = summary.upvotes - summary.downvotes;
-          });
+    // 1. Try disk cache first
+    try {
+      const fs = await import("fs");
+      const path = await import("path");
+      const diskPath = path.join(process.cwd(), ".validily-cache", "resource_votes.json");
+      if (fs.existsSync(diskPath)) {
+        const raw = fs.readFileSync(diskPath, "utf8");
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          fallbackVotes = parsed;
         }
       }
+    } catch {}
+
+    // 2. Check global memory store
+    if (fallbackVotes.length === 0) {
+      const globalVotes = (globalThis as any).__localVotesStore;
+      if (globalVotes && globalVotes instanceof Map) {
+        fallbackVotes = Array.from(globalVotes.values());
+      }
+    }
+
+    if (fallbackVotes.length > 0) {
+      fallbackVotes.forEach((v: any) => {
+        const entry = result[v.resource_id];
+        if (!entry) return;
+        if (v.vote_value === 1) entry.upvotes++;
+        else if (v.vote_value === -1) entry.downvotes++;
+
+        if (userId && v.user_id === userId) {
+          entry.userVote = v.vote_value;
+        }
+      });
+      Object.values(result).forEach((summary) => {
+        summary.score = summary.upvotes - summary.downvotes;
+      });
     }
   } catch {}
 
   return result;
+}
+
+export function inferResourceType(r: any): "document" | "quiz" | "url" | "link" {
+  if (
+    r.resource_type === "quiz" ||
+    r.mime_type?.includes("quiz") ||
+    r.mime_type === "text/html" ||
+    (Array.isArray(r.tags) && r.tags.includes("quiz"))
+  ) {
+    return "quiz";
+  }
+  if (
+    r.resource_type === "link" ||
+    r.resource_type === "url" ||
+    r.mime_type?.includes("url") ||
+    r.mime_type === "application/vnd.google-apps" ||
+    (typeof r.storage_path === "string" && (r.storage_path.startsWith("http://") || r.storage_path.startsWith("https://"))) ||
+    (Array.isArray(r.tags) && (r.tags.includes("external_link") || r.tags.includes("gdrive"))) ||
+    Boolean(r.external_url)
+  ) {
+    return "url";
+  }
+  return "document";
 }
 
 export async function getResources(options?: {
@@ -340,14 +392,8 @@ export async function getResources(options?: {
       .select("*, subject:subjects(*), category:resource_categories(*)")
       .eq("publication_status", "published");
 
-    // Sorting at DB query level
-    if (options?.sort === "useful") {
-      query = query.order("usefulness_score", { ascending: false, nullsFirst: false }).order("created_at", { ascending: false });
-    } else if (options?.sort === "voted") {
-      query = query.order("upvotes_count", { ascending: false, nullsFirst: false }).order("created_at", { ascending: false });
-    } else {
-      query = query.order("created_at", { ascending: false });
-    }
+    // Sorting at DB query level: always created_at DESC for schema resilience
+    query = query.order("created_at", { ascending: false });
 
     // Strict visibility and privacy isolation
     if (options?.includeAll) {
@@ -397,14 +443,6 @@ export async function getResources(options?: {
       }
     }
 
-    if (options?.resourceType && options.resourceType !== "all") {
-      if (options.resourceType === "document") {
-        query = query.or("resource_type.eq.document,resource_type.is.null");
-      } else {
-        query = query.eq("resource_type", options.resourceType);
-      }
-    }
-
     if (options?.folderId) {
       query = query.eq("chapter", options.folderId);
     }
@@ -424,36 +462,108 @@ export async function getResources(options?: {
       return [];
     }
 
+    // Attach inferred resource_type
+    let enrichedData = data.map((r: any) => ({
+      ...r,
+      resource_type: inferResourceType(r),
+    }));
+
+    // In-memory format filter
+    if (options?.resourceType && options.resourceType !== "all") {
+      const targetType = options.resourceType === "link" ? "url" : options.resourceType;
+      enrichedData = enrichedData.filter((r: any) => {
+        if (targetType === "url") {
+          return r.resource_type === "url" || r.resource_type === "link";
+        }
+        return r.resource_type === targetType;
+      });
+    }
+
     // Batch enrich vote summaries without N+1 requests
-    const ids = data.map((r: any) => r.id);
+    const ids = enrichedData.map((r: any) => r.id);
     if (ids.length > 0) {
       try {
         const voteSummaries = await getResourceVotes(ids, options?.userId);
-        data.forEach((r: any) => {
+        enrichedData.forEach((r: any) => {
           if (voteSummaries[r.id]) {
             r.vote_summary = voteSummaries[r.id];
             r.usefulness_score = voteSummaries[r.id].score;
+            r.upvotes_count = voteSummaries[r.id].upvotes;
+            r.downvotes_count = voteSummaries[r.id].downvotes;
           }
         });
+      } catch {}
 
-        if (options?.sort === "useful") {
-          data.sort(
-            (a: any, b: any) =>
-              (b.vote_summary?.score ?? b.usefulness_score ?? 0) -
-              (a.vote_summary?.score ?? a.usefulness_score ?? 0)
-          );
-        } else if (options?.sort === "voted") {
-          data.sort((a: any, b: any) => {
-            const sumA = (a.vote_summary?.upvotes || 0) + (a.vote_summary?.downvotes || 0);
-            const sumB = (b.vote_summary?.upvotes || 0) + (b.vote_summary?.downvotes || 0);
-            return sumB - sumA;
+      // Batch enrich revision status and bookmark state per user
+      if (options?.userId) {
+        try {
+          const { data: revData } = await supabase
+            .from("revision_progress")
+            .select("resource_id, status")
+            .eq("user_id", options.userId)
+            .in("resource_id", ids);
+
+          const revMap = new Map<string, string>();
+          if (Array.isArray(revData)) {
+            revData.forEach((row: any) => {
+              if (row.resource_id) revMap.set(row.resource_id, row.status);
+            });
+          }
+
+          const { data: bkmData } = await supabase
+            .from("bookmarks")
+            .select("resource_id")
+            .eq("user_id", options.userId)
+            .in("resource_id", ids);
+
+          const bkmSet = new Set<string>();
+          if (Array.isArray(bkmData)) {
+            bkmData.forEach((b: any) => {
+              if (b.resource_id) bkmSet.add(b.resource_id);
+            });
+          }
+
+          enrichedData.forEach((r: any) => {
+            r.revision_status = (revMap.get(r.id) as any) || "not_started";
+            r.is_bookmarked = bkmSet.has(r.id);
+          });
+        } catch {
+          enrichedData.forEach((r: any) => {
+            if (!r.revision_status) r.revision_status = "not_started";
+            if (r.is_bookmarked === undefined) r.is_bookmarked = false;
           });
         }
-      } catch {}
+      } else {
+        enrichedData.forEach((r: any) => {
+          if (!r.revision_status) r.revision_status = "not_started";
+          if (r.is_bookmarked === undefined) r.is_bookmarked = false;
+        });
+      }
     }
 
-    setToCache(cacheKey, data, 20000);
-    return data;
+    // In-memory sort by usefulness or votes or recency
+    if (options?.sort === "useful") {
+      enrichedData.sort((a: any, b: any) => {
+        const scoreA = a.vote_summary?.score ?? a.usefulness_score ?? 0;
+        const scoreB = b.vote_summary?.score ?? b.usefulness_score ?? 0;
+        if (scoreB !== scoreA) return scoreB - scoreA;
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      });
+    } else if (options?.sort === "voted") {
+      enrichedData.sort((a: any, b: any) => {
+        const votesA = (a.vote_summary?.upvotes || 0) + (a.vote_summary?.downvotes || 0);
+        const votesB = (b.vote_summary?.upvotes || 0) + (b.vote_summary?.downvotes || 0);
+        if (votesB !== votesA) return votesB - votesA;
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      });
+    } else {
+      enrichedData.sort(
+        (a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+    }
+
+    setToCache(cacheKey, enrichedData, 20000);
+    return enrichedData;
   } catch (err) {
     console.error("Failed to query resources from database:", err);
     return [];
@@ -473,14 +583,48 @@ export async function getResourceById(id: string, userId?: string): Promise<Acad
       return null;
     }
 
+    data.resource_type = inferResourceType(data);
+
     // Enrich single resource with vote summary
     try {
       const voteMap = await getResourceVotes([data.id], userId);
       if (voteMap[data.id]) {
         data.vote_summary = voteMap[data.id];
         data.usefulness_score = voteMap[data.id].score;
+        data.upvotes_count = voteMap[data.id].upvotes;
+        data.downvotes_count = voteMap[data.id].downvotes;
       }
     } catch {}
+
+    // Enrich single resource with user revision status and bookmark state
+    if (userId) {
+      try {
+        const { data: rev } = await supabase
+          .from("revision_progress")
+          .select("status")
+          .eq("user_id", userId)
+          .eq("resource_id", id)
+          .maybeSingle();
+        data.revision_status = (rev?.status as any) || "not_started";
+      } catch {
+        data.revision_status = "not_started";
+      }
+
+      try {
+        const { data: bkm } = await supabase
+          .from("bookmarks")
+          .select("id")
+          .eq("user_id", userId)
+          .eq("resource_id", id)
+          .maybeSingle();
+        data.is_bookmarked = Boolean(bkm?.id);
+      } catch {
+        data.is_bookmarked = false;
+      }
+    } else {
+      data.revision_status = "not_started";
+      data.is_bookmarked = false;
+    }
 
     return data;
   } catch {
@@ -515,7 +659,12 @@ export async function getNotes(userId?: string, subjectId?: string): Promise<Not
       return [];
     }
 
-    const filtered = data.filter((n: any) => !n.tags?.includes("system_folder_registry"));
+    const filtered = data.filter((n: any) => {
+      if (!n || !n.title) return false;
+      if (n.title.startsWith("__")) return false;
+      if (Array.isArray(n.tags) && n.tags.some((t: string) => t.startsWith("system_"))) return false;
+      return true;
+    });
     setToCache(cacheKey, filtered, 60000);
     return filtered;
   } catch (err) {
@@ -530,26 +679,44 @@ export async function getSubjectFolders(subjectId: string): Promise<import("@/ty
   if (cached) return cached;
 
   try {
-    const supabase = await getDbClient();
-    const { data, error } = await supabase
-      .from("notes")
-      .select("id, content")
-      .eq("subject_id", subjectId)
-      .contains("tags", ["system_folder_registry"])
-      .maybeSingle();
-
-    if (error || !data || !data.content) {
-      return [];
+    const fs = await import("fs");
+    const path = await import("path");
+    const cacheDir = path.join(process.cwd(), ".validily-cache");
+    const file = path.join(cacheDir, `folders_${subjectId}.json`);
+    if (fs.existsSync(file)) {
+      const raw = fs.readFileSync(file, "utf8");
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        setToCache(cacheKey, parsed, 20000);
+        return parsed;
+      }
     }
 
+    // Auto-heal from canonical curriculum defaults
+    let canonical: import("@/types/database").SubjectFolder[] = [];
     try {
-      const parsed = JSON.parse(data.content);
-      const result = Array.isArray(parsed) ? parsed : [];
-      setToCache(cacheKey, result, 20000);
-      return result;
+      const mod = await import("../constants/curriculum-folders").catch(
+        () => import("../constants/curriculum-folders.ts" as any)
+      );
+      canonical = mod.getDefaultSubjectFolders(subjectId);
     } catch {
-      return [];
+      try {
+        const mod = await import("@/lib/constants/curriculum-folders");
+        canonical = mod.getDefaultSubjectFolders(subjectId);
+      } catch {}
     }
+    if (canonical.length > 0) {
+      try {
+        if (!fs.existsSync(cacheDir)) {
+          fs.mkdirSync(cacheDir, { recursive: true });
+        }
+        fs.writeFileSync(file, JSON.stringify(canonical, null, 2), "utf8");
+      } catch {}
+      setToCache(cacheKey, canonical, 20000);
+      return canonical;
+    }
+
+    return [];
   } catch {
     return [];
   }

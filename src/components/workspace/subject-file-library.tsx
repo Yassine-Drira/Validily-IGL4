@@ -11,6 +11,7 @@ import {
 import {
   createFolderAction,
   renameFolderAction,
+  updateFolderSettingsAction,
   moveFolderAction,
   deleteFolderAction,
 } from "@/lib/actions/folder-actions";
@@ -50,6 +51,7 @@ import {
   Globe,
   HardDrive,
   Layers,
+  Settings2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FolderTree } from "lucide-react";
@@ -59,13 +61,18 @@ import { SubjectTreeView } from "@/components/workspace/subject-tree-view";
 import { DeleteConfirmModal } from "@/components/ui/delete-confirm-modal";
 import { cn } from "@/lib/utils";
 import { ResourceVoteControl } from "@/components/resources/resource-vote-control";
-import { ContributeTrigger } from "@/components/resources/contribute-trigger";
+import {
+  getFolderVisual,
+  FOLDER_COLOR_PALETTE,
+  FOLDER_ICON_OPTIONS,
+} from "@/lib/utils/folder-visual";
 
 interface SubjectFileLibraryProps {
   subject: Subject;
   categories: ResourceCategory[];
   resources: AcademicResource[];
   folders: SubjectFolder[];
+  isFilterActive?: boolean;
   onResourcesChange: (updater: (prev: AcademicResource[]) => AcademicResource[]) => void;
   onFoldersChange: (updater: (prev: SubjectFolder[]) => SubjectFolder[]) => void;
   onViewPdf: (res: AcademicResource) => void;
@@ -79,6 +86,7 @@ export function SubjectFileLibrary({
   categories,
   resources,
   folders,
+  isFilterActive = false,
   onResourcesChange,
   onFoldersChange,
   onViewPdf,
@@ -131,8 +139,13 @@ export function SubjectFileLibrary({
       const q = searchQuery.toLowerCase();
       return folders.filter((f) => f.name.toLowerCase().includes(q));
     }
+    // When a filter is actively selected at root, show matching folders
+    if (isFilterActive && currentFolderId === null) {
+      const matchingFolderIds = new Set(resources.map((r) => r.chapter).filter(Boolean));
+      return folders.filter((f) => f.parent_id === null && matchingFolderIds.has(f.id));
+    }
     return folders.filter((f) => f.parent_id === currentFolderId);
-  }, [folders, currentFolderId, searchQuery]);
+  }, [folders, resources, currentFolderId, searchQuery, isFilterActive]);
 
   // Resources in current level
   const currentResources = useMemo(() => {
@@ -145,13 +158,22 @@ export function SubjectFileLibrary({
           r.description?.toLowerCase().includes(q)
       );
     }
+    // When a filter is actively selected at root, display all matching resources directly
+    if (isFilterActive && currentFolderId === null) {
+      return resources;
+    }
     return resources.filter((r) => {
       if (currentFolderId === null) {
-        return !r.chapter || r.chapter === "root" || r.chapter === "";
+        return (
+          !r.chapter ||
+          r.chapter === "root" ||
+          r.chapter === "" ||
+          !folders.some((f) => f.id === r.chapter)
+        );
       }
       return r.chapter === currentFolderId;
     });
-  }, [resources, currentFolderId, searchQuery]);
+  }, [resources, folders, currentFolderId, searchQuery, isFilterActive]);
 
   // Status toggle handler
   const handleToggleRevision = (resId: string, currentStatus?: RevisionStatus) => {
@@ -336,7 +358,23 @@ export function SubjectFileLibrary({
                         : "hover:text-[#2855D9] hover:bg-[#F4F6FA]"
                     )}
                   >
-                    {idx === 0 && <Folder className="w-3.5 h-3.5 text-[#2855D9]" />}
+                    {idx === 0 ? (
+                      <Folder className="w-3.5 h-3.5 text-[#2855D9]" />
+                    ) : (
+                      (() => {
+                        const f = folders.find((folder) => folder.id === crumb.id);
+                        const visual = f ? getFolderVisual(f.color, f.icon) : null;
+                        const CrumbIcon = visual ? visual.Icon : Folder;
+                        return (
+                          <CrumbIcon
+                            className={cn(
+                              "w-3.5 h-3.5 shrink-0",
+                              visual ? visual.color.text : "text-[#68748A]"
+                            )}
+                          />
+                        );
+                      })()
+                    )}
                     <span>{crumb.name}</span>
                   </button>
                 </React.Fragment>
@@ -346,16 +384,6 @@ export function SubjectFileLibrary({
 
           {/* Action Buttons */}
           <div className="flex flex-wrap items-center gap-2 shrink-0">
-            <ContributeTrigger
-              subjects={[subject]}
-              categories={categories}
-              folders={folders}
-              defaultSubjectId={subject.id}
-              defaultFolderId={currentFolderId}
-              label="Contribuer"
-              size="sm"
-              showSparkle={true}
-            />
 
             <button
               type="button"
@@ -496,16 +524,6 @@ export function SubjectFileLibrary({
             </p>
           </div>
           <div className="pt-2 flex flex-wrap items-center justify-center gap-2">
-            <ContributeTrigger
-              subjects={[subject]}
-              categories={categories}
-              folders={folders}
-              defaultSubjectId={subject.id}
-              defaultFolderId={currentFolderId}
-              label="Contribuer une ressource"
-              showSparkle={true}
-              size="sm"
-            />
             <Button
               size="sm"
               variant="outline"
@@ -552,6 +570,8 @@ export function SubjectFileLibrary({
                   const itemsCount =
                     resources.filter((r) => r.chapter === folder.id).length +
                     folders.filter((f) => f.parent_id === folder.id).length;
+                  const visual = getFolderVisual(folder.color, folder.icon);
+                  const FolderIconComp = visual.Icon;
 
                   if (viewMode === "grid") {
                     return (
@@ -564,17 +584,33 @@ export function SubjectFileLibrary({
                           className="cursor-pointer space-y-3"
                         >
                           <div className="flex items-center justify-between">
-                            <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-[#2855D9] group-hover:scale-105 transition-transform">
-                              <Folder className="w-5 h-5 fill-[#2855D9]/15" />
+                            <div
+                              className={cn(
+                                "w-10 h-10 rounded-xl border flex items-center justify-center group-hover:scale-105 transition-transform",
+                                visual.color.bg,
+                                visual.color.border,
+                                visual.color.text
+                              )}
+                            >
+                              <FolderIconComp className={cn("w-5 h-5", visual.color.fill)} />
                             </div>
                             <span className="text-[11px] font-mono text-[#68748A] bg-[#FAFAF7] border border-[#E4E8F0] px-2 py-0.5 rounded-full">
                               {itemsCount} élément{itemsCount !== 1 ? "s" : ""}
                             </span>
                           </div>
                           <div>
-                            <h4 className="font-bold text-xs sm:text-sm text-[#111A2E] group-hover:text-[#2855D9] transition-colors line-clamp-2 min-h-[2.25rem] leading-snug">
+                            <h4 className="font-bold text-xs sm:text-sm text-[#111A2E] group-hover:text-[#2855D9] transition-colors line-clamp-1 leading-snug">
                               {folder.name}
                             </h4>
+                            {folder.description ? (
+                              <p className="text-[11px] text-[#68748A] line-clamp-2 mt-1">
+                                {folder.description}
+                              </p>
+                            ) : (
+                              <p className="text-[11px] text-[#8C9AAE] italic mt-1 line-clamp-1">
+                                Aucun sous-titre
+                              </p>
+                            )}
                           </div>
                         </div>
 
@@ -593,9 +629,9 @@ export function SubjectFileLibrary({
                               type="button"
                               onClick={() => setFolderToRename(folder)}
                               className="p-1 rounded-md text-[#68748A] hover:text-[#182235] hover:bg-[#F4F6FA] cursor-pointer"
-                              title="Renommer le dossier"
+                              title="Paramètres du dossier (renommer, couleur, icône, description)"
                             >
-                              <Edit2 className="w-3.5 h-3.5" />
+                              <Settings2 className="w-3.5 h-3.5" />
                             </button>
                             <button
                               type="button"
@@ -629,16 +665,33 @@ export function SubjectFileLibrary({
                         onClick={() => setCurrentFolderId(folder.id)}
                         className="flex items-center space-x-3 min-w-0 flex-1 cursor-pointer"
                       >
-                        <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-[#2855D9] shrink-0">
-                          <Folder className="w-4 h-4 fill-[#2855D9]/20" />
+                        <div
+                          className={cn(
+                            "w-8 h-8 rounded-lg border flex items-center justify-center shrink-0",
+                            visual.color.bg,
+                            visual.color.border,
+                            visual.color.text
+                          )}
+                        >
+                          <FolderIconComp className={cn("w-4 h-4", visual.color.fill)} />
                         </div>
                         <div className="min-w-0">
                           <h4 className="font-bold text-xs sm:text-sm text-[#111A2E] group-hover:text-[#2855D9] transition-colors truncate">
                             {folder.name}
                           </h4>
-                          <span className="text-[11px] text-[#68748A] font-mono">
-                            {itemsCount} élément{itemsCount !== 1 ? "s" : ""}
-                          </span>
+                          <div className="flex items-center space-x-2 text-[11px] text-[#68748A]">
+                            <span className="font-mono">
+                              {itemsCount} élément{itemsCount !== 1 ? "s" : ""}
+                            </span>
+                            {folder.description && (
+                              <>
+                                <span>•</span>
+                                <span className="truncate max-w-sm text-[#8C9AAE]">
+                                  {folder.description}
+                                </span>
+                              </>
+                            )}
+                          </div>
                         </div>
                       </div>
 
@@ -647,9 +700,9 @@ export function SubjectFileLibrary({
                           type="button"
                           onClick={() => setFolderToRename(folder)}
                           className="p-1.5 rounded-lg text-[#68748A] hover:text-[#182235] hover:bg-white cursor-pointer"
-                          title="Renommer"
+                          title="Paramètres du dossier (renommer, couleur, icône, description)"
                         >
-                          <Edit2 className="w-3.5 h-3.5" />
+                          <Settings2 className="w-3.5 h-3.5" />
                         </button>
                         <button
                           type="button"
@@ -672,7 +725,7 @@ export function SubjectFileLibrary({
                           onClick={() => setCurrentFolderId(folder.id)}
                           className="ml-1 text-xs font-semibold text-[#2855D9] hover:text-[#1E40AF] px-2 py-1 rounded-md hover:bg-[#EDF2FF] flex items-center space-x-1 cursor-pointer"
                         >
-                          <span>Entrer</span>
+                          <span>Ouvrir</span>
                           <ArrowRight className="w-3 h-3" />
                         </button>
                       </div>
@@ -705,6 +758,8 @@ export function SubjectFileLibrary({
                     res.file_size_bytes > 0
                       ? `${(res.file_size_bytes / (1024 * 1024)).toFixed(1)} Mo`
                       : "";
+
+                  const parentFolder = folders.find((f) => f.id === res.chapter);
 
                   if (viewMode === "grid") {
                     return (
@@ -743,11 +798,17 @@ export function SubjectFileLibrary({
                               {sizeFormatted && <span>{sizeFormatted}</span>}
                               {res.instructor && <span>• {res.instructor}</span>}
                             </div>
+                            {parentFolder && (isFilterActive || searchQuery.trim()) && (
+                              <div className="flex items-center space-x-1 text-[10px] text-[#2855D9] bg-blue-50/70 border border-blue-200/60 px-1.5 py-0.5 rounded-md mt-1.5 font-medium truncate">
+                                <Folder className="w-2.5 h-2.5 shrink-0" />
+                                <span className="truncate">{parentFolder.name}</span>
+                              </div>
+                            )}
                           </div>
                         </div>
 
                         {/* Card Footer Actions */}
-                        <div className="mt-3 pt-2.5 border-t border-[#F1F4F9] flex items-center justify-between gap-1">
+                        <div className="mt-3 pt-2.5 border-t border-[#F1F4F9] flex flex-wrap items-center justify-between gap-1.5">
                           <ResourceVoteControl
                             resourceId={res.id}
                             initialScore={res.vote_summary?.score ?? res.usefulness_score ?? 0}
@@ -778,7 +839,7 @@ export function SubjectFileLibrary({
                               : "À réviser"}
                           </button>
 
-                          <div className="flex items-center space-x-1">
+                          <div className="flex items-center space-x-1 shrink-0">
                             <button
                               type="button"
                               onClick={() => setResourceToRename(res)}
@@ -841,6 +902,12 @@ export function SubjectFileLibrary({
                             >
                               {meta.label}
                             </span>
+                            {parentFolder && (isFilterActive || searchQuery.trim()) && (
+                              <span className="text-[10px] text-[#2855D9] bg-blue-50/70 border border-blue-200/60 px-1.5 py-0.2 rounded-md font-medium flex items-center space-x-1 shrink-0">
+                                <Folder className="w-2.5 h-2.5" />
+                                <span>{parentFolder.name}</span>
+                              </span>
+                            )}
                           </div>
 
                           <div className="flex items-center space-x-2 text-[11px] text-[#68748A] font-mono mt-0.5">
@@ -862,7 +929,7 @@ export function SubjectFileLibrary({
                       </div>
 
                       {/* Row Actions */}
-                      <div className="flex items-center justify-between sm:justify-end space-x-2 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-[#F1F4F9]">
+                      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 justify-between sm:justify-end shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-[#F1F4F9]">
                         <ResourceVoteControl
                           resourceId={res.id}
                           initialScore={res.vote_summary?.score ?? res.usefulness_score ?? 0}
@@ -996,18 +1063,19 @@ export function SubjectFileLibrary({
         />
       )}
 
-      {/* --- MODAL: RENOMMER DOSSIER --- */}
+      {/* --- MODAL: PARAMÈTRES DU DOSSIER --- */}
       {folderToRename && (
-        <RenameFolderModal
+        <FolderSettingsModal
           folder={folderToRename}
+          allFolders={folders}
           subjectId={subject.id}
           onClose={() => setFolderToRename(null)}
-          onRenamed={(newName) => {
+          onSaved={(updatedFolder) => {
             onFoldersChange((prev) =>
-              prev.map((f) => (f.id === folderToRename.id ? { ...f, name: newName } : f))
+              prev.map((f) => (f.id === updatedFolder.id ? updatedFolder : f))
             );
             setFolderToRename(null);
-            showFeedback("Dossier renommé.");
+            showFeedback(`Paramètres du dossier "${updatedFolder.name}" mis à jour.`);
           }}
         />
       )}
@@ -1168,6 +1236,8 @@ function CreateFolderModal({
   onCreated: (folder: SubjectFolder) => void;
 }) {
   const [name, setName] = useState("");
+  const [color, setColor] = useState("blue");
+  const [icon, setIcon] = useState("folder");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -1182,6 +1252,8 @@ function CreateFolderModal({
       subject_id: subjectId,
       name: name.trim(),
       parent_id: currentFolderId,
+      color,
+      icon,
     });
 
     setIsSubmitting(false);
@@ -1192,17 +1264,36 @@ function CreateFolderModal({
     }
   };
 
+  const activeVisual = getFolderVisual(color, icon);
+  const FolderIconComp = activeVisual.Icon;
+
   return (
     <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-[#E4E8F0] space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2.5">
-            <div className="w-8 h-8 rounded-lg bg-blue-50 text-[#2855D9] flex items-center justify-center border border-blue-100">
-              <FolderPlus className="w-4 h-4" />
+            <div
+              className={cn(
+                "w-9 h-9 rounded-xl flex items-center justify-center border",
+                activeVisual.color.bg,
+                activeVisual.color.border,
+                activeVisual.color.text
+              )}
+            >
+              <FolderIconComp className="w-5 h-5" />
             </div>
-            <h3 className="font-bold text-sm text-[#111A2E]">Créer un Nouveau Dossier</h3>
+            <div>
+              <h3 className="font-bold text-sm text-[#111A2E]">Créer un Nouveau Dossier</h3>
+              <p className="text-[11px] text-[#68748A]">
+                Organisez vos cours et examens avec précision
+              </p>
+            </div>
           </div>
-          <button type="button" onClick={onClose} className="text-[#68748A] hover:text-[#111A2E]">
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-[#68748A] hover:text-[#111A2E] p-1 rounded-lg"
+          >
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -1214,7 +1305,7 @@ function CreateFolderModal({
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4 text-xs">
           <div>
             <label className="block text-xs font-semibold text-[#111A2E] mb-1">
               Nom du dossier *
@@ -1226,15 +1317,51 @@ function CreateFolderModal({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Ex: Chapitre 1 - Widgets / TP 2 / Examen 2024"
-              className="w-full bg-[#FAFAF7] border border-[#E4E8F0] rounded-xl px-3.5 py-2 text-xs text-[#111A2E] focus:outline-none focus:border-[#2855D9]"
+              className="w-full bg-[#FAFAF7] border border-[#E4E8F0] focus:border-[#2855D9] focus:bg-white rounded-xl px-3.5 py-2 text-xs text-[#111A2E] outline-hidden transition-all"
             />
+          </div>
+
+          {/* Color Palette Picker */}
+          <div>
+            <label className="block text-xs font-semibold text-[#111A2E] mb-1.5 flex items-center justify-between">
+              <span>Couleur</span>
+              <span className="text-[11px] font-normal text-[#68748A]">
+                {activeVisual.color.label}
+              </span>
+            </label>
+            <div className="grid grid-cols-8 gap-1.5">
+              {FOLDER_COLOR_PALETTE.map((pal) => (
+                <button
+                  key={pal.id}
+                  type="button"
+                  onClick={() => setColor(pal.id)}
+                  title={pal.label}
+                  className={cn(
+                    "h-7 rounded-lg border flex items-center justify-center transition-all cursor-pointer relative",
+                    pal.bg,
+                    pal.border,
+                    color === pal.id ? "ring-2 ring-offset-1 ring-[#182235]" : "hover:scale-105"
+                  )}
+                >
+                  <span
+                    className="w-3 h-3 rounded-full"
+                    style={{ backgroundColor: pal.hex }}
+                  />
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="flex items-center justify-end space-x-2 pt-2 border-t border-[#F1F4F9]">
             <Button type="button" size="sm" variant="ghost" onClick={onClose}>
               Annuler
             </Button>
-            <Button type="submit" size="sm" variant="primary" disabled={isSubmitting || !name.trim()}>
+            <Button
+              type="submit"
+              size="sm"
+              variant="primary"
+              disabled={isSubmitting || !name.trim()}
+            >
               {isSubmitting ? "Création..." : "Créer le dossier"}
             </Button>
           </div>
@@ -1407,60 +1534,269 @@ function AddExternalLinkModal({
   );
 }
 
-function RenameFolderModal({
+function FolderSettingsModal({
   folder,
+  allFolders,
   subjectId,
   onClose,
-  onRenamed,
+  onSaved,
 }: {
   folder: SubjectFolder;
+  allFolders: SubjectFolder[];
   subjectId: string;
   onClose: () => void;
-  onRenamed: (newName: string) => void;
+  onSaved: (updatedFolder: SubjectFolder) => void;
 }) {
   const [name, setName] = useState(folder.name);
+  const [color, setColor] = useState(folder.color || "blue");
+  const [icon, setIcon] = useState(folder.icon || "folder");
+  const [description, setDescription] = useState(folder.description || "");
+  const [targetParentId, setTargetParentId] = useState<string | null>(folder.parent_id);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
+
+  const disabledFolderIds = useMemo(() => {
+    return getDescendantFolderIds(folder.id, allFolders);
+  }, [folder.id, allFolders]);
+
+  const activeVisual = useMemo(() => {
+    return getFolderVisual(color, icon);
+  }, [color, icon]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
 
     setIsSubmitting(true);
-    const res = await renameFolderAction({
+    setError("");
+
+    const res = await updateFolderSettingsAction({
       subject_id: subjectId,
       folder_id: folder.id,
       name: name.trim(),
+      color,
+      icon,
+      description: description.trim() || undefined,
+      parent_id: targetParentId,
     });
+
     setIsSubmitting(false);
 
-    if (!res.success) {
-      setError(res.error || "Échec du renommage.");
+    if (!res.success || !res.folder) {
+      setError(res.error || "Échec de l'enregistrement des paramètres du dossier.");
     } else {
-      onRenamed(name.trim());
+      onSaved(res.folder);
     }
   };
 
+  const PreviewIcon = activeVisual.Icon;
+
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-[#E4E8F0] space-y-4">
-        <h3 className="font-bold text-sm text-[#111A2E]">Renommer le Dossier</h3>
-        {error && <div className="text-xs text-rose-600">{error}</div>}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <input
-            type="text"
-            required
-            autoFocus
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="w-full bg-[#FAFAF7] border border-[#E4E8F0] rounded-xl px-3.5 py-2 text-xs text-[#111A2E]"
-          />
-          <div className="flex justify-end space-x-2">
-            <Button type="button" size="sm" variant="ghost" onClick={onClose}>
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-2.5 sm:p-4 overflow-y-auto">
+      <div className="bg-white rounded-2xl max-w-lg w-full max-h-[92vh] flex flex-col shadow-2xl border border-[#E4E8F0] my-auto overflow-hidden">
+        {/* Header (sticky top) */}
+        <div className="flex items-center justify-between p-4 sm:p-5 pb-3 border-b border-[#F1F4F9] shrink-0 bg-white">
+          <div className="flex items-center space-x-2.5 min-w-0">
+            <div
+              className={cn(
+                "w-9 h-9 rounded-xl flex items-center justify-center border shrink-0",
+                activeVisual.color.bg,
+                activeVisual.color.border,
+                activeVisual.color.text
+              )}
+            >
+              <PreviewIcon className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <h3 className="font-bold text-sm text-[#111A2E] truncate">Paramètres du Dossier</h3>
+              <p className="text-[11px] text-[#68748A] truncate">
+                Personnalisez le nom, la couleur, l'icône et l'arborescence
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-[#68748A] hover:text-[#111A2E] p-1.5 rounded-lg hover:bg-[#F4F6FA] transition-colors cursor-pointer shrink-0 ml-2"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Form with scrollable body */}
+        <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden">
+          <div className="overflow-y-auto p-4 sm:p-5 space-y-4 text-xs flex-1 overscroll-contain">
+            {/* Live Preview Card */}
+            <div className="bg-[#FAFAF7] border border-[#E4E8F0] rounded-xl p-3 space-y-1.5">
+              <div className="text-[10px] font-mono uppercase tracking-wider text-[#68748A] font-semibold">
+                Aperçu en direct du dossier
+              </div>
+              <div className="flex items-start space-x-3 bg-white p-3 rounded-lg border border-[#E4E8F0] shadow-2xs">
+                <div
+                  className={cn(
+                    "w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border",
+                    activeVisual.color.bg,
+                    activeVisual.color.border,
+                    activeVisual.color.text
+                  )}
+                >
+                  <PreviewIcon className={cn("w-5 h-5", activeVisual.color.fill)} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="font-bold text-xs sm:text-sm text-[#111A2E] truncate">
+                    {name.trim() || "Nom du dossier"}
+                  </div>
+                  <p className="text-[11px] text-[#68748A] line-clamp-2 mt-0.5">
+                    {description.trim() || "Aucune description (optionnelle)."}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {error && (
+              <div className="bg-rose-50 border border-rose-200 text-rose-700 text-xs p-3 rounded-xl flex items-center space-x-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{error}</span>
+              </div>
+            )}
+
+            {/* Name Field */}
+            <div>
+              <label className="block text-xs font-semibold text-[#111A2E] mb-1">
+                Nom du dossier *
+              </label>
+              <input
+                type="text"
+                required
+                autoFocus
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Ex: Chapitre 1 - Fondamentaux Dart"
+                className="w-full bg-[#FAFAF7] border border-[#E4E8F0] focus:border-[#2855D9] focus:bg-white rounded-xl px-3.5 py-2 text-xs text-[#111A2E] transition-all outline-hidden"
+              />
+            </div>
+
+            {/* Description Field */}
+            <div>
+              <label className="block text-xs font-semibold text-[#111A2E] mb-1">
+                Description <span className="font-normal text-[#68748A]">(optionnelle)</span>
+              </label>
+              <textarea
+                rows={2}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Expliquez brièvement le contenu ou les objectifs de ce dossier..."
+                className="w-full bg-[#FAFAF7] border border-[#E4E8F0] focus:border-[#2855D9] focus:bg-white rounded-xl px-3.5 py-2 text-xs text-[#111A2E] transition-all outline-hidden resize-none"
+              />
+            </div>
+
+            {/* Color Palette Picker */}
+            <div>
+              <label className="block text-xs font-semibold text-[#111A2E] mb-1.5 flex items-center justify-between">
+                <span>Couleur thématique</span>
+                <span className="text-[11px] font-normal text-[#68748A]">
+                  {activeVisual.color.label}
+                </span>
+              </label>
+              <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
+                {FOLDER_COLOR_PALETTE.map((pal) => (
+                  <button
+                    key={pal.id}
+                    type="button"
+                    onClick={() => setColor(pal.id)}
+                    title={pal.label}
+                    className={cn(
+                      "h-8 rounded-lg border flex items-center justify-center transition-all cursor-pointer relative",
+                      pal.bg,
+                      pal.border,
+                      color === pal.id
+                        ? "ring-2 ring-offset-1 ring-[#182235] shadow-xs"
+                        : "hover:scale-105"
+                    )}
+                  >
+                    <span
+                      className="w-3.5 h-3.5 rounded-full"
+                      style={{ backgroundColor: pal.hex }}
+                    />
+                    {color === pal.id && (
+                      <CheckCircle2 className="w-3.5 h-3.5 text-[#182235] absolute -top-1 -right-1 bg-white rounded-full" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Icon Picker (3 cols on phone, 6 cols on sm) */}
+            <div>
+              <label className="block text-xs font-semibold text-[#111A2E] mb-1.5">
+                Icône représentative
+              </label>
+              <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                {FOLDER_ICON_OPTIONS.map((item) => {
+                  const ItemIcon = item.icon;
+                  const isSelected = icon === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setIcon(item.id)}
+                      title={item.label}
+                      className={cn(
+                        "flex flex-col items-center justify-center p-2 rounded-xl border transition-all cursor-pointer",
+                        isSelected
+                          ? "bg-[#2855D9]/10 border-[#2855D9] text-[#2855D9] font-bold shadow-2xs"
+                          : "bg-white border-[#E4E8F0] text-[#68748A] hover:text-[#111A2E] hover:border-[#CCD4E0]"
+                      )}
+                    >
+                      <ItemIcon className="w-4 h-4 mb-1" />
+                      <span className="text-[10px] truncate max-w-full leading-tight">
+                        {item.label}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Organization / Parent folder selection */}
+            <div className="pt-2 border-t border-[#F1F4F9]">
+              <FolderTreePicker
+                folders={allFolders}
+                selectedFolderId={targetParentId}
+                onSelect={setTargetParentId}
+                disabledFolderIds={disabledFolderIds}
+                label="Emplacement parent dans l'arborescence :"
+              />
+            </div>
+          </div>
+
+          {/* Modal Actions Footer (sticky bottom) */}
+          <div className="p-4 sm:p-5 pt-3 border-t border-[#F1F4F9] flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2 shrink-0 bg-white">
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={onClose}
+              disabled={isSubmitting}
+              className="w-full sm:w-auto"
+            >
               Annuler
             </Button>
-            <Button type="submit" size="sm" variant="primary" disabled={isSubmitting || !name.trim()}>
-              {isSubmitting ? "Enregistrement..." : "Renommer"}
+            <Button
+              type="submit"
+              size="sm"
+              variant="primary"
+              disabled={isSubmitting || !name.trim()}
+              className="w-full sm:w-auto"
+            >
+              {isSubmitting ? (
+                <span className="flex items-center justify-center space-x-1.5">
+                  <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <span>Enregistrement...</span>
+                </span>
+              ) : (
+                "Enregistrer les paramètres"
+              )}
             </Button>
           </div>
         </form>
@@ -1509,47 +1845,49 @@ function MoveFolderModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl border border-[#E4E8F0] space-y-4">
-        <div className="flex items-center justify-between pb-2 border-b border-[#E4E8F0]">
-          <div>
-            <h3 className="font-bold text-sm text-[#111A2E]">
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-2.5 sm:p-4 overflow-y-auto">
+      <div className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] flex flex-col shadow-2xl border border-[#E4E8F0] my-auto overflow-hidden">
+        <div className="flex items-center justify-between p-4 sm:p-5 pb-3 border-b border-[#E4E8F0] shrink-0 bg-white">
+          <div className="min-w-0">
+            <h3 className="font-bold text-sm text-[#111A2E] truncate">
               Déplacer le dossier "{folder.name}"
             </h3>
-            <p className="text-[11px] text-[#68748A]">
+            <p className="text-[11px] text-[#68748A] truncate">
               Sélectionnez son nouvel emplacement dans l'arborescence.
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="text-[#68748A] hover:text-[#111A2E] p-1 rounded-lg"
+            className="text-[#68748A] hover:text-[#111A2E] p-1.5 rounded-lg hover:bg-[#F4F6FA] cursor-pointer shrink-0 ml-2"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {error && (
-          <div className="bg-rose-50 border border-rose-200 text-rose-700 text-xs p-3 rounded-xl flex items-center space-x-2">
+          <div className="m-4 bg-rose-50 border border-rose-200 text-rose-700 text-xs p-3 rounded-xl flex items-center space-x-2">
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{error}</span>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4 text-xs">
-          <FolderTreePicker
-            folders={allFolders}
-            selectedFolderId={targetParentId}
-            onSelect={setTargetParentId}
-            disabledFolderIds={disabledFolderIds}
-            label="Choisir le dossier parent cible :"
-          />
+        <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden">
+          <div className="overflow-y-auto p-4 sm:p-5 space-y-4 text-xs flex-1">
+            <FolderTreePicker
+              folders={allFolders}
+              selectedFolderId={targetParentId}
+              onSelect={setTargetParentId}
+              disabledFolderIds={disabledFolderIds}
+              label="Choisir le dossier parent cible :"
+            />
+          </div>
 
-          <div className="flex items-center justify-end space-x-2 pt-3 border-t border-[#E4E8F0]">
-            <Button type="button" size="sm" variant="ghost" onClick={onClose}>
+          <div className="p-4 sm:p-5 pt-3 border-t border-[#E4E8F0] flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2 shrink-0 bg-white">
+            <Button type="button" size="sm" variant="ghost" onClick={onClose} className="w-full sm:w-auto">
               Annuler
             </Button>
-            <Button type="submit" size="sm" variant="primary" disabled={isSubmitting}>
+            <Button type="submit" size="sm" variant="primary" disabled={isSubmitting} className="w-full sm:w-auto">
               {isSubmitting ? "Déplacement..." : "Déplacer ici"}
             </Button>
           </div>
@@ -1588,9 +1926,18 @@ function RenameResourceModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-[#E4E8F0] space-y-4">
-        <h3 className="font-bold text-sm text-[#111A2E]">Renommer la Ressource</h3>
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+      <div className="bg-white rounded-2xl max-w-md w-full p-5 sm:p-6 shadow-2xl border border-[#E4E8F0] my-auto space-y-4">
+        <div className="flex items-center justify-between pb-2 border-b border-[#E4E8F0]">
+          <h3 className="font-bold text-sm text-[#111A2E]">Renommer la Ressource</h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-[#68748A] hover:text-[#111A2E] p-1 rounded-lg"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
         {error && <div className="text-xs text-rose-600">{error}</div>}
         <form onSubmit={handleSubmit} className="space-y-4">
           <input
@@ -1599,13 +1946,13 @@ function RenameResourceModal({
             autoFocus
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="w-full bg-[#FAFAF7] border border-[#E4E8F0] rounded-xl px-3.5 py-2 text-xs text-[#111A2E]"
+            className="w-full bg-[#FAFAF7] border border-[#E4E8F0] focus:border-[#2855D9] rounded-xl px-3.5 py-2 text-xs text-[#111A2E] outline-hidden"
           />
-          <div className="flex justify-end space-x-2">
-            <Button type="button" size="sm" variant="ghost" onClick={onClose}>
+          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-2">
+            <Button type="button" size="sm" variant="ghost" onClick={onClose} className="w-full sm:w-auto">
               Annuler
             </Button>
-            <Button type="submit" size="sm" variant="primary" disabled={isSubmitting || !title.trim()}>
+            <Button type="submit" size="sm" variant="primary" disabled={isSubmitting || !title.trim()} className="w-full sm:w-auto">
               {isSubmitting ? "Enregistrement..." : "Renommer"}
             </Button>
           </div>
@@ -1644,46 +1991,48 @@ function MoveResourceModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl border border-[#E4E8F0] space-y-4">
-        <div className="flex items-center justify-between pb-2 border-b border-[#E4E8F0]">
-          <div>
-            <h3 className="font-bold text-sm text-[#111A2E]">
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-2.5 sm:p-4 overflow-y-auto">
+      <div className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] flex flex-col shadow-2xl border border-[#E4E8F0] my-auto overflow-hidden">
+        <div className="flex items-center justify-between p-4 sm:p-5 pb-3 border-b border-[#E4E8F0] shrink-0 bg-white">
+          <div className="min-w-0">
+            <h3 className="font-bold text-sm text-[#111A2E] truncate">
               Déplacer la ressource "{resource.title}"
             </h3>
-            <p className="text-[11px] text-[#68748A]">
+            <p className="text-[11px] text-[#68748A] truncate">
               Sélectionnez son dossier de destination dans l'arborescence.
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="text-[#68748A] hover:text-[#111A2E] p-1 rounded-lg"
+            className="text-[#68748A] hover:text-[#111A2E] p-1.5 rounded-lg hover:bg-[#F4F6FA] cursor-pointer shrink-0 ml-2"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {error && (
-          <div className="bg-rose-50 border border-rose-200 text-rose-700 text-xs p-3 rounded-xl flex items-center space-x-2">
+          <div className="m-4 bg-rose-50 border border-rose-200 text-rose-700 text-xs p-3 rounded-xl flex items-center space-x-2">
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{error}</span>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4 text-xs">
-          <FolderTreePicker
-            folders={allFolders}
-            selectedFolderId={targetFolderId}
-            onSelect={setTargetFolderId}
-            label="Sélectionner le dossier de destination :"
-          />
+        <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden">
+          <div className="overflow-y-auto p-4 sm:p-5 space-y-4 text-xs flex-1">
+            <FolderTreePicker
+              folders={allFolders}
+              selectedFolderId={targetFolderId}
+              onSelect={setTargetFolderId}
+              label="Sélectionner le dossier de destination :"
+            />
+          </div>
 
-          <div className="flex items-center justify-end space-x-2 pt-3 border-t border-[#E4E8F0]">
-            <Button type="button" size="sm" variant="ghost" onClick={onClose}>
+          <div className="p-4 sm:p-5 pt-3 border-t border-[#E4E8F0] flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2 shrink-0 bg-white">
+            <Button type="button" size="sm" variant="ghost" onClick={onClose} className="w-full sm:w-auto">
               Annuler
             </Button>
-            <Button type="submit" size="sm" variant="primary" disabled={isSubmitting}>
+            <Button type="submit" size="sm" variant="primary" disabled={isSubmitting} className="w-full sm:w-auto">
               {isSubmitting ? "Déplacement..." : "Déplacer ici"}
             </Button>
           </div>

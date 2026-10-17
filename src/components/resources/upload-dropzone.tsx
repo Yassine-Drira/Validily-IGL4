@@ -60,18 +60,21 @@ export function UploadDropzone({
 
   const validateAndSetFile = (selectedFile: File) => {
     setErrorMsg("");
-    const isPdfMime = selectedFile.type === "application/pdf";
-    const isPdfExt = selectedFile.name.toLowerCase().endsWith(".pdf");
+    const lower = selectedFile.name.toLowerCase();
+    const isPdf = lower.endsWith(".pdf") || selectedFile.type === "application/pdf";
+    const isHtml = lower.endsWith(".html") || selectedFile.type === "text/html";
+    const isTxt = lower.endsWith(".txt") || selectedFile.type === "text/plain";
+    const isMd = lower.endsWith(".md") || lower.endsWith(".markdown") || selectedFile.type === "text/markdown";
 
-    if (!isPdfMime && !isPdfExt) {
-      setErrorMsg("Invalid file format. Only PDF (.pdf) files are supported.");
+    if (!isPdf && !isHtml && !isTxt && !isMd) {
+      setErrorMsg("Format non supporté. Formats acceptés : PDF (.pdf), Markdown (.md), Texte (.txt) et HTML (.html).");
       return;
     }
 
     const MAX_SIZE = 50 * 1024 * 1024; // 50MB
     if (selectedFile.size > MAX_SIZE) {
       setErrorMsg(
-        `File size (${formatBytes(selectedFile.size)}) exceeds the 50MB limit.`
+        `La taille du fichier (${formatBytes(selectedFile.size)}) dépasse la limite de 50 Mo.`
       );
       return;
     }
@@ -80,7 +83,7 @@ export function UploadDropzone({
     if (!title) {
       // Auto-suggest title from filename
       const suggested = selectedFile.name
-        .replace(/\.pdf$/i, "")
+        .replace(/\.(pdf|md|markdown|txt|html)$/i, "")
         .replace(/[_-]+/g, " ");
       setTitle(suggested);
     }
@@ -204,7 +207,7 @@ export function UploadDropzone({
           <input
             ref={fileInputRef}
             type="file"
-            accept="application/pdf"
+            accept=".pdf,.md,.markdown,.txt,.html,application/pdf,text/markdown,text/plain,text/html"
             onChange={handleFileChange}
             className="hidden"
           />
@@ -216,7 +219,7 @@ export function UploadDropzone({
                 {file.name}
               </div>
               <div className="text-[11px] text-stone-500 font-mono mt-0.5">
-                {formatBytes(file.size)} • PDF Ready
+                {formatBytes(file.size)} • Document prêt
               </div>
               <button
                 type="button"
@@ -226,18 +229,18 @@ export function UploadDropzone({
                 }}
                 className="mt-2 text-xs text-rose-600 hover:underline"
               >
-                Change File
+                Changer de fichier
               </button>
             </div>
           ) : (
             <div className="flex flex-col items-center">
               <UploadCloud className="w-10 h-10 text-[#68748A] mb-2" />
               <div className="font-semibold text-xs text-[#182235]">
-                Drag and drop your PDF course material here, or{" "}
-                <span className="text-[#2855D9] underline">browse</span>
+                Glissez-déposez votre document de cours ici, ou{" "}
+                <span className="text-[#2855D9] underline">parcourez</span>
               </div>
               <div className="text-[11px] text-[#68748A] font-mono mt-1">
-                Strictly validated for PDF format • Max 50 MB
+                Formats acceptés : PDF, Markdown (.md), Texte (.txt), HTML • Max 50 Mo
               </div>
             </div>
           )}

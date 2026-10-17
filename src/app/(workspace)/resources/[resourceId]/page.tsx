@@ -33,7 +33,8 @@ export default async function ResourceDetailPage({
   params,
 }: ResourceDetailPageProps) {
   const { resourceId } = await params;
-  const resource = await getResourceById(resourceId);
+  const requester = await getRequesterUser();
+  const resource = await getResourceById(resourceId, requester?.id);
 
   if (!resource) {
     notFound();
@@ -41,7 +42,6 @@ export default async function ResourceDetailPage({
 
   // Strict Access Control: Private resources are only visible to the owner or admin, and shared resources to authorized recipients
   if (resource.visibility === "private" || resource.visibility === "shared") {
-    const requester = await getRequesterUser();
     const accessCheck = await checkResourceAccess(resource, requester?.id, "view");
 
     if (!accessCheck.allowed) {

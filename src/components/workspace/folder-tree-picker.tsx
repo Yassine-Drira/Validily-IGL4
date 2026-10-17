@@ -44,10 +44,10 @@ export function FolderTreePicker({
 
   return (
     <div className={cn("space-y-2.5 text-xs", className)}>
-      <div className="flex items-center justify-between">
-        <label className="font-semibold text-[#111A2E]">{label}</label>
+      <div className="flex items-center justify-between gap-1.5">
+        <label className="font-semibold text-[#111A2E] truncate">{label}</label>
         {selectedNode && (
-          <span className="text-[10px] font-mono text-[#2855D9] bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100 truncate max-w-[200px]">
+          <span className="text-[10px] font-mono text-[#2855D9] bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100 truncate max-w-[120px] sm:max-w-[200px] shrink-0">
             {selectedNode.path.join(" / ")}
           </span>
         )}
@@ -77,7 +77,7 @@ export function FolderTreePicker({
       )}
 
       {/* Visual Interactive Tree View Box */}
-      <div className="bg-[#FAFBFD] border border-[#E4E8F0] rounded-xl p-2 max-h-60 overflow-y-auto space-y-1">
+      <div className="bg-[#FAFBFD] border border-[#E4E8F0] rounded-xl p-2 max-h-48 sm:max-h-60 overflow-y-auto space-y-1">
         {displayedNodes.length === 0 ? (
           <div className="p-4 text-center text-xs text-[#68748A]">
             Aucun dossier ne correspond à votre recherche.

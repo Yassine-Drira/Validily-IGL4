@@ -7,7 +7,34 @@ import { SubjectFolder } from "@/types/database";
 import { getRequesterUser, assertOwnershipOrAdmin } from "@/lib/auth/authorization";
 import { invalidateRepositoryCache } from "@/lib/supabase/repository";
 
+import fs from "fs";
+import path from "path";
+import { getDefaultSubjectFolders } from "@/lib/constants/curriculum-folders";
+
 const FOLDER_REGISTRY_TAG = "system_folder_registry";
+const CACHE_DIR = path.join(process.cwd(), ".validily-cache");
+
+function readDiskFolders(subjectId: string): SubjectFolder[] {
+  try {
+    const file = path.join(CACHE_DIR, `folders_${subjectId}.json`);
+    if (fs.existsSync(file)) {
+      const raw = fs.readFileSync(file, "utf8");
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed as SubjectFolder[];
+    }
+  } catch {}
+  return [];
+}
+
+function writeDiskFolders(subjectId: string, folders: SubjectFolder[]): void {
+  try {
+    if (!fs.existsSync(CACHE_DIR)) {
+      fs.mkdirSync(CACHE_DIR, { recursive: true });
+    }
+    const file = path.join(CACHE_DIR, `folders_${subjectId}.json`);
+    fs.writeFileSync(file, JSON.stringify(folders, null, 2), "utf8");
+  } catch {}
+}
 
 function safeRevalidate(path: string) {
   try {
@@ -17,44 +44,48 @@ function safeRevalidate(path: string) {
   }
 }
 
+// In-memory cache & fallback for fast navigation without redundant DB queries
+const inMemorySubjectFolders = new Map<string, { folders: SubjectFolder[]; expiry: number }>();
+
 /**
  * Fetch all folders for a specific subject
  */
 export async function getSubjectFolders(subjectId: string): Promise<SubjectFolder[]> {
   try {
-    if (!isSupabaseConfigured()) {
-      return [];
+    const cached = inMemorySubjectFolders.get(subjectId);
+    if (cached && Date.now() < cached.expiry) {
+      return cached.folders;
     }
 
-    const serviceSupabase = getServiceSupabase();
-    const { data, error } = await serviceSupabase
-      .from("notes")
-      .select("id, content")
-      .eq("subject_id", subjectId)
-      .contains("tags", [FOLDER_REGISTRY_TAG])
-      .maybeSingle();
-
-    if (error || !data || !data.content) {
-      return [];
+    const disk = readDiskFolders(subjectId);
+    if (disk.length > 0) {
+      inMemorySubjectFolders.set(subjectId, {
+        folders: disk,
+        expiry: Date.now() + 30000,
+      });
+      return disk;
     }
 
-    try {
-      const parsed = JSON.parse(data.content);
-      if (Array.isArray(parsed)) {
-        return parsed as SubjectFolder[];
-      }
-      return [];
-    } catch {
-      return [];
+    // Auto-heal from canonical curriculum defaults
+    const canonical = getDefaultSubjectFolders(subjectId);
+    if (canonical.length > 0) {
+      writeDiskFolders(subjectId, canonical);
+      inMemorySubjectFolders.set(subjectId, {
+        folders: canonical,
+        expiry: Date.now() + 30000,
+      });
+      return canonical;
     }
+
+    return cached?.folders || [];
   } catch (err) {
     console.error("Failed to query subject folders:", err);
-    return [];
+    return inMemorySubjectFolders.get(subjectId)?.folders || [];
   }
 }
 
 /**
- * Internal helper to save folders array to the subject's folder registry note
+ * Internal helper to save folders array without touching the notes table
  */
 async function saveSubjectFolders(
   subjectId: string,
@@ -62,45 +93,11 @@ async function saveSubjectFolders(
   actorUserId?: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const serviceSupabase = getServiceSupabase();
-    const requester = await getRequesterUser();
-    const userId = actorUserId || requester?.id;
-
-    const { data: existing } = await serviceSupabase
-      .from("notes")
-      .select("id")
-      .eq("subject_id", subjectId)
-      .contains("tags", [FOLDER_REGISTRY_TAG])
-      .maybeSingle();
-
-    const jsonContent = JSON.stringify(folders);
-
-    if (existing?.id) {
-      const { error } = await serviceSupabase
-        .from("notes")
-        .update({
-          content: jsonContent,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", existing.id);
-
-      if (error) return { success: false, error: error.message };
-    } else {
-      if (!userId) {
-        return { success: false, error: "Authentification requise pour créer le registre de dossiers." };
-      }
-      const { error } = await serviceSupabase.from("notes").insert({
-        user_id: userId,
-        subject_id: subjectId,
-        title: "__folder_registry__",
-        content: jsonContent,
-        tags: [FOLDER_REGISTRY_TAG],
-        visibility: "public",
-      });
-
-      if (error) return { success: false, error: error.message };
-    }
-
+    inMemorySubjectFolders.set(subjectId, {
+      folders: [...folders],
+      expiry: Date.now() + 30000,
+    });
+    writeDiskFolders(subjectId, folders);
     invalidateRepositoryCache();
     return { success: true };
   } catch (err: any) {
@@ -116,6 +113,8 @@ export async function createFolderAction(data: {
   name: string;
   parent_id?: string | null;
   color?: string;
+  icon?: string;
+  description?: string;
 }): Promise<{ success: boolean; folder?: SubjectFolder; error?: string }> {
   try {
     if (!data.name?.trim() || !data.subject_id) {
@@ -150,6 +149,8 @@ export async function createFolderAction(data: {
       name: data.name.trim(),
       parent_id: targetParentId,
       color: data.color || "blue",
+      icon: data.icon || "folder",
+      description: data.description?.trim() || undefined,
       sort_order: currentFolders.filter((f) => f.parent_id === targetParentId).length + 1,
       owner_id: requester.id,
       created_at: new Date().toISOString(),
@@ -171,13 +172,17 @@ export async function createFolderAction(data: {
 }
 
 /**
- * Rename an existing folder
+ * Update comprehensive folder settings: name, color, icon, description, parent_id
  */
-export async function renameFolderAction(data: {
+export async function updateFolderSettingsAction(data: {
   subject_id: string;
   folder_id: string;
   name: string;
-}): Promise<{ success: boolean; error?: string }> {
+  color?: string;
+  icon?: string;
+  description?: string;
+  parent_id?: string | null;
+}): Promise<{ success: boolean; folder?: SubjectFolder; error?: string }> {
   try {
     if (!data.name?.trim() || !data.folder_id || !data.subject_id) {
       return { success: false, error: "Nom et identifiant de dossier requis." };
@@ -185,7 +190,7 @@ export async function renameFolderAction(data: {
 
     const requester = await getRequesterUser();
     if (!requester) {
-      return { success: false, error: "Authentification requise pour renommer un dossier." };
+      return { success: false, error: "Authentification requise pour modifier les paramètres du dossier." };
     }
 
     const currentFolders = await getSubjectFolders(data.subject_id);
@@ -201,7 +206,34 @@ export async function renameFolderAction(data: {
       return { success: false, error: authCheck.error };
     }
 
-    const targetParentId = targetFolder.parent_id;
+    // Determine target parent
+    const targetParentId = data.parent_id !== undefined ? data.parent_id : targetFolder.parent_id;
+
+    // Cannot nest within self
+    if (targetParentId === data.folder_id) {
+      return { success: false, error: "Un dossier ne peut pas être son propre sous-dossier." };
+    }
+
+    // Circular reference check: targetParentId cannot be a descendant of folder_id
+    if (targetParentId) {
+      const isDescendant = (checkId: string, ancestorId: string): boolean => {
+        let current = currentFolders.find((f) => f.id === checkId);
+        while (current?.parent_id) {
+          if (current.parent_id === ancestorId) return true;
+          current = currentFolders.find((f) => f.id === current?.parent_id);
+        }
+        return false;
+      };
+
+      if (isDescendant(targetParentId, data.folder_id)) {
+        return {
+          success: false,
+          error: "Impossible de placer un dossier à l'intérieur de son propre sous-dossier.",
+        };
+      }
+    }
+
+    // Check duplicate folder name under destination parent
     const duplicate = currentFolders.some(
       (f) =>
         f.id !== data.folder_id &&
@@ -216,12 +248,18 @@ export async function renameFolderAction(data: {
       };
     }
 
-    const updatedFolders = [...currentFolders];
-    updatedFolders[targetIndex] = {
-      ...updatedFolders[targetIndex],
+    const updatedFolder: SubjectFolder = {
+      ...targetFolder,
       name: data.name.trim(),
+      parent_id: targetParentId,
+      color: data.color !== undefined ? data.color : targetFolder.color,
+      icon: data.icon !== undefined ? data.icon : targetFolder.icon,
+      description: data.description !== undefined ? data.description.trim() : targetFolder.description,
       updated_at: new Date().toISOString(),
     };
+
+    const updatedFolders = [...currentFolders];
+    updatedFolders[targetIndex] = updatedFolder;
 
     const saveRes = await saveSubjectFolders(data.subject_id, updatedFolders);
     if (!saveRes.success) {
@@ -229,10 +267,26 @@ export async function renameFolderAction(data: {
     }
 
     safeRevalidate("/subjects");
-    return { success: true };
+    return { success: true, folder: updatedFolder };
   } catch (err: any) {
-    return { success: false, error: err.message || "Échec du renommage du dossier." };
+    return { success: false, error: err.message || "Échec de l'enregistrement des paramètres du dossier." };
   }
+}
+
+/**
+ * Rename an existing folder (Legacy shorthand delegating to updateFolderSettingsAction)
+ */
+export async function renameFolderAction(data: {
+  subject_id: string;
+  folder_id: string;
+  name: string;
+}): Promise<{ success: boolean; error?: string }> {
+  const res = await updateFolderSettingsAction({
+    subject_id: data.subject_id,
+    folder_id: data.folder_id,
+    name: data.name,
+  });
+  return { success: res.success, error: res.error };
 }
 
 /**

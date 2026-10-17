@@ -38,13 +38,14 @@ export type AuditAction =
   | "VIP_REVOKED"
   | "AUDIO_CATALOG_CREATE"
   | "AUDIO_CATALOG_UPDATE"
-  | "AUDIO_CATALOG_DELETE";
+  | "AUDIO_CATALOG_DELETE"
+  | "ANNOUNCEMENT_BROADCAST";
 
 export interface AuditEvent {
   actor_id: string; // user ID or "guest" or "system"
   action: AuditAction;
   target_id: string; // resource ID, quiz ID, etc.
-  target_type: "resource" | "folder" | "quiz" | "note" | "subject" | "auth" | "vip" | "audio";
+  target_type: "resource" | "folder" | "quiz" | "note" | "subject" | "auth" | "vip" | "audio" | "announcement";
   metadata?: Record<string, any>;
   ip_address?: string;
 }

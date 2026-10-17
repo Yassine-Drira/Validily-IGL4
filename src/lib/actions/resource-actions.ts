@@ -1,6 +1,5 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { getServiceSupabase } from "@/lib/supabase/admin";
 import { RevisionStatus, AcademicResource } from "@/types/database";
@@ -8,14 +7,15 @@ import { logAuditEvent } from "@/lib/audit/audit-logger";
 import { getRequesterUser, assertOwnershipOrAdmin } from "@/lib/auth/authorization";
 import { invalidateRepositoryCache } from "@/lib/supabase/repository";
 
-function safeRevalidate(path: string) {
+async function safeRevalidate(path: string) {
   try {
-    revalidatePath(path);
+    const cacheMod = await import("next/cache");
+    cacheMod.revalidatePath?.(path);
   } catch {
     // Outside active Next.js request context
   }
   try {
-    invalidateRepositoryCache();
+    invalidateRepositoryCache("resources");
   } catch {
     // Ignore cache failure
   }
@@ -40,12 +40,35 @@ export async function createResource(data: {
   resource_type?: "document" | "quiz" | "link" | "exercise";
 }): Promise<{ success?: boolean; error?: string; resource?: AcademicResource }> {
   try {
-    if (!isSupabaseConfigured()) {
-      return { error: "Database not configured." };
-    }
-
     if (!data.title?.trim() || !data.subject_id || !data.category_id) {
       return { error: "Title, Subject, and Category are required." };
+    }
+
+    if (!isSupabaseConfigured()) {
+      const mockResource: AcademicResource = {
+        id: `mock_res_${Date.now()}`,
+        subject_id: data.subject_id,
+        category_id: data.category_id,
+        owner_id: "demo_user",
+        title: data.title.trim(),
+        description: data.description?.trim() || null,
+        storage_path: data.storage_path || data.external_url || `links/${Date.now()}`,
+        external_url: data.external_url,
+        original_filename: data.original_filename || "Resource Document",
+        mime_type: data.mime_type || "application/pdf",
+        file_size_bytes: data.file_size_bytes || 0,
+        academic_year: data.academic_year || "2026-2027",
+        exam_session: data.exam_session || null,
+        instructor: data.instructor || null,
+        chapter: data.chapter || null,
+        tags: data.tags || [],
+        visibility: data.visibility || "private",
+        publication_status: "published",
+        resource_type: data.resource_type || (data.external_url ? "link" : "document"),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      return { success: true, resource: mockResource };
     }
 
     const supabase = await createClient();
@@ -67,6 +90,10 @@ export async function createResource(data: {
     const mimeType = data.mime_type || (data.external_url ? "application/x-url" : "application/pdf");
     const resourceType = data.resource_type || (data.external_url ? "link" : "document");
 
+    const effectiveTags = Array.isArray(data.tags) ? [...data.tags] : [];
+    if (resourceType === "quiz" && !effectiveTags.includes("quiz")) effectiveTags.push("quiz");
+    if (resourceType === "link" && !effectiveTags.includes("external_link")) effectiveTags.push("external_link");
+
     const { data: resource, error } = await serviceSupabase
       .from("resources")
       .insert({
@@ -83,10 +110,9 @@ export async function createResource(data: {
         exam_session: data.exam_session || null,
         instructor: data.instructor || null,
         chapter: data.chapter || null,
-        tags: data.tags || [],
+        tags: effectiveTags,
         visibility: data.visibility || "private",
         publication_status: "published",
-        resource_type: resourceType,
       })
       .select("*, subject:subjects(*), category:resource_categories(*)")
       .single();
@@ -94,6 +120,10 @@ export async function createResource(data: {
     if (error) {
       console.error("Error creating resource:", error);
       return { error: error.message };
+    }
+
+    if (resource) {
+      resource.resource_type = resourceType;
     }
 
     safeRevalidate("/library");
@@ -415,11 +445,12 @@ export async function toggleBookmark(resourceId: string) {
 
 export async function updateRevisionStatus(
   resourceId: string,
-  status: RevisionStatus
+  status: RevisionStatus | "not_revised"
 ) {
   try {
+    const normalizedStatus = status === "not_revised" ? "not_started" : status;
     if (!isSupabaseConfigured()) {
-      return { success: true, status, isDemo: true };
+      return { success: true, status: normalizedStatus, isDemo: true };
     }
 
     const requester = await getRequesterUser();
@@ -435,9 +466,9 @@ export async function updateRevisionStatus(
       {
         user_id: userId,
         resource_id: resourceId,
-        status,
+        status: normalizedStatus,
         last_viewed_at: now,
-        revised_at: status === "revised" ? now : null,
+        revised_at: normalizedStatus === "revised" ? now : null,
         updated_at: now,
       },
       { onConflict: "user_id,resource_id" }
@@ -449,8 +480,9 @@ export async function updateRevisionStatus(
 
     safeRevalidate(`/resources/${resourceId}`);
     safeRevalidate("/subjects");
+    safeRevalidate("/my-space");
     safeRevalidate("/");
-    return { success: true, status };
+    return { success: true, status: normalizedStatus };
   } catch (err: any) {
     return { error: err.message };
   }
@@ -598,6 +630,152 @@ export async function updateResourceVisibility(
     return { success: true };
   } catch (err: any) {
     return { error: err.message || "Échec de modification de la visibilité." };
+  }
+}
+
+export interface UserSubjectRevisionProgress {
+  subjectId: string;
+  subjectName: string;
+  subjectSlug: string;
+  semesterName: string;
+  totalResources: number;
+  revisedCount: number;
+  inProgressCount: number;
+  notStartedCount: number;
+  percentage: number;
+}
+
+export interface UserOverallRevisionMetrics {
+  totalResources: number;
+  totalRevised: number;
+  totalInProgress: number;
+  totalNotStarted: number;
+  overallPercentage: number;
+  subjects: UserSubjectRevisionProgress[];
+  activeDates?: string[];
+}
+
+/**
+ * Fetch authoritative persistent revision progress across all subjects for a student.
+ * Drives personalized insights metrics and revision trackers.
+ */
+export async function getUserSubjectsRevisionProgress(
+  userId?: string
+): Promise<UserOverallRevisionMetrics> {
+  const empty: UserOverallRevisionMetrics = {
+    totalResources: 0,
+    totalRevised: 0,
+    totalInProgress: 0,
+    totalNotStarted: 0,
+    overallPercentage: 0,
+    subjects: [],
+    activeDates: [],
+  };
+
+  try {
+    const requester = await getRequesterUser();
+    const effectiveUserId = userId || requester?.id;
+    if (!effectiveUserId) return empty;
+
+    const serviceSupabase = getServiceSupabase();
+    if (!serviceSupabase) return empty;
+
+    // 1. Fetch subjects
+    const { data: subjects, error: subjErr } = await serviceSupabase
+      .from("subjects")
+      .select("id, name, slug, semester:semesters(name)")
+      .order("name", { ascending: true });
+
+    if (subjErr || !Array.isArray(subjects)) return empty;
+
+    // 2. Fetch accessible resources for this student
+    const isUuid = effectiveUserId.length === 36 && !effectiveUserId.startsWith("simulated-");
+    let resQuery = serviceSupabase.from("resources").select("id, subject_id, visibility, owner_id");
+    if (isUuid) {
+      resQuery = resQuery.or(`visibility.eq.public,owner_id.eq.${effectiveUserId}`);
+    } else {
+      resQuery = resQuery.eq("visibility", "public");
+    }
+
+    const { data: resources, error: resErr } = await resQuery;
+    if (resErr || !Array.isArray(resources)) return empty;
+
+    // 3. Fetch student's revision_progress
+    const { data: revData } = await serviceSupabase
+      .from("revision_progress")
+      .select("resource_id, status, updated_at, revised_at, last_viewed_at")
+      .eq("user_id", effectiveUserId);
+
+    const revMap = new Map<string, string>();
+    const activeDatesSet = new Set<string>();
+    if (Array.isArray(revData)) {
+      revData.forEach((row: any) => {
+        if (row.resource_id) revMap.set(row.resource_id, row.status);
+        const dt = row.updated_at || row.revised_at || row.last_viewed_at;
+        if (dt && typeof dt === "string") {
+          activeDatesSet.add(dt.split("T")[0]);
+        }
+      });
+    }
+
+    // 4. Compute per-subject progress
+    const subjectProgressList: UserSubjectRevisionProgress[] = [];
+    let sumTotal = 0;
+    let sumRevised = 0;
+    let sumInProgress = 0;
+    let sumNotStarted = 0;
+
+    for (const s of subjects) {
+      const subjectResources = resources.filter((r: any) => r.subject_id === s.id);
+      const total = subjectResources.length;
+
+      let revised = 0;
+      let inProgress = 0;
+      let notStarted = 0;
+
+      subjectResources.forEach((r: any) => {
+        const st = revMap.get(r.id);
+        if (st === "revised") revised++;
+        else if (st === "in_progress") inProgress++;
+        else notStarted++;
+      });
+
+      const percentage = total > 0 ? Math.round((revised / total) * 100) : 0;
+
+      sumTotal += total;
+      sumRevised += revised;
+      sumInProgress += inProgress;
+      sumNotStarted += notStarted;
+
+      const semesterName = (s.semester as any)?.name || "Semestre 1";
+
+      subjectProgressList.push({
+        subjectId: s.id,
+        subjectName: s.name,
+        subjectSlug: s.slug,
+        semesterName,
+        totalResources: total,
+        revisedCount: revised,
+        inProgressCount: inProgress,
+        notStartedCount: notStarted,
+        percentage,
+      });
+    }
+
+    const overallPercentage = sumTotal > 0 ? Math.round((sumRevised / sumTotal) * 100) : 0;
+
+    return {
+      totalResources: sumTotal,
+      totalRevised: sumRevised,
+      totalInProgress: sumInProgress,
+      totalNotStarted: sumNotStarted,
+      overallPercentage,
+      subjects: subjectProgressList,
+      activeDates: Array.from(activeDatesSet).sort().reverse(),
+    };
+  } catch (err) {
+    console.error("getUserSubjectsRevisionProgress error:", err);
+    return empty;
   }
 }
 

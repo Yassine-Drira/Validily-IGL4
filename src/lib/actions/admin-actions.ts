@@ -166,7 +166,7 @@ export async function updateSubject(
     if (data.name !== undefined) updatePayload.name = data.name.trim();
     if (data.description !== undefined) updatePayload.description = data.description.trim() || null;
     if (data.icon !== undefined) updatePayload.icon = data.icon;
-    if (data.semester_id !== undefined) updatePayload.semester_id = resolveSemesterId(data.semester_id);
+    if (data.semester_id !== undefined) updatePayload.semester_id = await resolveSemesterId(data.semester_id, serviceSupabase);
 
     const { data: subject, error } = await serviceSupabase
       .from("subjects")

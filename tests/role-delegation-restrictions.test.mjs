@@ -293,4 +293,15 @@ test("UI-UX-04: Admin Manager Temporary Admin Governance & UI Controls", () => {
     vipManagerCode.includes("Réservé Admin Permanent"),
     "AdminVipManager must show Réservé Admin Permanent lock when isTemporaryAdmin is true"
   );
+
+  // updateSubject properly awaits resolveSemesterId to avoid passing Promise to Supabase
+  const adminActionsCode = fs.readFileSync(
+    path.resolve("src/lib/actions/admin-actions.ts"),
+    "utf8"
+  );
+  assert.match(
+    adminActionsCode,
+    /updatePayload\.semester_id\s*=\s*await\s+resolveSemesterId/,
+    "updateSubject must await resolveSemesterId to prevent UUID syntax errors"
+  );
 });

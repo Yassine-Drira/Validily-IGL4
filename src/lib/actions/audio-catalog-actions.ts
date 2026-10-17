@@ -37,55 +37,114 @@ if (!globalAudioState.__localCatalogEntries) {
 }
 const localCatalogMap = globalAudioState.__localCatalogEntries;
 
-// Supabase DB System Record Resilience Helpers (Guarantees catalog persistence across restarts)
-async function getDbCatalogFallback(): Promise<AudioCatalogEntry[]> {
+import fs from "fs";
+import path from "path";
+
+// Local file resilience directory
+const CACHE_DIR = path.join(process.cwd(), ".validily-cache");
+const CATALOG_CACHE_FILE = path.join(CACHE_DIR, "audio_catalog.json");
+
+function readDiskCatalogCache(): AudioCatalogEntry[] {
   try {
-    const serviceSupabase = getServiceSupabase();
-    if (!serviceSupabase) return [];
-    const { data } = await serviceSupabase
-      .from("notes")
-      .select("content")
-      .eq("title", "__validily_audio_catalog__")
-      .maybeSingle();
-    if (data?.content) {
-      const parsed = JSON.parse(data.content);
-      if (Array.isArray(parsed)) return parsed as AudioCatalogEntry[];
+    if (fs.existsSync(CATALOG_CACHE_FILE)) {
+      const raw = fs.readFileSync(CATALOG_CACHE_FILE, "utf8");
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
     }
   } catch {}
   return [];
 }
 
-async function saveDbCatalogFallback(entries: AudioCatalogEntry[]): Promise<void> {
+function writeDiskCatalogCache(entries: AudioCatalogEntry[]): void {
   try {
-    const serviceSupabase = getServiceSupabase();
-    if (!serviceSupabase) return;
-    const { data: existing } = await serviceSupabase
-      .from("notes")
-      .select("id")
-      .eq("title", "__validily_audio_catalog__")
-      .maybeSingle();
-
-    if (existing?.id) {
-      await serviceSupabase
-        .from("notes")
-        .update({
-          content: JSON.stringify(entries),
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", existing.id);
-    } else {
-      const user = await getRequesterUser();
-      const adminId = user?.id || "00000000-0000-0000-0000-000000000000";
-      await serviceSupabase.from("notes").insert({
-        user_id: adminId,
-        title: "__validily_audio_catalog__",
-        content: JSON.stringify(entries),
-        tags: ["system_audio_catalog"],
-        visibility: "public",
-      });
+    if (!fs.existsSync(CACHE_DIR)) {
+      fs.mkdirSync(CACHE_DIR, { recursive: true });
     }
+    fs.writeFileSync(CATALOG_CACHE_FILE, JSON.stringify(entries, null, 2), "utf8");
   } catch {}
 }
+
+const DEFAULT_SEEDS: AudioCatalogEntry[] = [
+  {
+    id: "cat-lofi-01",
+    title: "Lofi Study Beats — Session IGL4",
+    description: "Rythmes lofi doux et apaisants pour les sessions de code prolongées.",
+    category: "lofi",
+    source_type: "youtube",
+    source_key: "https://www.youtube.com/watch?v=jfKfPfyJRdk",
+    youtube_video_id: "jfKfPfyJRdk",
+    is_published: true,
+    sort_order: 1,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: "cat-classical-02",
+    title: "Concentration Baroque & Piano Zen",
+    description: "Harmonies classiques favorisant la clarté mentale et la mémorisation.",
+    category: "classical",
+    source_type: "youtube",
+    source_key: "https://www.youtube.com/watch?v=WPni755-Krg",
+    youtube_video_id: "WPni755-Krg",
+    is_published: true,
+    sort_order: 2,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: "cat-nature-03",
+    title: "Feu de Camp & Forêt Sous la Pluie",
+    description: "Crépitement chaleureux de braises et bruine apaisante en sous-bois.",
+    category: "nature",
+    source_type: "youtube",
+    source_key: "https://www.youtube.com/watch?v=mPZkdNFkNps",
+    youtube_video_id: "mPZkdNFkNps",
+    is_published: true,
+    sort_order: 3,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+];
+
+async function getValidSystemUserId(serviceSupabase: any): Promise<string> {
+  try {
+    const user = await getRequesterUser();
+    if (user?.id && user.id.length === 36 && !user.id.startsWith("simulated-")) {
+      return user.id;
+    }
+  } catch {}
+
+  try {
+    const { data: admin } = await serviceSupabase
+      .from("profiles")
+      .select("id")
+      .eq("role", "admin")
+      .limit(1)
+      .maybeSingle();
+    if (admin?.id) return admin.id;
+
+    const { data: anyUser } = await serviceSupabase
+      .from("profiles")
+      .select("id")
+      .limit(1)
+      .maybeSingle();
+    if (anyUser?.id) return anyUser.id;
+  } catch {}
+
+  return "12b54e6a-f1e0-4bee-b520-b4e479da3044";
+}
+
+// Audio Catalog Resilience Helpers (Disk Cache & Memory Store - Never touches notes table)
+async function getDbCatalogFallback(): Promise<AudioCatalogEntry[]> {
+  const disk = readDiskCatalogCache();
+  if (disk.length > 0) return disk;
+  return DEFAULT_SEEDS;
+}
+
+async function saveDbCatalogFallback(entries: AudioCatalogEntry[]): Promise<void> {
+  writeDiskCatalogCache(entries);
+}
+
 
 /**
  * List all catalog entries including unpublished drafts (Admin only).

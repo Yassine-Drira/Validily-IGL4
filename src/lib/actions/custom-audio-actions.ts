@@ -89,70 +89,85 @@ if (localCatalogEntries.size === 0) {
   seeds.forEach((s) => localCatalogEntries.set(s.id, s));
 }
 
-// Supabase DB System Record Resilience Helpers (Guarantees persistence across restarts)
-async function getDbCustomAudioFallback(userId: string): Promise<CustomAudioEntry[]> {
+import fs from "fs";
+import path from "path";
+
+const CACHE_DIR = path.join(process.cwd(), ".validily-cache");
+
+function getCustomAudioCachePath(userId: string): string {
+  const safeId = userId.replace(/[^a-zA-Z0-9_-]/g, "_");
+  return path.join(CACHE_DIR, `custom_audio_${safeId}.json`);
+}
+
+function readDiskCustomAudioCache(userId: string): CustomAudioEntry[] {
   try {
-    const serviceSupabase = getServiceSupabase();
-    if (!serviceSupabase) return [];
-    const { data } = await serviceSupabase
-      .from("notes")
-      .select("content")
-      .eq("user_id", userId)
-      .eq("title", "__validily_custom_audio__")
-      .maybeSingle();
-    if (data?.content) {
-      const parsed = JSON.parse(data.content);
+    const filePath = getCustomAudioCachePath(userId);
+    if (fs.existsSync(filePath)) {
+      const raw = fs.readFileSync(filePath, "utf8");
+      const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) return parsed as CustomAudioEntry[];
     }
   } catch {}
   return [];
 }
 
-async function saveDbCustomAudioFallback(userId: string, entries: CustomAudioEntry[]): Promise<void> {
+function writeDiskCustomAudioCache(userId: string, entries: CustomAudioEntry[]): void {
   try {
-    const serviceSupabase = getServiceSupabase();
-    if (!serviceSupabase) return;
-    const { data: existing } = await serviceSupabase
-      .from("notes")
-      .select("id")
-      .eq("user_id", userId)
-      .eq("title", "__validily_custom_audio__")
-      .maybeSingle();
+    if (!fs.existsSync(CACHE_DIR)) {
+      fs.mkdirSync(CACHE_DIR, { recursive: true });
+    }
+    const filePath = getCustomAudioCachePath(userId);
+    fs.writeFileSync(filePath, JSON.stringify(entries, null, 2), "utf8");
+  } catch {}
+}
 
-    if (existing?.id) {
-      await serviceSupabase
-        .from("notes")
-        .update({
-          content: JSON.stringify(entries),
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", existing.id);
-    } else {
-      await serviceSupabase.from("notes").insert({
-        user_id: userId,
-        title: "__validily_custom_audio__",
-        content: JSON.stringify(entries),
-        tags: ["system_custom_audio"],
-        visibility: "private",
-      });
+async function getValidSystemUserId(serviceSupabase: any): Promise<string> {
+  try {
+    const user = await getRequesterUser();
+    if (user?.id && user.id.length === 36 && !user.id.startsWith("simulated-")) {
+      return user.id;
     }
   } catch {}
+
+  try {
+    const { data: admin } = await serviceSupabase
+      .from("profiles")
+      .select("id")
+      .eq("role", "admin")
+      .limit(1)
+      .maybeSingle();
+    if (admin?.id) return admin.id;
+
+    const { data: anyUser } = await serviceSupabase
+      .from("profiles")
+      .select("id")
+      .limit(1)
+      .maybeSingle();
+    if (anyUser?.id) return anyUser.id;
+  } catch {}
+
+  return "12b54e6a-f1e0-4bee-b520-b4e479da3044";
+}
+
+// Custom Audio Resilience Helpers (Disk Cache & Memory Store - Never touches notes table)
+async function getDbCustomAudioFallback(userId: string): Promise<CustomAudioEntry[]> {
+  return readDiskCustomAudioCache(userId);
+}
+
+async function saveDbCustomAudioFallback(userId: string, entries: CustomAudioEntry[]): Promise<void> {
+  writeDiskCustomAudioCache(userId, entries);
 }
 
 async function getDbCatalogFallback(): Promise<AudioCatalogEntry[]> {
   try {
-    const serviceSupabase = getServiceSupabase();
-    if (!serviceSupabase) return [];
-    const { data } = await serviceSupabase
-      .from("notes")
-      .select("content")
-      .eq("title", "__validily_audio_catalog__")
-      .maybeSingle();
-    if (data?.content) {
-      const parsed = JSON.parse(data.content);
-      if (Array.isArray(parsed)) return parsed as AudioCatalogEntry[];
+    const catalogFile = path.join(CACHE_DIR, "audio_catalog.json");
+    if (fs.existsSync(catalogFile)) {
+      const raw = fs.readFileSync(catalogFile, "utf8");
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed as AudioCatalogEntry[];
     }
   } catch {}
+
   return [];
 }
 
@@ -660,7 +675,7 @@ export async function getSharedAudioCatalog(): Promise<{
       if (c.is_published) map.set(c.id, c);
     }
 
-    // 2. Fallback DB entries from notes table (__validily_audio_catalog__)
+    // 2. Fallback disk cache entries for audio catalog
     for (const c of dbCatalog) {
       if (c.is_published) {
         map.set(c.id, c);

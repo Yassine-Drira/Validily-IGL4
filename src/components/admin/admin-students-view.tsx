@@ -16,7 +16,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { StudentPerformanceOverview } from "@/lib/actions/profile-actions";
+import { StudentPerformanceOverview, StudentPublicProfile } from "@/lib/actions/profile-actions";
 import { StudentProfileModal } from "@/components/profile/student-profile-modal";
 import { cn } from "@/lib/utils";
 
@@ -51,9 +51,8 @@ export function AdminStudentsView({
   }, [students, searchQuery, filterRole]);
 
   // Aggregate stats
-  const totalFocusHours = Math.floor(
-    students.reduce((acc, s) => acc + s.totalFocusedMinutes, 0) / 60
-  );
+  const totalFocusMinutes = students.reduce((acc, s) => acc + s.totalFocusedMinutes, 0);
+  const totalFocusHours = Math.floor(totalFocusMinutes / 60);
   const totalTreesPlanted = students.reduce((acc, s) => acc + s.healthyTreesCount, 0);
   const avgAchievements =
     students.length > 0
@@ -90,7 +89,9 @@ export function AdminStudentsView({
             <Clock className="w-4 h-4 text-[#2855D9]" />
           </div>
           <div className="text-2xl font-extrabold text-[#111A2E] font-mono">
-            {totalFocusHours} h
+            {totalFocusHours > 0
+              ? `${totalFocusHours} h ${totalFocusMinutes % 60 > 0 ? `${totalFocusMinutes % 60} m` : ""}`.trim()
+              : `${totalFocusMinutes} m`}
           </div>
           <p className="text-[11px] text-[#68748A]">
             Concentration totale vérifiée sur le cursus
@@ -105,7 +106,7 @@ export function AdminStudentsView({
             <Trees className="w-4 h-4" />
           </div>
           <div className="text-2xl font-extrabold text-emerald-900 font-mono">
-            {totalTreesPlanted} arbres
+            {totalTreesPlanted} {totalTreesPlanted > 1 ? "arbres" : "arbre"}
           </div>
           <p className="text-[11px] text-[#68748A]">
             Totalité des arbres sains cultivés en sessions
@@ -303,11 +304,41 @@ export function AdminStudentsView({
       </div>
 
       {/* Admin Student Inspection Modal */}
-      <StudentProfileModal
-        studentId={inspectedStudentId}
-        isOpen={Boolean(inspectedStudentId)}
-        onClose={() => setInspectedStudentId(null)}
-      />
+      {(() => {
+        const selected = inspectedStudentId
+          ? students.find((s) => s.id === inspectedStudentId) || null
+          : null;
+        const initialProfile: StudentPublicProfile | null = selected
+          ? {
+              id: selected.id,
+              displayName: selected.displayName,
+              avatarUrl: selected.avatarUrl || null,
+              role: selected.role,
+              isVip: selected.isVip,
+              email: selected.email,
+              stats: {
+                streak: selected.streak,
+                totalFocusedMinutes: selected.totalFocusedMinutes,
+                healthyTreesCount: selected.healthyTreesCount,
+                witheredTreesCount: 0,
+                totalSessions: selected.healthyTreesCount,
+                speciesCount: Math.min(selected.healthyTreesCount, 5),
+              },
+              trees: [],
+              achievements: [],
+              unlockedAchievementsCount: selected.achievementsUnlocked,
+            }
+          : null;
+
+        return (
+          <StudentProfileModal
+            studentId={inspectedStudentId}
+            isOpen={Boolean(inspectedStudentId)}
+            onClose={() => setInspectedStudentId(null)}
+            initialProfile={initialProfile}
+          />
+        );
+      })()}
     </div>
   );
 }

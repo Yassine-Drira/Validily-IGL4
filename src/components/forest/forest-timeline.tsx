@@ -22,58 +22,117 @@ interface ForestTimelineProps {
 export function ForestTimeline({ entries = [], className = "" }: ForestTimelineProps) {
   const [selectedEntry, setSelectedEntry] = useState<ForestEntry | null>(null);
   const [statusFilter, setStatusFilter] = useState<"all" | "healthy" | "leafless">("all");
+  const [periodFilter, setPeriodFilter] = useState<"all" | "today" | "7d" | "30d">("all");
 
   const filteredEntries = useMemo(() => {
+    const now = Date.now();
+    const todayIso = new Date().toISOString().split("T")[0];
+    const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
+    const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000;
+
     let list = [...entries].sort((a, b) => {
       const timeB = new Date(b.earned_at || b.created_at || 0).getTime();
       const timeA = new Date(a.earned_at || a.created_at || 0).getTime();
       return (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);
     });
+
     if (statusFilter === "healthy") {
       list = list.filter((e) => e.tree_status === "healthy");
     } else if (statusFilter === "leafless") {
       list = list.filter((e) => e.tree_status === "leafless");
     }
+
+    if (periodFilter === "today") {
+      list = list.filter((e) => {
+        const d = (e.earned_at || e.created_at || "").split("T")[0];
+        return d === todayIso;
+      });
+    } else if (periodFilter === "7d") {
+      list = list.filter((e) => {
+        const t = new Date(e.earned_at || e.created_at || 0).getTime();
+        return t >= sevenDaysAgo;
+      });
+    } else if (periodFilter === "30d") {
+      list = list.filter((e) => {
+        const t = new Date(e.earned_at || e.created_at || 0).getTime();
+        return t >= thirtyDaysAgo;
+      });
+    }
+
     return list;
-  }, [entries, statusFilter]);
+  }, [entries, statusFilter, periodFilter]);
 
   return (
     <div className={cn("space-y-4", className)}>
-      {/* Filter Tabs */}
-      <div className="flex items-center justify-between border-b border-[#E4E8F0] pb-3">
-        <div className="flex items-center space-x-2 text-xs text-[#68748A]">
-          <Filter className="w-3.5 h-3.5" />
-          <span className="font-semibold text-[#182235]">Filtrer l&apos;historique :</span>
+      {/* Filter Tabs & Period Switcher */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#E4E8F0] pb-3">
+        {/* Status Filters */}
+        <div className="flex items-center space-x-2 text-xs">
+          <div className="flex items-center space-x-1.5 text-[#68748A]">
+            <Filter className="w-3.5 h-3.5" />
+            <span className="font-semibold text-[#182235]">Statut :</span>
+          </div>
+          <div className="flex items-center space-x-1 bg-[#F4F6FA] p-1 rounded-xl border border-[#E4E8F0]">
+            {(
+              [
+                { key: "all", label: `Tous (${entries.length})` },
+                {
+                  key: "healthy",
+                  label: `Sains (${entries.filter((e) => e.tree_status === "healthy").length})`,
+                },
+                {
+                  key: "leafless",
+                  label: `Défeuillés (${entries.filter((e) => e.tree_status === "leafless").length})`,
+                },
+              ] as const
+            ).map((t) => (
+              <button
+                key={t.key}
+                type="button"
+                onClick={() => setStatusFilter(t.key)}
+                className={cn(
+                  "px-2.5 py-1 rounded-lg transition-all font-medium cursor-pointer",
+                  statusFilter === t.key
+                    ? "bg-white text-[#111A2E] shadow-2xs font-bold"
+                    : "text-[#68748A] hover:text-[#182235]"
+                )}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
         </div>
 
-        <div className="flex items-center space-x-1 bg-[#F4F6FA] p-1 rounded-xl border border-[#E4E8F0] text-xs">
-          {(
-            [
-              { key: "all", label: `Tous (${entries.length})` },
-              {
-                key: "healthy",
-                label: `Sains (${entries.filter((e) => e.tree_status === "healthy").length})`,
-              },
-              {
-                key: "leafless",
-                label: `Défeuillés (${entries.filter((e) => e.tree_status === "leafless").length})`,
-              },
-            ] as const
-          ).map((t) => (
-            <button
-              key={t.key}
-              type="button"
-              onClick={() => setStatusFilter(t.key)}
-              className={cn(
-                "px-3 py-1 rounded-lg transition-all font-medium cursor-pointer",
-                statusFilter === t.key
-                  ? "bg-white text-[#111A2E] shadow-2xs font-bold"
-                  : "text-[#68748A] hover:text-[#182235]"
-              )}
-            >
-              {t.label}
-            </button>
-          ))}
+        {/* Period Filter */}
+        <div className="flex items-center space-x-2 text-xs">
+          <div className="flex items-center space-x-1.5 text-[#68748A]">
+            <Clock className="w-3.5 h-3.5" />
+            <span className="font-semibold text-[#182235]">Période :</span>
+          </div>
+          <div className="flex items-center space-x-1 bg-[#F4F6FA] p-1 rounded-xl border border-[#E4E8F0]">
+            {(
+              [
+                { key: "all", label: "Tout" },
+                { key: "today", label: "Aujourd'hui" },
+                { key: "7d", label: "7 Jours" },
+                { key: "30d", label: "30 Jours" },
+              ] as const
+            ).map((p) => (
+              <button
+                key={p.key}
+                type="button"
+                onClick={() => setPeriodFilter(p.key)}
+                className={cn(
+                  "px-2.5 py-1 rounded-lg transition-all font-medium cursor-pointer",
+                  periodFilter === p.key
+                    ? "bg-[#2855D9] text-white shadow-2xs font-bold"
+                    : "text-[#68748A] hover:text-[#182235]"
+                )}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 

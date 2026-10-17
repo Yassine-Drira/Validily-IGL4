@@ -128,6 +128,14 @@ test("Anti-Bypass Focus Session & Dead Tree Integrity: State Machine pause suspe
     hubContent.includes("arbre mort (défeuillé)") || hubContent.includes("arbre mort permanent"),
     "FocusHubModal must warn of indelible dead tree penalty upon confirmation"
   );
+  assert.ok(
+    hubContent.includes("handleModeClick") && hubContent.includes("pendingAbandonModal"),
+    "FocusHubModal must intercept mode changes with confirmation dialog to prevent accidental penalties"
+  );
+  assert.ok(
+    hubContent.includes("Basculer vers la") && hubContent.includes("Pause courte"),
+    "FocusHubModal must specifically protect against accidental switch to Pause courte or break modes"
+  );
 
   // 3. FocusHeaderWidget
   const headerWidgetPath = path.join(rootDir, "src/components/focus/focus-header-widget.tsx");

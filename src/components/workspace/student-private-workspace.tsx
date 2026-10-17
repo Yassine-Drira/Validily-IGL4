@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -30,9 +30,10 @@ import {
   Activity,
   Calendar,
   AlertTriangle,
+  Search,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { updateResourceVisibility, deleteResource } from "@/lib/actions/resource-actions";
+import { updateResourceVisibility, deleteResource, UserOverallRevisionMetrics } from "@/lib/actions/resource-actions";
 import { updateNote, deleteNote } from "@/lib/actions/note-actions";
 import { updateUserProfile, removeUserAvatar } from "@/lib/actions/profile-actions";
 import { DeleteConfirmModal } from "@/components/ui/delete-confirm-modal";
@@ -55,6 +56,7 @@ interface StudentPrivateWorkspaceProps {
   publicResources?: any[];
   bookmarkedCount: number;
   recentActivity?: any[];
+  revisionProgress?: UserOverallRevisionMetrics;
 }
 
 export function StudentPrivateWorkspace({
@@ -69,16 +71,35 @@ export function StudentPrivateWorkspace({
   publicResources: initialPublicResources = [],
   bookmarkedCount,
   recentActivity = [],
+  revisionProgress = {
+    totalResources: 0,
+    totalRevised: 0,
+    totalInProgress: 0,
+    totalNotStarted: 0,
+    overallPercentage: 0,
+    subjects: [],
+  },
 }: StudentPrivateWorkspaceProps) {
   const [activeTab, setActiveTab] = useState<
-    "overview" | "private" | "shared" | "public" | "quizzes" | "notes" | "activity" | "profile"
+    "overview" | "revisions" | "private" | "shared" | "public" | "quizzes" | "notes" | "activity" | "profile"
   >("overview");
 
-  const [privateNotes, setPrivateNotes] = useState(initialPrivateNotes);
+  const [privateNotes, setPrivateNotes] = useState(() =>
+    (initialPrivateNotes || []).filter(
+      (n: any) =>
+        n?.title &&
+        !n.title.startsWith("__") &&
+        !(Array.isArray(n.tags) && n.tags.some((t: string) => t.startsWith("system_")))
+    )
+  );
   const [privateResources, setPrivateResources] = useState(initialPrivateResources);
   const [sharedResources, setSharedResources] = useState(initialSharedResources);
   const [publicResources, setPublicResources] = useState(initialPublicResources);
   const [feedback, setFeedback] = useState<string>("");
+  const [revisionFilter, setRevisionFilter] = useState<"all" | "in_progress" | "not_started" | "revised">("all");
+  const [revisionSemesterFilter, setRevisionSemesterFilter] = useState<string>("all");
+  const [revisionSearch, setRevisionSearch] = useState<string>("");
+  const [activityPeriodFilter, setActivityPeriodFilter] = useState<"all" | "today" | "7d" | "30d">("all");
 
   // Modals & Confirmation
   const [itemToDelete, setItemToDelete] = useState<{ id: string; title: string; type: "resource" | "note" } | null>(null);
@@ -290,6 +311,50 @@ export function StudentPrivateWorkspace({
         )
       : 0;
 
+  // Priority subjects for "Vue d'ensemble" (shows max 3 actionable subjects)
+  const activeOrPrioritySubjects = useMemo(() => {
+    const list = revisionProgress?.subjects || [];
+    if (list.length === 0) return [];
+    const inProgress = list.filter((s) => s.inProgressCount > 0);
+    if (inProgress.length >= 3) return inProgress.slice(0, 3);
+
+    const revised = list.filter((s) => s.revisedCount > 0 && s.percentage < 100);
+    const combined = Array.from(new Set([...inProgress, ...revised]));
+    if (combined.length >= 3) return combined.slice(0, 3);
+
+    const remaining = list.filter((s) => !combined.includes(s));
+    return [...combined, ...remaining].slice(0, 3);
+  }, [revisionProgress?.subjects]);
+
+  // Available semesters for "Mes Révisions" filter dropdown
+  const availableSemesters = useMemo(() => {
+    const s = new Set<string>();
+    (revisionProgress?.subjects || []).forEach((subj) => {
+      if (subj.semesterName) s.add(subj.semesterName);
+    });
+    return Array.from(s);
+  }, [revisionProgress?.subjects]);
+
+  // Filtered subjects for "Mes Révisions"
+  const filteredRevisionSubjects = useMemo(() => {
+    return (revisionProgress?.subjects || []).filter((subj) => {
+      if (revisionFilter === "in_progress" && subj.inProgressCount === 0) return false;
+      if (revisionFilter === "revised" && subj.percentage < 100) return false;
+      if (revisionFilter === "not_started" && (subj.revisedCount > 0 || subj.inProgressCount > 0)) return false;
+
+      if (revisionSemesterFilter !== "all" && subj.semesterName !== revisionSemesterFilter) return false;
+
+      if (revisionSearch.trim()) {
+        const query = revisionSearch.toLowerCase().trim();
+        const matchesName = subj.subjectName.toLowerCase().includes(query);
+        const matchesSemester = subj.semesterName.toLowerCase().includes(query);
+        if (!matchesName && !matchesSemester) return false;
+      }
+
+      return true;
+    });
+  }, [revisionProgress?.subjects, revisionFilter, revisionSemesterFilter, revisionSearch]);
+
   return (
     <div className="space-y-6">
       {/* Toast Feedback */}
@@ -414,6 +479,17 @@ export function StudentPrivateWorkspace({
 
         <button
           type="button"
+          onClick={() => setActiveTab("revisions")}
+          className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1.5 whitespace-nowrap transition-all cursor-pointer ${
+            activeTab === "revisions" ? "bg-[#2855D9] text-white shadow-2xs" : "text-[#68748A] hover:bg-[#F4F6FA]"
+          }`}
+        >
+          <BookOpen className="w-3.5 h-3.5" />
+          <span>Mes Révisions ({revisionProgress?.overallPercentage || 0}%)</span>
+        </button>
+
+        <button
+          type="button"
           onClick={() => setActiveTab("private")}
           className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1.5 whitespace-nowrap transition-all cursor-pointer ${
             activeTab === "private" ? "bg-[#2855D9] text-white shadow-2xs" : "text-[#68748A] hover:bg-[#F4F6FA]"
@@ -482,14 +558,37 @@ export function StudentPrivateWorkspace({
       {/* TAB 1: OVERVIEW */}
       {activeTab === "overview" && (
         <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-white border border-[#E4E8F0] rounded-2xl p-5 shadow-xs space-y-2">
+              <div className="flex items-center justify-between text-xs text-[#68748A]">
+                <span>Progression Révisions</span>
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              </div>
+              <div className="text-2xl font-bold font-mono text-[#111A2E]">
+                {revisionProgress?.overallPercentage || 0}%
+              </div>
+              <div className="w-full bg-[#E4E8F0] h-1.5 rounded-full overflow-hidden mt-1">
+                <div
+                  className="bg-gradient-to-r from-[#2855D9] to-emerald-500 h-full rounded-full transition-all duration-500"
+                  style={{ width: `${revisionProgress?.overallPercentage || 0}%` }}
+                />
+              </div>
+              <p className="text-[11px] text-[#68748A]">
+                {revisionProgress?.totalRevised || 0}/{revisionProgress?.totalResources || 0} documents révisés.
+              </p>
+            </div>
+
             <div className="bg-white border border-[#E4E8F0] rounded-2xl p-5 shadow-xs space-y-2">
               <div className="flex items-center justify-between text-xs text-[#68748A]">
                 <span>Taux de Réussite Moyen</span>
                 <Award className="w-4 h-4 text-amber-500" />
               </div>
-              <div className="text-2xl font-bold font-mono text-[#111A2E]">{averageScore}%</div>
-              <p className="text-[11px] text-[#68748A]">Sur l&apos;ensemble de vos évaluations IGL4.</p>
+              <div className="text-2xl font-bold font-mono text-[#111A2E]">
+                {totalQuizzes > 0 ? `${averageScore}%` : "—"}
+              </div>
+              <p className="text-[11px] text-[#68748A]">
+                {totalQuizzes > 0 ? "Sur l'ensemble de vos évaluations IGL4." : "Aucun quiz complété pour le moment."}
+              </p>
             </div>
 
             <div className="bg-white border border-[#E4E8F0] rounded-2xl p-5 shadow-xs space-y-2">
@@ -514,27 +613,420 @@ export function StudentPrivateWorkspace({
             </div>
           </div>
 
-          {/* Quick Mistakes Review */}
-          {initialMistakes.length > 0 && (
-            <div className="bg-white border border-[#E4E8F0] rounded-2xl p-5 shadow-xs space-y-3">
-              <h3 className="font-bold text-sm text-[#111A2E] flex items-center space-x-2">
-                <RotateCcw className="w-4 h-4 text-rose-500" />
-                <span>Questions à consolider (Carnet d&apos;Erreurs)</span>
-              </h3>
-              <div className="divide-y divide-[#F1F4F9]">
-                {initialMistakes.slice(0, 5).map((m: any, idx: number) => (
-                  <div key={m.id || idx} className="py-2.5 text-xs space-y-1">
-                    <p className="font-semibold text-[#182235]">{m.question_text}</p>
-                    {m.explanation && (
-                      <p className="text-[11px] text-emerald-700 bg-emerald-50/60 p-2 rounded-lg border border-emerald-100">
-                        {m.explanation}
-                      </p>
-                    )}
+          {/* REPRENDRE VOS RÉVISIONS (ACTIONABLE JUMP-BACK-IN / TOP PRIORITIES) */}
+          <div className="bg-white border border-[#E4E8F0] rounded-2xl p-6 shadow-xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center space-x-2">
+                  <h3 className="font-bold text-base text-[#111A2E] flex items-center space-x-2">
+                    <BookOpen className="w-4 h-4 text-[#2855D9]" />
+                    <span>Reprendre vos révisions</span>
+                  </h3>
+                  <span className="px-2 py-0.5 rounded-full text-[11px] font-mono font-bold bg-blue-50 text-[#2855D9] border border-blue-200">
+                    {activeOrPrioritySubjects.length} prioritaires
+                  </span>
+                </div>
+                <p className="text-xs text-[#68748A] mt-1">
+                  Accédez directement aux cours en cours ou démarrez vos priorités du cursus.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab("revisions")}
+                className="text-xs font-semibold text-[#2855D9] hover:text-[#1E40AF] flex items-center space-x-1.5 self-start sm:self-auto group cursor-pointer"
+              >
+                <span>Gérer les {revisionProgress?.subjects?.length || 11} matières dans Mes Révisions</span>
+                <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
+              </button>
+            </div>
+
+            {/* Smart 3-card priority display */}
+            {activeOrPrioritySubjects.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 pt-1">
+                {activeOrPrioritySubjects.map((subj) => (
+                  <div
+                    key={subj.subjectId}
+                    className="bg-[#FAFBFD] border border-[#E4E8F0] hover:border-[#2855D9]/40 rounded-xl p-4 flex flex-col justify-between space-y-3 transition-all"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="min-w-0 flex-1 pr-2">
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-white border border-[#E4E8F0] text-[#68748A]">
+                          {subj.semesterName}
+                        </span>
+                        <h4 className="font-bold text-sm text-[#111A2E] mt-1.5 truncate">
+                          {subj.subjectName}
+                        </h4>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <span className="text-sm font-bold font-mono text-[#2855D9]">
+                          {subj.percentage}%
+                        </span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="w-full bg-[#E4E8F0] h-2 rounded-full overflow-hidden">
+                        <div
+                          className="bg-gradient-to-r from-[#2855D9] to-emerald-500 h-full rounded-full transition-all duration-500"
+                          style={{ width: `${subj.percentage}%` }}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between text-[10px] font-medium text-[#68748A] mt-1.5">
+                        <span className="text-emerald-700 font-semibold">{subj.revisedCount} révisé{subj.revisedCount !== 1 ? "s" : ""}</span>
+                        <span className="text-amber-700 font-semibold">{subj.inProgressCount} en cours</span>
+                        <span>{subj.notStartedCount} restant{subj.notStartedCount !== 1 ? "s" : ""}</span>
+                      </div>
+                    </div>
+
+                    <Link
+                      href={`/subjects/${subj.subjectSlug}`}
+                      className="text-xs font-semibold text-[#2855D9] hover:text-[#1E40AF] flex items-center justify-between pt-2 border-t border-[#E4E8F0]/70"
+                    >
+                      <span>{subj.percentage > 0 ? "Continuer la révision" : "Démarrer cette matière"}</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </Link>
                   </div>
                 ))}
               </div>
+            ) : null}
+
+            {/* Quick Banner CTA */}
+            <div className="p-3.5 rounded-xl bg-gradient-to-r from-[#EDF2FF] to-white border border-[#2855D9]/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+              <div className="flex items-center space-x-2 text-[#182235]">
+                <Sparkles className="w-4 h-4 text-[#2855D9] shrink-0" />
+                <span>
+                  <strong>{revisionProgress?.totalResources || 51} cours au total</strong> répartis sur vos {revisionProgress?.subjects?.length || 11} matières. Planifiez l&apos;ensemble de votre semestre avec filtres et statuts.
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveTab("revisions")}
+                className="px-3 py-1.5 rounded-lg bg-[#2855D9] hover:bg-[#1E40AF] text-white text-xs font-semibold shrink-0 cursor-pointer transition-colors"
+              >
+                Ouvrir le Centre de Révision
+              </button>
             </div>
-          )}
+          </div>
+
+          {/* TWO-COLUMN COCKPIT SECTION */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Quick Mistakes Review */}
+            <div className="bg-white border border-[#E4E8F0] rounded-2xl p-5 shadow-xs space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="font-bold text-sm text-[#111A2E] flex items-center space-x-2">
+                  <RotateCcw className="w-4 h-4 text-rose-500" />
+                  <span>Carnet d&apos;Erreurs & Consolidation</span>
+                </h3>
+                {initialMistakes.length > 0 && (
+                  <span className="text-[11px] font-mono font-semibold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200">
+                    {initialMistakes.length} à revoir
+                  </span>
+                )}
+              </div>
+
+              {initialMistakes.length > 0 ? (
+                <div className="divide-y divide-[#F1F4F9]">
+                  {initialMistakes.slice(0, 4).map((m: any, idx: number) => (
+                    <div key={m.id || idx} className="py-2.5 text-xs space-y-1">
+                      <p className="font-semibold text-[#182235]">{m.question_text}</p>
+                      {m.explanation && (
+                        <p className="text-[11px] text-emerald-700 bg-emerald-50/60 p-2 rounded-lg border border-emerald-100">
+                          {m.explanation}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                  <div className="pt-2 text-right">
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("quizzes")}
+                      className="text-xs text-[#2855D9] hover:underline font-semibold cursor-pointer"
+                    >
+                      Voir toutes mes erreurs →
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-6 text-center text-xs text-[#68748A] border border-dashed border-[#E4E8F0] rounded-xl space-y-2">
+                  <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto" />
+                  <p className="font-medium text-[#111A2E]">Aucune erreur active enregistrée</p>
+                  <p className="text-[11px]">Vos évaluations sont parfaites ou vous n&apos;avez pas encore passé de quiz.</p>
+                  <Link href="/quizzes" className="inline-block mt-2">
+                    <Button size="sm" variant="outline" className="text-xs">
+                      Passer un quiz d&apos;entraînement
+                    </Button>
+                  </Link>
+                </div>
+              )}
+            </div>
+
+            {/* Quick Activity / Recent Quiz attempts */}
+            <div className="bg-white border border-[#E4E8F0] rounded-2xl p-5 shadow-xs space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="font-bold text-sm text-[#111A2E] flex items-center space-x-2">
+                  <Activity className="w-4 h-4 text-[#2855D9]" />
+                  <span>Dernières Activités & Évaluations</span>
+                </h3>
+                {initialQuizAttempts.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("quizzes")}
+                    className="text-xs text-[#2855D9] hover:underline font-semibold cursor-pointer"
+                  >
+                    Historique complet →
+                  </button>
+                )}
+              </div>
+
+              {initialQuizAttempts.length > 0 ? (
+                <div className="divide-y divide-[#F1F4F9]">
+                  {initialQuizAttempts.slice(0, 4).map((att: any, idx: number) => {
+                    const pct = Math.round((att.score / (att.total_questions || 1)) * 100);
+                    return (
+                      <div key={att.id || idx} className="py-2.5 flex items-center justify-between gap-3 text-xs">
+                        <div className="min-w-0">
+                          <p className="font-semibold text-[#182235] truncate">{att.quiz?.title || "Quiz évalué"}</p>
+                          <p className="text-[11px] text-[#68748A]">{att.quiz?.subject?.name || "Matière"}</p>
+                        </div>
+                        <div className="shrink-0 flex items-center space-x-2">
+                          <span className={`font-mono font-bold px-2 py-0.5 rounded text-[11px] border ${
+                            pct >= 70 ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-amber-50 text-amber-700 border-amber-200"
+                          }`}>
+                            {pct}%
+                          </span>
+                          {att.quiz_id && (
+                            <Link href={`/quizzes/${att.quiz_id}`}>
+                              <Button size="sm" variant="ghost" className="h-6 px-1.5 text-[11px]">
+                                <RotateCcw className="w-3 h-3" />
+                              </Button>
+                            </Link>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="p-6 text-center text-xs text-[#68748A] border border-dashed border-[#E4E8F0] rounded-xl space-y-2">
+                  <Award className="w-8 h-8 text-amber-500 mx-auto" />
+                  <p className="font-medium text-[#111A2E]">Aucun quiz complété récemment</p>
+                  <p className="text-[11px]">Évaluez vos connaissances pour calculer votre taux de réussite moyen.</p>
+                  <Link href="/quizzes" className="inline-block mt-2">
+                    <Button size="sm" variant="primary" className="text-xs">
+                      Découvrir les quiz disponibles
+                    </Button>
+                  </Link>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB REVISIONS: FULL DEDICATED REVISION VIEW */}
+      {activeTab === "revisions" && (
+        <div className="space-y-6">
+          <div className="bg-white border border-[#E4E8F0] rounded-2xl p-6 shadow-xs space-y-5">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h3 className="font-bold text-lg text-[#111A2E] flex items-center space-x-2">
+                  <BookOpen className="w-5 h-5 text-[#2855D9]" />
+                  <span>Centre de Révision & Planification du Cursus</span>
+                </h3>
+                <p className="text-xs text-[#68748A] mt-1">
+                  Suivez votre progression sur chaque matière, validez vos acquis document par document et filtrez selon vos priorités.
+                </p>
+              </div>
+
+              {/* Progress Counters */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-bold px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center space-x-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>{revisionProgress?.totalRevised || 0} Validés</span>
+                </span>
+                <span className="text-xs font-bold px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 flex items-center space-x-1.5">
+                  <Clock className="w-3.5 h-3.5" />
+                  <span>{revisionProgress?.totalInProgress || 0} En cours</span>
+                </span>
+                <span className="text-xs font-bold px-3 py-1.5 rounded-xl bg-[#FAFAF7] border border-[#E4E8F0] text-[#68748A] flex items-center space-x-1.5">
+                  <span>{revisionProgress?.totalNotStarted || 0} À réviser</span>
+                </span>
+              </div>
+            </div>
+
+            {/* Global Curriculum Progress Bar */}
+            <div className="p-4 rounded-xl bg-[#FAFBFD] border border-[#E4E8F0] space-y-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-semibold text-[#111A2E]">
+                  Progression globale : {revisionProgress?.totalRevised || 0} sur {revisionProgress?.totalResources || 51} cours validés
+                </span>
+                <span className="font-bold font-mono text-[#2855D9] text-sm">
+                  {revisionProgress?.overallPercentage || 0}%
+                </span>
+              </div>
+              <div className="w-full bg-[#E4E8F0] h-2.5 rounded-full overflow-hidden">
+                <div
+                  className="bg-gradient-to-r from-[#2855D9] to-emerald-500 h-full rounded-full transition-all duration-500"
+                  style={{ width: `${revisionProgress?.overallPercentage || 0}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Filters Bar: Status Tabs, Semester Selector, Search Bar */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pt-2 border-t border-[#E4E8F0]">
+              {/* Status Chips */}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => setRevisionFilter("all")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                    revisionFilter === "all"
+                      ? "bg-[#2855D9] text-white shadow-2xs font-semibold"
+                      : "bg-[#FAFAF7] text-[#68748A] hover:bg-[#F4F6FA] border border-[#E4E8F0]"
+                  }`}
+                >
+                  Toutes ({revisionProgress?.subjects?.length || 0})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRevisionFilter("in_progress")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                    revisionFilter === "in_progress"
+                      ? "bg-amber-600 text-white shadow-2xs font-semibold"
+                      : "bg-[#FAFAF7] text-[#68748A] hover:bg-[#F4F6FA] border border-[#E4E8F0]"
+                  }`}
+                >
+                  En cours ({revisionProgress?.subjects?.filter((s) => s.inProgressCount > 0).length || 0})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRevisionFilter("not_started")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                    revisionFilter === "not_started"
+                      ? "bg-[#182235] text-white shadow-2xs font-semibold"
+                      : "bg-[#FAFAF7] text-[#68748A] hover:bg-[#F4F6FA] border border-[#E4E8F0]"
+                  }`}
+                >
+                  À réviser ({revisionProgress?.subjects?.filter((s) => s.revisedCount === 0 && s.inProgressCount === 0).length || 0})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRevisionFilter("revised")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                    revisionFilter === "revised"
+                      ? "bg-emerald-600 text-white shadow-2xs font-semibold"
+                      : "bg-[#FAFAF7] text-[#68748A] hover:bg-[#F4F6FA] border border-[#E4E8F0]"
+                  }`}
+                >
+                  Validées ({revisionProgress?.subjects?.filter((s) => s.percentage === 100).length || 0})
+                </button>
+              </div>
+
+              {/* Semester & Search */}
+              <div className="flex items-center gap-2 flex-wrap">
+                {availableSemesters.length > 1 && (
+                  <select
+                    value={revisionSemesterFilter}
+                    onChange={(e) => setRevisionSemesterFilter(e.target.value)}
+                    aria-label="Filtrer par semestre"
+                    className="text-xs px-2.5 py-1.5 rounded-lg border border-[#E4E8F0] bg-white text-[#182235] focus:outline-none focus:ring-1 focus:ring-[#2855D9]"
+                  >
+                    <option value="all">Tous les semestres</option>
+                    {availableSemesters.map((sem) => (
+                      <option key={sem} value={sem}>{sem}</option>
+                    ))}
+                  </select>
+                )}
+
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 text-[#68748A] absolute left-2.5 top-2.5" />
+                  <input
+                    type="text"
+                    value={revisionSearch}
+                    onChange={(e) => setRevisionSearch(e.target.value)}
+                    placeholder="Filtrer une matière..."
+                    className="pl-8 pr-3 py-1 text-xs rounded-lg border border-[#E4E8F0] bg-white text-[#182235] placeholder:text-[#68748A] focus:outline-none focus:ring-1 focus:ring-[#2855D9] w-40 sm:w-48"
+                  />
+                  {revisionSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setRevisionSearch("")}
+                      className="absolute right-2 top-2 text-[#68748A] hover:text-[#182235] text-xs cursor-pointer"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Grid of Subjects */}
+            {filteredRevisionSubjects.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-1">
+                {filteredRevisionSubjects.map((subj) => (
+                  <div
+                    key={subj.subjectId}
+                    className="bg-[#FAFBFD] border border-[#E4E8F0] hover:border-[#2855D9]/40 rounded-xl p-5 shadow-xs space-y-3 flex flex-col justify-between transition-all"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="min-w-0 flex-1 pr-2">
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-white border border-[#E4E8F0] text-[#68748A]">
+                          {subj.semesterName}
+                        </span>
+                        <h4 className="font-bold text-sm text-[#111A2E] mt-1.5 truncate">
+                          {subj.subjectName}
+                        </h4>
+                      </div>
+                      <span className="text-base font-bold font-mono text-[#2855D9]">
+                        {subj.percentage}%
+                      </span>
+                    </div>
+
+                    <div>
+                      <div className="w-full bg-[#E4E8F0] h-2.5 rounded-full overflow-hidden">
+                        <div
+                          className="bg-gradient-to-r from-[#2855D9] to-emerald-500 h-full rounded-full transition-all duration-500"
+                          style={{ width: `${subj.percentage}%` }}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between text-xs font-medium text-[#68748A] mt-2">
+                        <span className="text-emerald-700 font-semibold">{subj.revisedCount} révisé{subj.revisedCount !== 1 ? "s" : ""}</span>
+                        <span className="text-amber-700 font-semibold">{subj.inProgressCount} en cours</span>
+                        <span>{subj.notStartedCount} à réviser</span>
+                      </div>
+                    </div>
+
+                    <Link
+                      href={`/subjects/${subj.subjectSlug}`}
+                      className="w-full text-center py-2 px-3 rounded-lg bg-[#2855D9] hover:bg-[#1E40AF] text-white text-xs font-semibold flex items-center justify-center space-x-1.5 transition-colors shadow-2xs"
+                    >
+                      <span>Réviser maintenant</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </Link>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-8 text-center text-xs text-[#68748A] border border-dashed border-[#E4E8F0] rounded-xl space-y-2">
+                <BookOpen className="w-8 h-8 text-[#68748A] mx-auto opacity-60" />
+                <p className="font-semibold text-[#111A2E]">Aucune matière ne correspond à vos filtres</p>
+                <p className="text-[11px]">Modifiez ou réinitialisez vos critères de recherche.</p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-xs mt-2"
+                  onClick={() => {
+                    setRevisionFilter("all");
+                    setRevisionSemesterFilter("all");
+                    setRevisionSearch("");
+                  }}
+                >
+                  Réinitialiser les filtres
+                </Button>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -813,37 +1305,82 @@ export function StudentPrivateWorkspace({
       {/* TAB 7: HISTORIQUE D'ACTIVITÉ */}
       {activeTab === "activity" && (
         <div className="bg-white border border-[#E4E8F0] rounded-2xl p-6 shadow-xs space-y-4">
-          <div>
-            <h3 className="font-bold text-sm text-[#111A2E]">Historique de vos Actions & Événements</h3>
-            <p className="text-xs text-[#68748A]">
-              Journal chronologique sécurisé des modifications, ajouts et partages récents.
-            </p>
-          </div>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 className="font-bold text-sm text-[#111A2E]">Historique de vos Actions & Événements</h3>
+              <p className="text-xs text-[#68748A]">
+                Journal chronologique sécurisé des modifications, ajouts et partages récents.
+              </p>
+            </div>
 
-          {recentActivity.length > 0 ? (
-            <div className="relative pl-6 space-y-4 border-l-2 border-[#E4E8F0]">
-              {recentActivity.map((event: any, idx: number) => (
-                <div key={idx} className="relative group">
-                  <div className="absolute -left-[31px] top-1 w-3.5 h-3.5 rounded-full bg-[#2855D9] border-2 border-white shadow-xs" />
-                  <div className="text-xs">
-                    <span className="font-bold text-[#111A2E]">{event.action}</span>
-                    <span className="text-[#68748A] ml-2 font-mono text-[11px]">
-                      {event.timestamp ? new Date(event.timestamp).toLocaleString() : "Récemment"}
-                    </span>
-                    {event.metadata && (
-                      <p className="text-[11px] text-[#68748A] mt-0.5">
-                        {event.metadata.title || event.target_type || "Opération validée"}
-                      </p>
-                    )}
-                  </div>
-                </div>
+            <div className="flex items-center space-x-1 bg-[#FAFBFD] p-1 rounded-xl border border-[#E4E8F0] text-xs">
+              {(
+                [
+                  { key: "all", label: "Toutes" },
+                  { key: "today", label: "Aujourd'hui" },
+                  { key: "7d", label: "7 Jours" },
+                  { key: "30d", label: "30 Jours" },
+                ] as const
+              ).map((p) => (
+                <button
+                  key={p.key}
+                  type="button"
+                  onClick={() => setActivityPeriodFilter(p.key)}
+                  className={`px-2.5 py-1 rounded-lg transition font-medium cursor-pointer ${
+                    activityPeriodFilter === p.key
+                      ? "bg-[#2855D9] text-white shadow-2xs font-bold"
+                      : "text-[#68748A] hover:text-[#111A2E]"
+                  }`}
+                >
+                  {p.label}
+                </button>
               ))}
             </div>
-          ) : (
-            <div className="p-8 text-center text-xs text-[#68748A] border border-dashed border-[#E4E8F0] rounded-xl">
-              Aucune action récente enregistrée dans le journal.
-            </div>
-          )}
+          </div>
+
+          {(() => {
+            const filteredActivity = recentActivity.filter((event: any) => {
+              if (activityPeriodFilter === "all") return true;
+              if (!event.timestamp) return true;
+              const t = new Date(event.timestamp).getTime();
+              const now = Date.now();
+              if (activityPeriodFilter === "today") {
+                return new Date(event.timestamp).toISOString().split("T")[0] === new Date().toISOString().split("T")[0];
+              }
+              if (activityPeriodFilter === "7d") {
+                return t >= now - 7 * 24 * 60 * 60 * 1000;
+              }
+              if (activityPeriodFilter === "30d") {
+                return t >= now - 30 * 24 * 60 * 60 * 1000;
+              }
+              return true;
+            });
+
+            return filteredActivity.length > 0 ? (
+              <div className="relative pl-6 space-y-4 border-l-2 border-[#E4E8F0]">
+                {filteredActivity.map((event: any, idx: number) => (
+                  <div key={idx} className="relative group">
+                    <div className="absolute -left-[31px] top-1 w-3.5 h-3.5 rounded-full bg-[#2855D9] border-2 border-white shadow-xs" />
+                    <div className="text-xs">
+                      <span className="font-bold text-[#111A2E]">{event.action}</span>
+                      <span className="text-[#68748A] ml-2 font-mono text-[11px]">
+                        {event.timestamp ? new Date(event.timestamp).toLocaleString() : "Récemment"}
+                      </span>
+                      {event.metadata && (
+                        <p className="text-[11px] text-[#68748A] mt-0.5">
+                          {event.metadata.title || event.target_type || "Opération validée"}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-8 text-center text-xs text-[#68748A] border border-dashed border-[#E4E8F0] rounded-xl">
+                Aucune action enregistrée pour cette période.
+              </div>
+            );
+          })()}
         </div>
       )}
 

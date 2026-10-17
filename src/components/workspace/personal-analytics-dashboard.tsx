@@ -63,6 +63,8 @@ const SUBJECT_COLORS = [
   "#84CC16", // Lime
 ];
 
+import { UserOverallRevisionMetrics } from "@/lib/actions/resource-actions";
+
 interface PersonalAnalyticsDashboardProps {
   user: {
     id: string;
@@ -81,6 +83,7 @@ interface PersonalAnalyticsDashboardProps {
   allSubjects?: any[];
   weakAttempt?: any;
   recentAttempt?: any;
+  revisionProgress?: UserOverallRevisionMetrics | null;
 }
 
 export function PersonalAnalyticsDashboard({
@@ -97,6 +100,7 @@ export function PersonalAnalyticsDashboard({
   allSubjects = [],
   weakAttempt,
   recentAttempt,
+  revisionProgress,
 }: PersonalAnalyticsDashboardProps) {
   const { totalFocusSecondsToday, isRunning, toggleTimer, setIsModalOpen } = useFocusTimer();
 
@@ -229,11 +233,24 @@ export function PersonalAnalyticsDashboard({
   const surplusFocusSeconds = Math.max(0, effectiveTodayFocusSeconds - targetFocusSeconds);
   const remainingFocusSeconds = Math.max(0, targetFocusSeconds - effectiveTodayFocusSeconds);
 
-  // --- Real Subject Breakdown (Zero Hardcoding) ---
+  // --- Real Subject Breakdown (Combines Quizzes, Revisions & Study Activity) ---
   const subjectDistribution = useMemo(() => {
-    if (userAttempts.length === 0) return [];
     const counts: { [name: string]: { count: number; slug?: string } } = {};
 
+    // 1. Revision progress per subject
+    if (revisionProgress?.subjects) {
+      revisionProgress.subjects.forEach((s) => {
+        const engagedCount = (s.revisedCount || 0) + (s.inProgressCount || 0);
+        if (engagedCount > 0) {
+          counts[s.subjectName] = {
+            count: engagedCount,
+            slug: s.subjectSlug || s.subjectId,
+          };
+        }
+      });
+    }
+
+    // 2. Quiz attempts per subject
     userAttempts.forEach((a) => {
       const sub = a.quiz?.subject;
       const subName = sub?.name || "Matière non classée";
@@ -244,8 +261,11 @@ export function PersonalAnalyticsDashboard({
       counts[subName].count += 1;
     });
 
-    const total = userAttempts.length;
-    return Object.entries(counts)
+    const entries = Object.entries(counts);
+    const total = entries.reduce((acc, [, data]) => acc + data.count, 0);
+    if (total === 0) return [];
+
+    return entries
       .map(([name, data], idx) => ({
         name,
         slug: data.slug,
@@ -254,20 +274,105 @@ export function PersonalAnalyticsDashboard({
         color: SUBJECT_COLORS[idx % SUBJECT_COLORS.length],
       }))
       .sort((a, b) => b.count - a.count);
-  }, [userAttempts]);
+  }, [userAttempts, revisionProgress?.subjects]);
 
-  // Distinct subjects practiced out of available (combining Quizzes & Focus sessions)
-  const practicedSubjects = useMemo(() => {
-    const set = new Set<string>(practicedSubjectIds || []);
-    userAttempts.forEach((a) => {
-      const subKey = a.quiz?.subject_id || a.quiz?.subject?.id || a.quiz?.subject?.name;
-      if (subKey) set.add(subKey);
+  // Subjects completed with 100% progression (strictly per user)
+  const completedSubjects = useMemo(() => {
+    if (!revisionProgress?.subjects) return new Set<string>();
+    const completed = new Set<string>();
+    revisionProgress.subjects.forEach((s) => {
+      if (s.totalResources > 0 && s.percentage === 100) {
+        completed.add(s.subjectId);
+        if (s.subjectSlug) completed.add(s.subjectSlug);
+      }
     });
-    return set;
-  }, [userAttempts, practicedSubjectIds]);
+    return completed;
+  }, [revisionProgress?.subjects]);
 
-  const uniqueSubjectsCount = practicedSubjects.size;
-  const totalAvailableSubjects = Math.max(1, allSubjects.length || 10);
+  // Subjects in progress (pending "en cours", strictly < 100% but started)
+  const inProgressSubjects = useMemo(() => {
+    if (!revisionProgress?.subjects) return new Set<string>();
+    const inProgress = new Set<string>();
+    revisionProgress.subjects.forEach((s) => {
+      if (
+        s.totalResources > 0 &&
+        s.percentage < 100 &&
+        (s.inProgressCount > 0 || (s.revisedCount > 0 && s.percentage < 100))
+      ) {
+        inProgress.add(s.subjectId);
+        if (s.subjectSlug) inProgress.add(s.subjectSlug);
+      }
+    });
+    return inProgress;
+  }, [revisionProgress?.subjects]);
+
+  const completedSubjectsCount = useMemo(() => {
+    if (completedSubjects.size === 0) return 0;
+    if (allSubjects.length > 0) {
+      let count = 0;
+      allSubjects.forEach((s) => {
+        if (completedSubjects.has(s.id) || (s.slug && completedSubjects.has(s.slug))) {
+          count++;
+        }
+      });
+      return count;
+    }
+    return (
+      revisionProgress?.subjects?.filter((s) => s.totalResources > 0 && s.percentage === 100).length || 0
+    );
+  }, [completedSubjects, allSubjects, revisionProgress?.subjects]);
+
+  const inProgressSubjectsCount = useMemo(() => {
+    if (inProgressSubjects.size === 0) return 0;
+    if (allSubjects.length > 0) {
+      let count = 0;
+      allSubjects.forEach((s) => {
+        if (inProgressSubjects.has(s.id) || (s.slug && inProgressSubjects.has(s.slug))) {
+          count++;
+        }
+      });
+      return count;
+    }
+    return (
+      revisionProgress?.subjects?.filter(
+        (s) =>
+          s.totalResources > 0 &&
+          s.percentage < 100 &&
+          (s.inProgressCount > 0 || (s.revisedCount > 0 && s.percentage < 100))
+      ).length || 0
+    );
+  }, [inProgressSubjects, allSubjects, revisionProgress?.subjects]);
+
+  // Distinct subjects practiced out of available (combining Revisions, Quizzes & Focus sessions)
+  const practicedSubjects = useMemo(() => {
+    const keys = new Set<string>(practicedSubjectIds || []);
+    if (revisionProgress?.subjects) {
+      revisionProgress.subjects.forEach((s) => {
+        if (s.revisedCount > 0 || s.inProgressCount > 0) {
+          keys.add(s.subjectId);
+          if (s.subjectSlug) keys.add(s.subjectSlug);
+        }
+      });
+    }
+    userAttempts.forEach((a) => {
+      const subKey = a.quiz?.subject_id || a.quiz?.subject?.id;
+      if (subKey) keys.add(subKey);
+      const slug = a.quiz?.subject?.slug;
+      if (slug) keys.add(slug);
+    });
+
+    const matched = new Set<string>();
+    allSubjects.forEach((s) => {
+      if (keys.has(s.id) || (s.slug && keys.has(s.slug))) {
+        matched.add(s.id);
+      }
+    });
+    return matched;
+  }, [userAttempts, practicedSubjectIds, revisionProgress?.subjects, allSubjects]);
+
+  // Semester syllabus coverage strictly counts subjects with 100% completed progression
+  const uniqueSubjectsCount = completedSubjectsCount;
+  const totalAvailableSubjects = Math.max(1, allSubjects.length || 11);
   const syllabusCoveragePercent = Math.min(
     100,
     Math.round((uniqueSubjectsCount / totalAvailableSubjects) * 100)
@@ -1129,7 +1234,7 @@ export function PersonalAnalyticsDashboard({
                       <span className="text-amber-700 font-medium">À {goals.targetScore - averageScore}% de la cible ({goals.targetScore}%)</span>
                     )
                   ) : (
-                    <span className="text-[#68748A]">Cible : {goals.targetScore}%</span>
+                    <span className="text-[#68748A]">Cible : {goals.targetScore}% (Aucun quiz complété)</span>
                   )}
                 </span>
               </div>
@@ -1166,9 +1271,33 @@ export function PersonalAnalyticsDashboard({
                   <AlertCircle className="w-3 h-3 text-amber-600 shrink-0" />
                   <span>{mistakesCount} erreur(s) à réviser</span>
                 </Link>
+              ) : revisionProgress && (revisionProgress.totalRevised > 0 || inProgressSubjectsCount > 0) ? (
+                <Link
+                  href="/my-space"
+                  className="text-emerald-700 font-medium flex items-center space-x-1 hover:underline"
+                  title="Accéder à Mes Révisions"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  <span>
+                    {revisionProgress.totalRevised > 0 ? (
+                      <>
+                        {revisionProgress.totalRevised} cours validé{revisionProgress.totalRevised > 1 ? "s" : ""} ({revisionProgress.overallPercentage}%)
+                        {inProgressSubjectsCount > 0 && (
+                          <span className="text-[#68748A] font-normal">
+                            {" "}• {inProgressSubjectsCount} en cours
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      <span className="text-[#2855D9]">
+                        {inProgressSubjectsCount} matière{inProgressSubjectsCount > 1 ? "s" : ""} en cours
+                      </span>
+                    )}
+                  </span>
+                </Link>
               ) : (
                 <span className="text-emerald-700 font-medium flex items-center space-x-1">
-                  <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                   <span>Aucune erreur active</span>
                 </span>
               )}

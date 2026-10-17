@@ -48,8 +48,45 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const acceptHeader = req.headers.get("accept") || "";
+    const isFetch =
+      acceptHeader.includes("application/json") ||
+      req.headers.get("sec-fetch-dest") === "empty";
+
     if (!isSupabaseConfigured()) {
-      return NextResponse.redirect(new URL("/library?uploaded=demo", req.url));
+      const mockResource = {
+        id: `mock_upload_${Date.now()}`,
+        subject_id: subjectId,
+        category_id: categoryId,
+        owner_id: "demo_user",
+        title: title.trim(),
+        storage_path: `mock/${file.name}`,
+        original_filename: file.name,
+        mime_type: isHtml
+          ? "text/html"
+          : isMd
+          ? "text/markdown"
+          : isTxt
+          ? "text/plain"
+          : "application/pdf",
+        file_size_bytes: file.size,
+        academic_year: (formData.get("academicYear") as string | null) || "2026-2027",
+        exam_session: (formData.get("examSession") as string | null) || null,
+        instructor: instructor?.trim() || null,
+        chapter: folderId || null,
+        visibility: visibilityParam || (submitShared ? "public" : "private"),
+        publication_status: "published",
+        created_at: new Date().toISOString(),
+      };
+
+      if (isFetch) {
+        return NextResponse.json({
+          success: true,
+          resource: mockResource,
+          redirectUrl: "/library?uploaded=demo",
+        });
+      }
+      return NextResponse.redirect(new URL("/library?uploaded=demo", req.url), 303);
     }
 
     const requester = await getRequesterUser();
@@ -132,16 +169,11 @@ export async function POST(req: NextRequest) {
     }
 
     // Invalidate repository cache so subject counts, library, and workspace lists refresh immediately
-    invalidateRepositoryCache();
+    invalidateRepositoryCache("resources");
 
     const redirectPath = resource?.subject?.slug
       ? `/subjects/${resource.subject.slug}`
       : `/library?uploaded=true`;
-
-    const acceptHeader = req.headers.get("accept") || "";
-    const isFetch =
-      acceptHeader.includes("application/json") ||
-      req.headers.get("sec-fetch-dest") === "empty";
 
     if (isFetch) {
       return NextResponse.json({

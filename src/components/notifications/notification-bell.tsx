@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import Link from "next/link";
 import {
   Bell,
@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StudentProfileModal } from "@/components/profile/student-profile-modal";
+import { AnnouncementModal, AnnouncementData } from "./announcement-modal";
 import { SystemNotification, CheerType } from "@/types/database";
 import {
   getMyNotifications,
@@ -97,7 +98,20 @@ function getCheerMeta(type?: CheerType) {
 }
 
 function getNotificationMeta(item: SystemNotification) {
-  if (item.type === "role_assignment" || item.type === "announcement") {
+  if (item.type === "announcement" || item.id.startsWith("announcement-")) {
+    const isV1_1 = item.id.includes("v1-1") || item.title.includes("v1.1");
+    return {
+      icon: Sparkles,
+      bg: "bg-gradient-to-br from-blue-50 to-indigo-100 border-indigo-200 text-indigo-700 shadow-2xs",
+      badge: "bg-indigo-600 text-white font-bold border border-indigo-700 shadow-xs",
+      chip: isV1_1 ? "Release v1.1" : "Annonce",
+      emoji: "🚀",
+      isSpecial: true,
+      isAnnouncement: true,
+    };
+  }
+
+  if (item.type === "role_assignment") {
     const isVip = item.title.toLowerCase().includes("vip");
     return {
       icon: isVip ? Sparkles : Crown,
@@ -110,6 +124,7 @@ function getNotificationMeta(item: SystemNotification) {
       chip: isVip ? "Statut VIP" : "Attribution de Rôle",
       emoji: isVip ? "✨" : "👑",
       isSpecial: true,
+      isAnnouncement: false,
     };
   }
 
@@ -121,10 +136,11 @@ function getNotificationMeta(item: SystemNotification) {
       chip: "Accomplissement",
       emoji: "🏆",
       isSpecial: false,
+      isAnnouncement: false,
     };
   }
 
-  return { ...getCheerMeta(item.cheer_type), chip: "Encouragement", isSpecial: false };
+  return { ...getCheerMeta(item.cheer_type), chip: "Encouragement", isSpecial: false, isAnnouncement: false };
 }
 
 export function NotificationBell({ user }: NotificationBellProps) {
@@ -133,7 +149,23 @@ export function NotificationBell({ user }: NotificationBellProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [filterUnreadOnly, setFilterUnreadOnly] = useState(false);
   const [profileToViewId, setProfileToViewId] = useState<string | null>(null);
+  const [initialProfileToView, setInitialProfileToView] = useState<any>(null);
+  const [selectedAnnouncement, setSelectedAnnouncement] = useState<AnnouncementData | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const openStudentProfile = useCallback((senderId: string, senderName?: string | null, senderAvatar?: string | null) => {
+    setProfileToViewId(senderId);
+    setInitialProfileToView({
+      id: senderId,
+      displayName: senderName || "Étudiant IGL4",
+      avatarUrl: senderAvatar || null,
+      stats: { streak: 0, totalFocusedMinutes: 0, healthyTreesCount: 0, witheredTreesCount: 0, totalSessions: 0, speciesCount: 0 },
+      trees: [],
+      achievements: [],
+      unlockedAchievementsCount: 0,
+    });
+    setIsOpen(false);
+  }, []);
 
   const fetchNotifications = useCallback(async () => {
     if (!user) return;
@@ -157,12 +189,12 @@ export function NotificationBell({ user }: NotificationBellProps) {
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onFocus);
 
-    // 2. Poll every 25 seconds for incoming classmate cheers
+    // 2. Efficient periodic sync (every 60s when tab is visible)
     const timer = setInterval(() => {
-      if (document.visibilityState === "visible") {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
         fetchNotifications();
       }
-    }, 25000);
+    }, 60000);
 
     return () => {
       window.removeEventListener("focus", onFocus);
@@ -219,9 +251,11 @@ export function NotificationBell({ user }: NotificationBellProps) {
     } catch {}
   };
 
-  const displayedList = filterUnreadOnly
-    ? notifications.filter((n) => !n.is_read)
-    : notifications;
+  const displayedList = useMemo(() => {
+    return filterUnreadOnly
+      ? (notifications || []).filter((n) => !n.is_read)
+      : (notifications || []);
+  }, [filterUnreadOnly, notifications]);
 
   if (!user) {
     return null;
@@ -363,14 +397,25 @@ export function NotificationBell({ user }: NotificationBellProps) {
                     key={item.id}
                     onClick={() => {
                       if (!item.is_read) handleMarkAsRead(item.id);
-                      if (item.sender_id) {
-                        setProfileToViewId(item.sender_id);
+                      if (item.type === "announcement" || item.id.startsWith("announcement-")) {
+                        setSelectedAnnouncement({
+                          id: item.id,
+                          title: item.title,
+                          content: item.content,
+                          link: item.link,
+                          created_at: item.created_at,
+                          release_version: item.id.includes("v1-1") ? "v1.1" : undefined,
+                        });
                         setIsOpen(false);
+                      } else if (item.sender_id) {
+                        openStudentProfile(item.sender_id, item.sender_name, item.sender_avatar_url);
                       }
                     }}
                     className={`p-3.5 transition-colors cursor-pointer group flex items-start space-x-3 ${
                       item.is_read
                         ? "bg-white hover:bg-[#F8FAFC]"
+                        : meta.isAnnouncement
+                        ? "bg-gradient-to-r from-blue-50/80 via-indigo-50/40 to-white hover:bg-blue-50/90 border-l-3 border-indigo-600 shadow-2xs"
                         : meta.isSpecial
                         ? "bg-gradient-to-r from-amber-50/80 via-yellow-50/40 to-white hover:bg-amber-50/90 border-l-3 border-amber-500 shadow-2xs"
                         : "bg-[#F0F5FF]/60 hover:bg-[#F0F5FF] border-l-3 border-[#2855D9]"
@@ -383,8 +428,7 @@ export function NotificationBell({ user }: NotificationBellProps) {
                         if (item.sender_id) {
                           e.stopPropagation();
                           if (!item.is_read) handleMarkAsRead(item.id);
-                          setProfileToViewId(item.sender_id);
-                          setIsOpen(false);
+                          openStudentProfile(item.sender_id, item.sender_name, item.sender_avatar_url);
                         }
                       }}
                       title={item.sender_id ? "Consulter le profil de l'étudiant" : undefined}
@@ -439,14 +483,34 @@ export function NotificationBell({ user }: NotificationBellProps) {
                       </p>
 
                       <div className="flex items-center justify-between pt-1">
-                        {item.sender_id ? (
+                        {meta.isAnnouncement ? (
                           <button
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
                               if (!item.is_read) handleMarkAsRead(item.id);
-                              setProfileToViewId(item.sender_id || null);
+                              setSelectedAnnouncement({
+                                id: item.id,
+                                title: item.title,
+                                content: item.content,
+                                link: item.link,
+                                created_at: item.created_at,
+                                release_version: item.id.includes("v1-1") ? "v1.1" : undefined,
+                              });
                               setIsOpen(false);
+                            }}
+                            className="inline-flex items-center space-x-1 text-[11px] font-bold text-indigo-700 hover:text-indigo-900 hover:underline cursor-pointer"
+                          >
+                            <span>Consulter la note v1.1</span>
+                            <Sparkles className="w-3 h-3 text-indigo-600" />
+                          </button>
+                        ) : item.sender_id ? (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (!item.is_read) handleMarkAsRead(item.id);
+                              openStudentProfile(item.sender_id || "", item.sender_name, item.sender_avatar_url);
                             }}
                             className="inline-flex items-center space-x-1 text-[11px] font-semibold text-[#2855D9] hover:underline cursor-pointer"
                           >
@@ -520,7 +584,18 @@ export function NotificationBell({ user }: NotificationBellProps) {
       <StudentProfileModal
         studentId={profileToViewId}
         isOpen={Boolean(profileToViewId)}
-        onClose={() => setProfileToViewId(null)}
+        onClose={() => {
+          setProfileToViewId(null);
+          setInitialProfileToView(null);
+        }}
+        initialProfile={initialProfileToView}
+      />
+
+      {/* Global Release Announcement Modal */}
+      <AnnouncementModal
+        isOpen={Boolean(selectedAnnouncement)}
+        onClose={() => setSelectedAnnouncement(null)}
+        announcement={selectedAnnouncement}
       />
     </div>
   );

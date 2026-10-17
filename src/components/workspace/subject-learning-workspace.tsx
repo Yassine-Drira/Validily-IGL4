@@ -160,8 +160,9 @@ export function SubjectLearningWorkspace({
   }, [subject.slug, subject.name, subject.icon]);
   const SubjectGlyph = subjectVisual.icon;
 
-  // --- UNIFIED ACADEMIC TAXONOMY FILTERING ---
+  // --- UNIFIED ACADEMIC TAXONOMY & REVISION FILTERING ---
   const [taxonomyFilter, setTaxonomyFilter] = useState<"all" | "exams" | "ds" | "tp" | "courses">("all");
+  const [revisionFilter, setRevisionFilter] = useState<"all" | "revised" | "in_progress" | "not_started">("all");
 
   const examsCount = resources.filter(
     (r) => r.category?.slug?.includes("exam") || r.category?.name?.toLowerCase().includes("exam")
@@ -179,45 +180,56 @@ export function SubjectLearningWorkspace({
     (r) => r.category?.slug?.includes("course") || r.category?.name?.toLowerCase().includes("course")
   ).length;
 
+  const revisedResourcesCount = resources.filter((r) => r.revision_status === "revised").length;
+  const inProgressResourcesCount = resources.filter((r) => r.revision_status === "in_progress").length;
+  const notStartedResourcesCount = resources.filter(
+    (r) => !r.revision_status || r.revision_status === "not_started" || (r.revision_status as string) === "not_revised"
+  ).length;
+
   const displayedResources = React.useMemo(() => {
-    if (taxonomyFilter === "all") return resources;
+    let list = resources;
     if (taxonomyFilter === "exams") {
-      return resources.filter(
+      list = list.filter(
         (r) => r.category?.slug?.includes("exam") || r.category?.name?.toLowerCase().includes("exam")
       );
-    }
-    if (taxonomyFilter === "ds") {
-      return resources.filter(
+    } else if (taxonomyFilter === "ds") {
+      list = list.filter(
         (r) => r.category?.slug?.includes("ds") || r.category?.name?.toLowerCase().includes("ds")
       );
-    }
-    if (taxonomyFilter === "tp") {
-      return resources.filter(
+    } else if (taxonomyFilter === "tp") {
+      list = list.filter(
         (r) =>
           r.category?.slug?.includes("tp") ||
           r.category?.name?.toLowerCase().includes("tp") ||
           r.category?.name?.toLowerCase().includes("practical")
       );
-    }
-    if (taxonomyFilter === "courses") {
-      return resources.filter(
+    } else if (taxonomyFilter === "courses") {
+      list = list.filter(
         (r) => r.category?.slug?.includes("course") || r.category?.name?.toLowerCase().includes("course")
       );
     }
-    return resources;
-  }, [resources, taxonomyFilter]);
+
+    if (revisionFilter === "revised") {
+      list = list.filter((r) => r.revision_status === "revised");
+    } else if (revisionFilter === "in_progress") {
+      list = list.filter((r) => r.revision_status === "in_progress");
+    } else if (revisionFilter === "not_started") {
+      list = list.filter(
+        (r) => !r.revision_status || r.revision_status === "not_started" || (r.revision_status as string) === "not_revised"
+      );
+    }
+
+    return list;
+  }, [resources, taxonomyFilter, revisionFilter]);
 
   // --- DERIVED METRICS FOR PRACTICAL PROGRESS TRACKER ---
   const cheatSheets = notes.filter((n) => n.tags?.includes("cheat-sheet"));
   const regularNotes = notes.filter((n) => !n.tags?.includes("cheat-sheet"));
 
-  const revisedResourcesCount = resources.filter((r) => r.revision_status === "revised").length;
-  const inProgressResourcesCount = resources.filter((r) => r.revision_status === "in_progress").length;
-  
-  const totalTrackableItems = resources.length + quizzes.length;
+  const totalTrackableItems = resources.length;
   const progressPercentage =
     totalTrackableItems > 0
-      ? Math.round(((revisedResourcesCount + (quizzes.length > 0 ? 1 : 0)) / totalTrackableItems) * 100)
+      ? Math.round((revisedResourcesCount / totalTrackableItems) * 100)
       : 0;
 
 
@@ -420,14 +432,26 @@ ${resources.map((r) => `<li><strong>${r.title}</strong> (${r.mime_type}) - ${r.s
               {progressPercentage}%
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-[11px] font-semibold text-[#68748A] uppercase tracking-wider">
-                Progression
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-semibold text-[#68748A] uppercase tracking-wider">
+                  Progression
+                </span>
+                <span className="text-[10px] font-mono text-[#68748A]">
+                  {revisedResourcesCount}/{totalTrackableItems}
+                </span>
               </div>
               <div className="w-full bg-[#E4E8F0] h-2 rounded-full mt-1.5 overflow-hidden">
                 <div
                   className="bg-gradient-to-r from-[#2855D9] to-emerald-500 h-full rounded-full transition-all duration-500"
                   style={{ width: `${progressPercentage}%` }}
                 />
+              </div>
+              <div className="flex items-center gap-1.5 text-[9px] font-medium text-[#68748A] mt-1 truncate">
+                <span className="text-emerald-700 font-semibold">{revisedResourcesCount} révisé{revisedResourcesCount !== 1 ? "s" : ""}</span>
+                <span>•</span>
+                <span className="text-amber-700 font-semibold">{inProgressResourcesCount} en cours</span>
+                <span>•</span>
+                <span>{notStartedResourcesCount} à réviser</span>
               </div>
             </div>
           </div>
@@ -668,11 +692,68 @@ ${resources.map((r) => `<li><strong>${r.title}</strong> (${r.mime_type}) - ${r.s
             </button>
           </div>
 
+          {/* Revision Status Filter Bar */}
+          <div className="flex items-center space-x-1.5 overflow-x-auto pb-1 pt-1 text-xs">
+            <span className="text-[11px] font-semibold text-[#68748A] mr-1 shrink-0">Statut Révision :</span>
+            <button
+              type="button"
+              onClick={() => setRevisionFilter("all")}
+              className={cn(
+                "text-[11px] px-2.5 py-1 rounded-lg font-medium transition cursor-pointer shrink-0",
+                revisionFilter === "all"
+                  ? "bg-[#111A2E] text-white shadow-xs font-semibold"
+                  : "bg-[#FAFBFD] border border-[#E4E8F0] text-[#68748A] hover:text-[#111A2E]"
+              )}
+            >
+              Tous ({resources.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setRevisionFilter("revised")}
+              className={cn(
+                "text-[11px] px-2.5 py-1 rounded-lg font-medium transition cursor-pointer shrink-0 flex items-center space-x-1",
+                revisionFilter === "revised"
+                  ? "bg-emerald-600 text-white shadow-xs font-semibold"
+                  : "bg-emerald-50/70 border border-emerald-200 text-emerald-700 hover:bg-emerald-100"
+              )}
+            >
+              <span>✓ Révisés</span>
+              <span className="font-mono">({revisedResourcesCount})</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setRevisionFilter("in_progress")}
+              className={cn(
+                "text-[11px] px-2.5 py-1 rounded-lg font-medium transition cursor-pointer shrink-0 flex items-center space-x-1",
+                revisionFilter === "in_progress"
+                  ? "bg-amber-600 text-white shadow-xs font-semibold"
+                  : "bg-amber-50/70 border border-amber-200 text-amber-700 hover:bg-amber-100"
+              )}
+            >
+              <span>⏳ En cours</span>
+              <span className="font-mono">({inProgressResourcesCount})</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setRevisionFilter("not_started")}
+              className={cn(
+                "text-[11px] px-2.5 py-1 rounded-lg font-medium transition cursor-pointer shrink-0 flex items-center space-x-1",
+                revisionFilter === "not_started"
+                  ? "bg-slate-700 text-white shadow-xs font-semibold"
+                  : "bg-[#FAFAF7] border border-[#E4E8F0] text-[#68748A] hover:bg-slate-100"
+              )}
+            >
+              <span>○ À réviser</span>
+              <span className="font-mono">({notStartedResourcesCount})</span>
+            </button>
+          </div>
+
           <SubjectFileLibrary
             subject={subject}
             categories={categories}
             resources={displayedResources}
             folders={folders}
+            isFilterActive={taxonomyFilter !== "all" || revisionFilter !== "all"}
             onResourcesChange={setResources}
             onFoldersChange={setFolders}
             onViewPdf={(res) => setViewingResource(res)}

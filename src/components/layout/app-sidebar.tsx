@@ -9,7 +9,6 @@ import {
   FolderArchive,
   Bookmark,
   FileEdit,
-  GraduationCap,
   Layers,
   ChevronDown,
   Sparkles,
@@ -30,7 +29,6 @@ const navItems = [
   { label: "Accueil", href: "/", icon: LayoutDashboard },
   { label: "Semestres", href: "/semesters", icon: Calendar },
   { label: "Matières", href: "/subjects", icon: BookOpen },
-  { label: "Examens", href: "/library?category=exams", icon: GraduationCap },
   { label: "Bibliothèque", href: "/library", icon: FolderArchive },
   { label: "Quiz & QCM", href: "/quizzes", icon: Sparkles },
   { label: "Fiches de révision", href: "/notes", icon: FileEdit },
@@ -84,20 +82,13 @@ export function AppSidebar({ subjects = [], isAdmin = false }: AppSidebarProps) 
             })
             .map((item) => {
             const Icon = item.icon;
-            const isExamItem = item.label === "Examens";
             const isLibraryItem = item.label === "Bibliothèque" || item.label === "Fichiers";
 
             let isActive = false;
             if (item.href === "/") {
               isActive = pathname === "/";
-            } else if (isExamItem) {
-              isActive =
-                pathname === "/library" &&
-                (currentCategory === "exams" ||
-                  currentCategory === "cat-exam" ||
-                  currentCategory === "cat-exams");
             } else if (isLibraryItem) {
-              isActive = pathname === "/library" && !currentCategory;
+              isActive = pathname === "/library" || pathname.startsWith("/library/");
             } else {
               isActive =
                 pathname === item.href ||

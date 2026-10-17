@@ -31,6 +31,7 @@ import {
   BarChart3,
   Volume2,
   GraduationCap,
+  Mail,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -63,6 +64,7 @@ import { AdminVipManager } from "./admin-vip-manager";
 import { AdminPresenceView } from "./admin-presence-view";
 import { AdminAnalyticsView } from "./admin-analytics-view";
 import { AdminStudentsView } from "./admin-students-view";
+import { AdminEmailBroadcastView } from "./admin-email-broadcast";
 import { StudentPerformanceOverview } from "@/lib/actions/profile-actions";
 
 interface AdminManagerProps {
@@ -99,7 +101,7 @@ export function AdminManager({
   initialStudentsPerformance = [],
 }: AdminManagerProps) {
   const [activeTab, setActiveTab] = useState<
-    "curriculum" | "delegation" | "students" | "vip" | "audio" | "presence" | "analytics" | "audit"
+    "curriculum" | "delegation" | "students" | "vip" | "audio" | "presence" | "analytics" | "audit" | "email"
   >("curriculum");
   const [semesters, setSemesters] = useState<Semester[]>(initialSemesters);
   const [subjects, setSubjects] = useState<Subject[]>(initialSubjects);
@@ -137,6 +139,7 @@ export function AdminManager({
   // Audit Logs State
   const [auditLogs] = useState<any[]>(initialAuditLogs);
   const [auditFilter, setAuditFilter] = useState("");
+  const [auditPeriodFilter, setAuditPeriodFilter] = useState<"all" | "today" | "7d" | "30d">("all");
 
   const [feedbackMsg, setFeedbackMsg] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
@@ -588,6 +591,19 @@ export function AdminManager({
           <ShieldAlert className="w-3.5 h-3.5" />
           <span>Journal d&apos;Audit</span>
         </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("email")}
+          className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition-all cursor-pointer shrink-0 ${
+            activeTab === "email"
+              ? "bg-emerald-600 text-white shadow-2xs"
+              : "text-[#68748A] hover:bg-[#F4F6FA]"
+          }`}
+        >
+          <Mail className="w-3.5 h-3.5" />
+          <span>Diffusion Email ({users.length})</span>
+        </button>
       </div>
 
       {/* TAB 1: CURRICULUM & SUBJECT MANAGEMENT */}
@@ -853,15 +869,41 @@ export function AdminManager({
                 Audit chronologique des modifications sensibles (accès, suppressions, partages).
               </p>
             </div>
-            <div className="relative">
-              <Search className="w-3.5 h-3.5 text-[#68748A] absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={auditFilter}
-                onChange={(e) => setAuditFilter(e.target.value)}
-                placeholder="Filtrer l'audit..."
-                className="bg-[#FAFBFD] border border-[#E4E8F0] rounded-xl pl-8 pr-3 py-1.5 text-xs text-[#111A2E] focus:outline-none focus:border-[#2855D9]"
-              />
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center space-x-1 bg-[#FAFBFD] p-1 rounded-xl border border-[#E4E8F0] text-xs">
+                {(
+                  [
+                    { key: "all", label: "Toutes" },
+                    { key: "today", label: "Aujourd'hui" },
+                    { key: "7d", label: "7 Jours" },
+                    { key: "30d", label: "30 Jours" },
+                  ] as const
+                ).map((p) => (
+                  <button
+                    key={p.key}
+                    type="button"
+                    onClick={() => setAuditPeriodFilter(p.key)}
+                    className={`px-2.5 py-1 rounded-lg transition font-medium cursor-pointer ${
+                      auditPeriodFilter === p.key
+                        ? "bg-[#2855D9] text-white shadow-2xs font-bold"
+                        : "text-[#68748A] hover:text-[#111A2E]"
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-[#68748A] absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={auditFilter}
+                  onChange={(e) => setAuditFilter(e.target.value)}
+                  placeholder="Filtrer l'audit..."
+                  className="bg-[#FAFBFD] border border-[#E4E8F0] rounded-xl pl-8 pr-3 py-1.5 text-xs text-[#111A2E] focus:outline-none focus:border-[#2855D9]"
+                />
+              </div>
             </div>
           </div>
 
@@ -878,12 +920,28 @@ export function AdminManager({
               </thead>
               <tbody className="divide-y divide-[#E4E8F0]">
                 {auditLogs
-                  .filter((l) =>
-                    auditFilter
-                      ? l.action?.toLowerCase().includes(auditFilter.toLowerCase()) ||
-                        l.actor_id?.toLowerCase().includes(auditFilter.toLowerCase())
-                      : true
-                  )
+                  .filter((l) => {
+                    if (auditFilter) {
+                      const matchText =
+                        l.action?.toLowerCase().includes(auditFilter.toLowerCase()) ||
+                        l.actor_id?.toLowerCase().includes(auditFilter.toLowerCase());
+                      if (!matchText) return false;
+                    }
+                    if (auditPeriodFilter === "all") return true;
+                    if (!l.timestamp) return true;
+                    const logTime = new Date(l.timestamp).getTime();
+                    const now = Date.now();
+                    if (auditPeriodFilter === "today") {
+                      return new Date(l.timestamp).toISOString().split("T")[0] === new Date().toISOString().split("T")[0];
+                    }
+                    if (auditPeriodFilter === "7d") {
+                      return logTime >= now - 7 * 24 * 60 * 60 * 1000;
+                    }
+                    if (auditPeriodFilter === "30d") {
+                      return logTime >= now - 30 * 24 * 60 * 60 * 1000;
+                    }
+                    return true;
+                  })
                   .map((log, idx) => (
                     <tr key={idx} className="hover:bg-[#FAFBFD]">
                       <td className="py-2.5 px-3 font-mono text-[11px] text-[#68748A]">
@@ -945,6 +1003,11 @@ export function AdminManager({
       {/* TAB 8: STUDENTS PERFORMANCE & ACHIEVEMENTS */}
       {activeTab === "students" && (
         <AdminStudentsView initialStudents={initialStudentsPerformance} />
+      )}
+
+      {/* TAB 9: EMAIL ANNOUNCEMENTS & SMTP SERVICE */}
+      {activeTab === "email" && (
+        <AdminEmailBroadcastView />
       )}
 
       {/* MODAL: CREATE OR EDIT SUBJECT WITH ICON & COLOR PICKER */}

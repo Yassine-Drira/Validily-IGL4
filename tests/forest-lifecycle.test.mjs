@@ -15,6 +15,7 @@ import {
   getCommunityForests,
   updateForestPreferences,
   getForestPreferences,
+  resetUserForestData,
 } from "../src/lib/actions/forest-actions.ts";
 
 test("Forest Lifecycle: Database migration file exists with complete schema and security policies", () => {
@@ -118,6 +119,7 @@ test("Forest Lifecycle: Visibility preference (private vs members vs public) per
     role: "student",
     name: "Étudiant Discret",
   });
+  await resetUserForestData(userId);
 
   // 1. Initially defaults to "members"
   const initialPrefs = await getForestPreferences(userId);

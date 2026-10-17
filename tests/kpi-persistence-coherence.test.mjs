@@ -17,6 +17,7 @@ import {
   recordUserDailyFocus,
   getUserDailyFocusHistory,
   getUserTodayFocus,
+  resetUserStudyGoals,
 } from "../src/lib/actions/analytics-actions.ts";
 
 test("KPI & Insights Persistence: Study Goals Isolation & Persistence", async (t) => {
@@ -32,6 +33,9 @@ test("KPI & Insights Persistence: Study Goals Isolation & Persistence", async (t
     role: "student",
     name: "Étudiant Bêta",
   };
+
+  await resetUserStudyGoals(userA.id);
+  await resetUserStudyGoals(userB.id);
 
   // 1. Initial State: Default study goals for unconfigured user
   setTestUser(userA);
@@ -272,5 +276,162 @@ test("Achievement Badges: 12 Distinct Iconic SVG Badges & Component Integration"
     achievementsContent.includes("<AchievementBadgeIcon"),
     "forest-achievements.tsx must mount AchievementBadgeIcon"
   );
+});
+
+test("UI/UX Differentiation Contract: Overview vs Revisions Tabs Without Redundancy", () => {
+  const workspacePath = path.resolve("src/components/workspace/student-private-workspace.tsx");
+  assert.ok(fs.existsSync(workspacePath), "student-private-workspace.tsx must exist");
+  const content = fs.readFileSync(workspacePath, "utf-8");
+
+  // 1. Overview tab must NOT duplicate all 12 cards blindly; it must feature priority resume and quick cockpit
+  assert.ok(
+    content.includes("Reprendre vos révisions"),
+    "Overview tab must feature 'Reprendre vos révisions' instead of duplicated full catalog"
+  );
+  assert.ok(
+    content.includes("activeOrPrioritySubjects"),
+    "Overview tab uses activeOrPrioritySubjects to show focused actionable items"
+  );
+  assert.ok(
+    content.includes("Carnet d&apos;Erreurs") || content.includes("Carnet d'Erreurs"),
+    "Overview tab mounts cockpit widget for errors"
+  );
+  assert.ok(
+    content.includes("Dernières Activités & Évaluations"),
+    "Overview tab mounts cockpit widget for recent evaluations"
+  );
+
+  // 2. Dedicated Revisions tab must provide interactive hub features
+  assert.ok(
+    content.includes("Centre de Révision & Planification du Cursus"),
+    "Revisions tab must feature full dedicated title"
+  );
+  assert.ok(
+    content.includes("filteredRevisionSubjects"),
+    "Revisions tab mounts filteredRevisionSubjects"
+  );
+  assert.ok(
+    content.includes("setRevisionFilter"),
+    "Revisions tab has status filter controls"
+  );
+  assert.ok(
+    content.includes("setRevisionSemesterFilter"),
+    "Revisions tab has semester filter controls"
+  );
+  assert.ok(
+    content.includes("setRevisionSearch"),
+    "Revisions tab has real-time search input"
+  );
+});
+
+test("Couverture du Semestre: Strictly counts 100% completed subjects per user without counting in-progress ones", () => {
+  const dashboardPath = path.resolve("src/components/workspace/personal-analytics-dashboard.tsx");
+  assert.ok(fs.existsSync(dashboardPath), "personal-analytics-dashboard.tsx must exist");
+  const dashboardContent = fs.readFileSync(dashboardPath, "utf-8");
+
+  // Verify dashboard contracts for 100% completed subjects
+  assert.ok(
+    dashboardContent.includes("s.totalResources > 0 && s.percentage === 100"),
+    "Dashboard must strictly filter completedSubjects by totalResources > 0 and percentage === 100"
+  );
+  assert.ok(
+    dashboardContent.includes("uniqueSubjectsCount = completedSubjectsCount"),
+    "Dashboard uniqueSubjectsCount must be set to completedSubjectsCount"
+  );
+  assert.ok(
+    dashboardContent.includes("inProgressSubjectsCount"),
+    "Dashboard must compute inProgressSubjectsCount for pending subjects"
+  );
+
+  // Algorithmic simulation matching the user's exact reported scenario:
+  // 11 total available subjects
+  // 1 subject fully completed: 4/4 resources revised (100% progression)
+  // 1 subject in progress: 1/8 revised, 2/8 in_progress (13% progression)
+  // 9 subjects not started (0% progression)
+  const allSubjects = Array.from({ length: 11 }, (_, i) => ({
+    id: `subject-${i + 1}`,
+    name: `Matière ${i + 1}`,
+    slug: `matiere-${i + 1}`,
+  }));
+
+  const mockRevisionProgress = {
+    totalResources: 50,
+    totalRevised: 4,
+    totalInProgress: 2,
+    totalNotStarted: 44,
+    overallPercentage: 8,
+    subjects: [
+      {
+        subjectId: "subject-1",
+        subjectSlug: "matiere-1",
+        totalResources: 4,
+        revisedCount: 4,
+        inProgressCount: 0,
+        notStartedCount: 0,
+        percentage: 100, // 100% COMPLETED
+      },
+      {
+        subjectId: "subject-2",
+        subjectSlug: "matiere-2",
+        totalResources: 8,
+        revisedCount: 1,
+        inProgressCount: 2,
+        notStartedCount: 5,
+        percentage: 13, // IN PROGRESS / PENDING EN COURS
+      },
+      ...allSubjects.slice(2).map((s) => ({
+        subjectId: s.id,
+        subjectSlug: s.slug,
+        totalResources: 4,
+        revisedCount: 0,
+        inProgressCount: 0,
+        notStartedCount: 4,
+        percentage: 0,
+      })),
+    ],
+  };
+
+  // Replicate dashboard computation
+  const completed = new Set();
+  mockRevisionProgress.subjects.forEach((s) => {
+    if (s.totalResources > 0 && s.percentage === 100) {
+      completed.add(s.subjectId);
+      if (s.subjectSlug) completed.add(s.subjectSlug);
+    }
+  });
+
+  const inProgress = new Set();
+  mockRevisionProgress.subjects.forEach((s) => {
+    if (
+      s.totalResources > 0 &&
+      s.percentage < 100 &&
+      (s.inProgressCount > 0 || (s.revisedCount > 0 && s.percentage < 100))
+    ) {
+      inProgress.add(s.subjectId);
+      if (s.subjectSlug) inProgress.add(s.subjectSlug);
+    }
+  });
+
+  let completedCount = 0;
+  allSubjects.forEach((s) => {
+    if (completed.has(s.id) || (s.slug && completed.has(s.slug))) {
+      completedCount++;
+    }
+  });
+
+  let inProgressCount = 0;
+  allSubjects.forEach((s) => {
+    if (inProgress.has(s.id) || (s.slug && inProgress.has(s.slug))) {
+      inProgressCount++;
+    }
+  });
+
+  const totalAvailable = allSubjects.length; // 11
+  const coveragePercent = Math.min(100, Math.round((completedCount / totalAvailable) * 100));
+
+  // Assertions verifying exact fix:
+  assert.equal(completedCount, 1, "Only 1 subject with 100% progression must be counted");
+  assert.equal(inProgressCount, 1, "The pending/in-progress subject must be detected as 1");
+  assert.equal(coveragePercent, 9, "Coverage must be 1 / 11 = 9%, NOT 2 / 11 = 18%");
 });
 

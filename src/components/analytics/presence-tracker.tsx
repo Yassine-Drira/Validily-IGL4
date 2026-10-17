@@ -63,6 +63,9 @@ function getOrCreateSessionId(): string {
 export function PresenceAndAnalyticsTracker() {
   const pathname = usePathname();
   const lastPathnameRef = useRef<string | null>(null);
+  const lastHeartbeatRef = useRef<number>(0);
+  const pathnameRef = useRef(pathname);
+  pathnameRef.current = pathname;
 
   // 1. Record Page Views on route transitions
   useEffect(() => {
@@ -84,27 +87,32 @@ export function PresenceAndAnalyticsTracker() {
     }).catch(() => {});
   }, [pathname]);
 
-  // 2. Periodic Live Presence Heartbeat (Every 60s while tab active)
+  // 2. Periodic Live Presence Heartbeat (Throttled to at most once per 55-60s, tab-visibility aware)
   useEffect(() => {
     const device = detectDeviceCategory();
 
-    const sendHeartbeat = () => {
+    const sendHeartbeat = (force = false) => {
       if (typeof document !== "undefined" && document.visibilityState === "hidden") {
         return; // Don't ping if user minimized or switched tab
       }
+      const now = Date.now();
+      if (!force && now - lastHeartbeatRef.current < 55000) {
+        return; // Throttle: don't ping more than once every ~55 seconds
+      }
+      lastHeartbeatRef.current = now;
       pingPresence({
-        coarseRoute: pathname,
+        coarseRoute: pathnameRef.current,
         deviceCategory: device,
       }).catch(() => {});
     };
 
-    // Immediate initial ping
-    sendHeartbeat();
+    // Initial ping on mount or if >55s since last ping
+    sendHeartbeat(false);
 
     // 60-second periodic heartbeat
-    const interval = setInterval(sendHeartbeat, 60 * 1000);
+    const interval = setInterval(() => sendHeartbeat(true), 60 * 1000);
     return () => clearInterval(interval);
-  }, [pathname]);
+  }, []);
 
   return null;
 }

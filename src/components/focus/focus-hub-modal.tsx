@@ -82,7 +82,80 @@ export function FocusHubModal() {
     giveUpSession,
   } = useFocusTimer();
 
-  const [confirmAbandon, setConfirmAbandon] = useState(false);
+  interface PendingAbandonModal {
+    type: "switch_mode" | "change_duration" | "reset" | "skip" | "give_up";
+    targetMode?: TimerMode;
+    targetMinutes?: number;
+    title: string;
+    description: string;
+  }
+
+  const [pendingAbandonModal, setPendingAbandonModal] = useState<PendingAbandonModal | null>(null);
+
+  const handleModeClick = (targetMode: TimerMode) => {
+    if (targetMode === mode) return;
+
+    if (mode === "work" && (isRunning || isPaused)) {
+      const modeLabel = targetMode === "shortBreak" ? "Pause courte (5 min)" : "Pause longue (15 min)";
+      setPendingAbandonModal({
+        type: "switch_mode",
+        targetMode,
+        title: `Basculer vers la ${modeLabel} ?`,
+        description: `Une session de concentration est active avec un arbre en pleine croissance. Si vous basculez vers une pause maintenant, votre session actuelle sera interrompue et un arbre mort (défeuillé) sera pérennisé dans votre Bosquet.`,
+      });
+      return;
+    }
+
+    setMode(targetMode);
+  };
+
+  const handleDurationClick = (mins: number) => {
+    if (Math.round(workDuration / 60) === mins) return;
+
+    if (mode === "work" && (isRunning || isPaused)) {
+      setPendingAbandonModal({
+        type: "change_duration",
+        targetMinutes: mins,
+        title: `Changer la durée pour ${mins} minutes ?`,
+        description: `Une session de concentration est active avec un arbre en pleine croissance. Modifier la durée en cours de session interrompra votre arbre actuel et plantera un arbre mort (défeuillé) dans votre Bosquet.`,
+      });
+      return;
+    }
+
+    setWorkDurationMinutes(mins);
+  };
+
+  const handleResetClick = () => {
+    if (mode === "work" && (isRunning || isPaused)) {
+      setPendingAbandonModal({
+        type: "reset",
+        title: "Réinitialiser le chronomètre ?",
+        description: "Réinitialiser le chronomètre interrompt la session active. Un arbre mort (défeuillé) sera planté dans votre Bosquet.",
+      });
+    } else {
+      resetTimer();
+    }
+  };
+
+  const handleSkipClick = () => {
+    if (mode === "work" && (isRunning || isPaused)) {
+      setPendingAbandonModal({
+        type: "skip",
+        title: "Passer à la session suivante ?",
+        description: "Passer à la session suivante avant la fin du temps interrompt la session active. Un arbre mort (défeuillé) sera planté dans votre Bosquet.",
+      });
+    } else {
+      skipSession();
+    }
+  };
+
+  const handleAbandonClick = () => {
+    setPendingAbandonModal({
+      type: "give_up",
+      title: "Confirmer l'abandon avec pénalité ?",
+      description: "Cette décision est irréversible. Un arbre mort (défeuillé) sera certifié par le serveur et immédiatement planté dans votre Bosquet pour refléter cette interruption.",
+    });
+  };
 
   // Audio Customization & Catalog State
   const [audioCategoryTab, setAudioCategoryTab] = useState<"synth" | "custom" | "catalog">("synth");
@@ -378,7 +451,7 @@ export function FocusHubModal() {
             <button
               key={t.key}
               type="button"
-              onClick={() => setMode(t.key as TimerMode)}
+              onClick={() => handleModeClick(t.key as TimerMode)}
               className={cn(
                 "py-1.5 sm:py-2 px-2 sm:px-3 rounded-xl text-xs transition-all text-center flex flex-col items-center justify-center cursor-pointer",
                 mode === t.key
@@ -524,13 +597,7 @@ export function FocusHubModal() {
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => {
-                if ((isRunning || isPaused) && mode === "work") {
-                  setConfirmAbandon(true);
-                } else {
-                  resetTimer();
-                }
-              }}
+              onClick={handleResetClick}
               className="w-10 h-10 p-0 rounded-2xl text-[#68748A] hover:text-[#182235] hover:bg-[#F4F6FA] border-[#E4E8F0]"
               title="Réinitialiser le chronomètre"
             >
@@ -599,7 +666,7 @@ export function FocusHubModal() {
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => setConfirmAbandon(true)}
+                onClick={handleAbandonClick}
                 className="h-10 px-3 rounded-2xl text-xs font-semibold text-rose-700 hover:text-white hover:bg-rose-600 border-rose-200 hover:border-rose-600 flex items-center space-x-1.5 transition-all cursor-pointer"
                 title="Abandonner volontairement la session (Pénalité arbre mort)"
               >
@@ -611,13 +678,7 @@ export function FocusHubModal() {
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => {
-                  if ((isRunning || isPaused) && mode === "work") {
-                    setConfirmAbandon(true);
-                  } else {
-                    skipSession();
-                  }
-                }}
+                onClick={handleSkipClick}
                 className="w-10 h-10 p-0 rounded-2xl text-[#68748A] hover:text-[#182235] hover:bg-[#F4F6FA] border-[#E4E8F0]"
                 title="Passer à la session suivante"
               >
@@ -626,45 +687,10 @@ export function FocusHubModal() {
             )}
           </div>
 
-          {/* Strict Anti-Bypass Abandon Confirmation Dialog & Status Indicators */}
+          {/* Session Status Indicators */}
           {mode === "work" && (isRunning || isPaused) && (
             <div className="mt-3 text-center">
-              {confirmAbandon ? (
-                <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 animate-in fade-in duration-150 text-left max-w-md mx-auto shadow-sm">
-                  <div className="flex items-start space-x-3">
-                    <div className="w-8 h-8 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center shrink-0 mt-0.5">
-                      <AlertOctagon className="w-4 h-4 text-rose-600" />
-                    </div>
-                    <div>
-                      <p className="text-xs text-rose-950 font-bold">
-                        Confirmer l&apos;abandon avec pénalité ?
-                      </p>
-                      <p className="text-[11px] text-rose-800 leading-relaxed mt-1">
-                        Cette décision est irréversible. Un <strong className="font-semibold">arbre mort (défeuillé)</strong> sera certifié par le serveur et immédiatement planté dans votre Bosquet pour refléter cette interruption.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2 mt-3 pt-3 border-t border-rose-200/70">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        giveUpSession("Abandon volontaire de concentration");
-                        setConfirmAbandon(false);
-                      }}
-                      className="px-3.5 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold cursor-pointer transition-all shadow-xs"
-                    >
-                      Confirmer l&apos;abandon (Arbre mort)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setConfirmAbandon(false)}
-                      className="px-3.5 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 text-xs font-semibold cursor-pointer transition-all"
-                    >
-                      Continuer mon focus
-                    </button>
-                  </div>
-                </div>
-              ) : isPaused ? (
+              {isPaused ? (
                 <span className="text-[11px] font-medium text-amber-700 flex items-center justify-center space-x-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
                   <span>Session en pause : le temps de pause est déduit et ne compte pas dans votre focus certifié</span>
@@ -696,7 +722,7 @@ export function FocusHubModal() {
                 <button
                   key={mins}
                   type="button"
-                  onClick={() => setWorkDurationMinutes(mins)}
+                  onClick={() => handleDurationClick(mins)}
                   className={cn(
                     "py-2 rounded-xl text-xs font-mono font-semibold border transition-all cursor-pointer",
                     Math.round(workDuration / 60) === mins
@@ -1210,6 +1236,114 @@ export function FocusHubModal() {
             <span>Consulter mon Bosquet & Galerie de Promo</span>
           </Link>
         </div>
+
+        {/* Anti-Accidental Abandon Popup Modal */}
+        {pendingAbandonModal && (
+          <div className="fixed inset-0 z-70 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
+            <div
+              className="bg-white border border-rose-200 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 relative text-left"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="abandon-modal-title"
+            >
+              {/* Close / Cancel Button */}
+              <button
+                type="button"
+                onClick={() => setPendingAbandonModal(null)}
+                className="absolute top-4 right-4 p-1.5 text-[#68748A] hover:text-[#111A2E] hover:bg-[#F4F6FA] rounded-xl transition-colors cursor-pointer"
+                aria-label="Fermer et annuler"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              {/* Header with Warning Icon */}
+              <div className="flex items-start space-x-3 pr-8">
+                <div className="w-10 h-10 rounded-2xl bg-rose-100 text-rose-700 flex items-center justify-center shrink-0 shadow-xs mt-0.5">
+                  <AlertOctagon className="w-5 h-5 text-rose-600" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-rose-700 bg-rose-50 px-2.5 py-0.5 rounded-full border border-rose-200 inline-block mb-1">
+                    Attention — Session Active
+                  </span>
+                  <h3 id="abandon-modal-title" className="text-base font-extrabold text-[#111A2E] leading-snug">
+                    {pendingAbandonModal.title}
+                  </h3>
+                </div>
+              </div>
+
+              {/* Description */}
+              <p className="text-xs text-[#475569] leading-relaxed">
+                {pendingAbandonModal.description}
+              </p>
+
+              {/* Tree Penalty Notice */}
+              <div className="bg-rose-50/80 border border-rose-200 rounded-2xl p-3 flex items-start space-x-2.5 text-xs text-rose-950">
+                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                <div className="text-[11px] leading-tight text-rose-900">
+                  <strong className="font-semibold text-rose-950">Pénalité académique :</strong> un <strong className="font-semibold">arbre mort (défeuillé)</strong> pérenne sera planté dans votre Bosquet si vous confirmez l&apos;interruption.
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="space-y-2 pt-1">
+                {/* Safe Button: Keep Session */}
+                <Button
+                  type="button"
+                  variant="primary"
+                  onClick={() => setPendingAbandonModal(null)}
+                  className="w-full h-11 rounded-2xl text-xs sm:text-sm font-bold bg-[#2855D9] hover:bg-[#1E40AF] text-white flex items-center justify-center space-x-2 shadow-md shadow-blue-500/20 cursor-pointer transition-all"
+                >
+                  <Play className="w-4 h-4 fill-current" />
+                  <span>Continuer mon focus</span>
+                </Button>
+
+                {/* If user clicked a break mode, offer legitimate pause without penalty */}
+                {pendingAbandonModal.type === "switch_mode" && isRunning && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      pauseTimer();
+                      setPendingAbandonModal(null);
+                    }}
+                    className="w-full h-10 rounded-2xl text-xs font-semibold text-amber-800 bg-amber-50 hover:bg-amber-100 border-amber-300 flex items-center justify-center space-x-2 cursor-pointer transition-all"
+                  >
+                    <Pause className="w-3.5 h-3.5 fill-current text-amber-600" />
+                    <span>Mettre en Pause temporaire (Sans pénalité)</span>
+                  </Button>
+                )}
+
+                {/* Destructive Confirmation Button */}
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const action = pendingAbandonModal;
+                    setPendingAbandonModal(null);
+                    if (action.type === "switch_mode" && action.targetMode) {
+                      const label = action.targetMode === "shortBreak" ? "Pause courte" : "Pause longue";
+                      await giveUpSession(`Changement de mode vers ${label}`);
+                      setMode(action.targetMode);
+                    } else if (action.type === "change_duration" && action.targetMinutes) {
+                      await giveUpSession(`Modification de durée (${action.targetMinutes}m)`);
+                      setWorkDurationMinutes(action.targetMinutes);
+                    } else if (action.type === "reset") {
+                      await giveUpSession("Chronomètre réinitialisé");
+                      resetTimer();
+                    } else if (action.type === "skip") {
+                      await giveUpSession("Session sautée");
+                      skipSession();
+                    } else {
+                      await giveUpSession("Abandon volontaire de concentration");
+                    }
+                  }}
+                  className="w-full py-2.5 rounded-xl text-xs font-semibold text-rose-700 hover:text-rose-800 hover:bg-rose-50 border border-transparent hover:border-rose-200 cursor-pointer transition-all text-center block"
+                >
+                  Confirmer l&apos;abandon (Arbre mort)
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

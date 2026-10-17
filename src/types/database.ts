@@ -57,6 +57,8 @@ export interface SubjectFolder {
   name: string;
   parent_id: string | null;
   color?: string;
+  icon?: string;
+  description?: string;
   sort_order?: number;
   owner_id?: string;
   created_at: string;

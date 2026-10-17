@@ -1,18 +1,31 @@
 import { redirect } from "next/navigation";
-import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { getServiceSupabase } from "@/lib/supabase/admin";
+import { getRequesterUser } from "@/lib/auth/authorization";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { StudentPrivateWorkspace } from "@/components/workspace/student-private-workspace";
 import { getStudentQuizAttempts, getStudentMistakes } from "@/lib/actions/quiz-actions";
 import { getBookmarks } from "@/lib/supabase/repository";
 import { getRecentAuditLogs } from "@/lib/audit/audit-logger";
 import { getUserVipStatus } from "@/lib/actions/vip-actions";
+import { getUserSubjectsRevisionProgress, UserOverallRevisionMetrics } from "@/lib/actions/resource-actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function MySpacePage() {
-  let user: any = null;
-  let isGuest = true;
+  const requester = await getRequesterUser();
+
+  if (!requester || !requester.id) {
+    redirect("/login?next=/my-space");
+  }
+
+  const user = {
+    id: requester.id,
+    email: requester.email,
+    display_name: requester.name || requester.email?.split("@")[0] || "Étudiant",
+    avatar_url: requester.avatarUrl || null,
+  };
+  const isGuest = false;
+
   let isVip = false;
   let privateNotes: any[] = [];
   let privateResources: any[] = [];
@@ -22,78 +35,100 @@ export default async function MySpacePage() {
   let mistakes: any[] = [];
   let bookmarkedCount = 0;
   let recentActivity: any[] = [];
+  let revisionProgressMetrics: UserOverallRevisionMetrics = {
+    totalResources: 0,
+    totalRevised: 0,
+    totalInProgress: 0,
+    totalNotStarted: 0,
+    overallPercentage: 0,
+    subjects: [],
+  };
 
   try {
-    if (isSupabaseConfigured()) {
-      const supabase = await createClient();
-      const {
-        data: { user: authUser },
-      } = await supabase.auth.getUser();
+    const service = getServiceSupabase();
 
-      if (!authUser?.id) {
-        redirect("/login?next=/my-space");
-      }
+    // Parallelize all independent user space queries concurrently with safe fallbacks
+    const [
+      profileRes,
+      notesRes,
+      resDataRes,
+      attemptsRes,
+      mistakesRes,
+      bookmarksRes,
+      vipRes,
+      revRes,
+    ] = await Promise.all([
+      service
+        ? Promise.resolve(
+            service
+              .from("profiles")
+              .select("display_name, avatar_url")
+              .eq("id", requester.id)
+              .maybeSingle()
+          ).catch(() => ({ data: null }))
+        : Promise.resolve({ data: null }),
+      service
+        ? Promise.resolve(
+            service
+              .from("notes")
+              .select("*, subject:subjects(name)")
+              .eq("user_id", requester.id)
+              .order("created_at", { ascending: false })
+          ).catch(() => ({ data: [] }))
+        : Promise.resolve({ data: [] }),
+      service
+        ? Promise.resolve(
+            service
+              .from("resources")
+              .select("*, subject:subjects(name)")
+              .eq("owner_id", requester.id)
+              .order("created_at", { ascending: false })
+          ).catch(() => ({ data: [] }))
+        : Promise.resolve({ data: [] }),
+      getStudentQuizAttempts(requester.id).catch(() => []),
+      getStudentMistakes(requester.id).catch(() => []),
+      getBookmarks(requester.id).catch(() => []),
+      getUserVipStatus(requester.id).catch(() => ({ isVip: false })),
+      getUserSubjectsRevisionProgress(requester.id).catch(() => null),
+    ]);
 
-      const service = getServiceSupabase();
+    if (profileRes?.data?.display_name) {
+      user.display_name = profileRes.data.display_name;
+    }
+    if (profileRes?.data?.avatar_url) {
+      user.avatar_url = profileRes.data.avatar_url;
+    }
 
-        // 0. Fetch persisted student profile from database
-        const { data: profile } = await service
-          .from("profiles")
-          .select("display_name, avatar_url")
-          .eq("id", authUser.id)
-          .maybeSingle();
+    privateNotes = (notesRes?.data || []).filter((note: any) => {
+      if (!note || !note.title) return false;
+      if (note.title.startsWith("__")) return false;
+      if (Array.isArray(note.tags) && note.tags.some((t: string) => t.startsWith("system_"))) return false;
+      return true;
+    });
+    const allUserResources = resDataRes?.data || [];
+    privateResources = allUserResources.filter((r: any) => r.visibility === "private");
+    sharedResources = allUserResources.filter((r: any) => r.visibility === "shared");
+    publicResources = allUserResources.filter((r: any) => r.visibility === "public");
 
-        user = {
-          id: authUser.id,
-          email: authUser.email,
-          display_name: profile?.display_name || authUser.user_metadata?.display_name || authUser.email?.split("@")[0] || "Étudiant",
-          avatar_url: profile?.avatar_url || authUser.user_metadata?.avatar_url || null,
-        };
-        isGuest = false;
+    quizAttempts = attemptsRes || [];
+    mistakes = mistakesRes || [];
+    bookmarkedCount = (bookmarksRes || []).length;
 
-        // 1. Fetch student's personal notes
-        const { data: notesData } = await service
-          .from("notes")
-          .select("*, subject:subjects(name)")
-          .eq("user_id", authUser.id)
-          .order("created_at", { ascending: false });
-        privateNotes = notesData || [];
+    recentActivity = getRecentAuditLogs(30).filter(
+      (log: any) => log.actor_id === requester.id || log.metadata?.user_id === requester.id
+    );
 
-        // 2. Fetch student's uploaded personal resources
-        const { data: resData } = await service
-          .from("resources")
-          .select("*, subject:subjects(name)")
-          .eq("owner_id", authUser.id)
-          .order("created_at", { ascending: false });
-        const allUserResources = resData || [];
-        privateResources = allUserResources.filter((r: any) => r.visibility === "private");
-        sharedResources = allUserResources.filter((r: any) => r.visibility === "shared");
-        publicResources = allUserResources.filter((r: any) => r.visibility === "public");
-
-        // 3. Quiz attempts and mistakes
-        quizAttempts = await getStudentQuizAttempts(authUser.id);
-        mistakes = await getStudentMistakes(authUser.id);
-
-        // 4. Bookmarks count
-        const bookmarks = await getBookmarks(authUser.id);
-        bookmarkedCount = bookmarks.length;
-
-        // 5. Audit Activity history
-        recentActivity = getRecentAuditLogs(30).filter(
-          (log: any) => log.actor_id === authUser.id || log.metadata?.user_id === authUser.id
-        );
-
-        // 6. VIP Entitlement & Verified Badge status
-        try {
-          const vipRes = await getUserVipStatus(authUser.id);
-          isVip = Boolean(vipRes.isVip);
-        } catch {}
-      }
-    } catch (err: any) {
+    if (vipRes?.isVip !== undefined) {
+      isVip = Boolean(vipRes.isVip);
+    }
+    if (revRes) {
+      revisionProgressMetrics = revRes;
+    }
+  } catch (err: any) {
     if (err?.digest?.startsWith("NEXT_REDIRECT")) {
       throw err;
     }
-    console.error("MySpacePage error:", err);
+    console.error("MySpacePage query error:", err);
   }
 
   return (
@@ -111,6 +146,7 @@ export default async function MySpacePage() {
         publicResources={publicResources}
         bookmarkedCount={bookmarkedCount}
         recentActivity={recentActivity}
+        revisionProgress={revisionProgressMetrics}
       />
     </div>
   );

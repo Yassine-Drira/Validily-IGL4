@@ -15,7 +15,7 @@ interface ResourceVoteControlProps {
   orientation?: "horizontal" | "vertical";
   size?: "sm" | "md";
   className?: string;
-  onVoteChange?: (newScore: number, userVote: ResourceVoteValue) => void;
+  onVoteChange?: (newScore: number, userVote: ResourceVoteValue, upvotes?: number, downvotes?: number) => void;
 }
 
 export function ResourceVoteControl({
@@ -35,6 +35,14 @@ export function ResourceVoteControl({
   const [downvotes, setDownvotes] = useState<number>(initialDownvotes);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  // Sync state whenever props update from server actions / revalidations
+  React.useEffect(() => {
+    setScore(initialScore);
+    setUserVote(initialUserVote);
+    setUpvotes(initialUpvotes);
+    setDownvotes(initialDownvotes);
+  }, [initialScore, initialUserVote, initialUpvotes, initialDownvotes]);
 
   const handleVote = (targetVote: 1 | -1) => {
     if (isPending) return;
@@ -76,7 +84,7 @@ export function ResourceVoteControl({
     setUpvotes(optimisticUp);
     setDownvotes(optimisticDown);
     setFeedback(null);
-    onVoteChange?.(optimisticScore, nextVote);
+    onVoteChange?.(optimisticScore, nextVote, optimisticUp, optimisticDown);
 
     startTransition(async () => {
       try {
@@ -86,7 +94,7 @@ export function ResourceVoteControl({
           setUserVote(res.userVote);
           setUpvotes(res.upvotes);
           setDownvotes(res.downvotes);
-          onVoteChange?.(res.score, res.userVote);
+          onVoteChange?.(res.score, res.userVote, res.upvotes, res.downvotes);
         } else {
           // Revert on failure
           setScore(prevScore);
@@ -94,16 +102,16 @@ export function ResourceVoteControl({
           setUpvotes(prevUp);
           setDownvotes(prevDown);
           setFeedback(res.error || "Erreur lors du vote.");
-          onVoteChange?.(prevScore, prevVote);
+          onVoteChange?.(prevScore, prevVote, prevUp, prevDown);
           setTimeout(() => setFeedback(null), 3000);
         }
-      } catch (err: any) {
+      } catch {
         setScore(prevScore);
         setUserVote(prevVote);
         setUpvotes(prevUp);
         setDownvotes(prevDown);
         setFeedback("Erreur de connexion.");
-        onVoteChange?.(prevScore, prevVote);
+        onVoteChange?.(prevScore, prevVote, prevUp, prevDown);
         setTimeout(() => setFeedback(null), 3000);
       }
     });
@@ -111,7 +119,6 @@ export function ResourceVoteControl({
 
   const isUpvoted = userVote === 1;
   const isDownvoted = userVote === -1;
-
   const scoreFormatted = score > 0 ? `+${score}` : `${score}`;
 
   return (
@@ -119,14 +126,14 @@ export function ResourceVoteControl({
       className={cn(
         "relative inline-flex items-center select-none font-sans group/vote",
         orientation === "vertical"
-          ? "flex-col space-y-0.5 bg-[#FAFBFD] p-1 rounded-xl border border-[#E4E8F0]"
-          : "flex-row space-x-1 bg-[#FAFBFD] px-2 py-0.5 rounded-full border border-[#E4E8F0]",
+          ? "flex-col space-y-1 bg-[#FAFBFD] p-1 rounded-xl border border-[#E4E8F0] shadow-2xs"
+          : "flex-row items-center bg-[#FAFBFD] p-0.5 rounded-full border border-[#E4E8F0] shadow-2xs gap-0.5",
         className
       )}
       role="group"
       aria-label="Évaluation de l'utilité du document"
     >
-      {/* Upvote Button */}
+      {/* Upvote Button with count */}
       <button
         type="button"
         onClick={(e) => {
@@ -136,40 +143,56 @@ export function ResourceVoteControl({
         }}
         disabled={isPending}
         className={cn(
-          "transition-all cursor-pointer rounded-md flex items-center justify-center focus:outline-hidden focus:ring-1 focus:ring-[#2855D9]",
-          size === "sm" ? "p-1 w-6 h-6" : "p-1.5 w-7 h-7",
+          "transition-all cursor-pointer rounded-full flex items-center justify-center space-x-1 focus:outline-hidden",
+          size === "sm" ? "px-1.5 py-0.5 h-6 min-w-[28px]" : "px-2 py-1 h-7 min-w-[34px]",
           isUpvoted
-            ? "bg-[#2855D9]/10 text-[#2855D9] font-bold shadow-2xs"
-            : "text-[#68748A] hover:text-[#2855D9] hover:bg-white"
+            ? "bg-[#2855D9] text-white font-bold shadow-xs hover:bg-[#1f44b3]"
+            : "text-[#55647e] hover:text-[#2855D9] hover:bg-white/90"
         )}
-        title="Utile (+1)"
+        title={`Utile : ${upvotes} vote${upvotes > 1 ? "s" : ""}`}
         aria-label="Voter pour la pertinence de cette ressource"
         aria-pressed={isUpvoted}
       >
-        <ChevronUp className={cn(size === "sm" ? "w-4 h-4" : "w-5 h-5", isUpvoted && "stroke-[2.5]")} />
+        <ChevronUp className={cn(size === "sm" ? "w-3.5 h-3.5" : "w-4 h-4", isUpvoted ? "stroke-[2.5]" : "stroke-2")} />
+        <span className={cn("font-mono font-bold leading-none", size === "sm" ? "text-[11px]" : "text-xs")}>
+          {upvotes}
+        </span>
       </button>
 
-      {/* Score Badge */}
-      <div
-        className={cn(
-          "font-mono font-bold text-center tracking-tight transition-colors px-1",
-          size === "sm" ? "text-xs" : "text-sm",
-          score > 0
-            ? "text-[#2855D9]"
-            : score < 0
-            ? "text-rose-600"
-            : "text-[#68748A]"
-        )}
-        title={`Score d'utilité : ${score} (${upvotes} utiles • ${downvotes} non-utiles)`}
-      >
-        {isPending ? (
-          <Loader2 className="w-3 h-3 animate-spin mx-auto text-[#68748A]" />
-        ) : (
-          scoreFormatted
-        )}
-      </div>
+      {/* Middle indicator: Score in vertical mode or clean dot/loader in horizontal mode */}
+      {orientation === "vertical" ? (
+        <div
+          className={cn(
+            "font-mono font-bold text-center tracking-tight transition-colors px-1",
+            size === "sm" ? "text-[11px]" : "text-xs",
+            score > 0
+              ? "text-[#2855D9]"
+              : score < 0
+              ? "text-rose-600"
+              : "text-[#68748A]"
+          )}
+          title={`Score net : ${scoreFormatted} (${upvotes} utiles • ${downvotes} non-utiles)`}
+        >
+          {isPending ? (
+            <Loader2 className="w-3 h-3 animate-spin mx-auto text-[#68748A]" />
+          ) : (
+            scoreFormatted
+          )}
+        </div>
+      ) : isPending ? (
+        <div className="px-0.5 flex items-center justify-center">
+          <Loader2 className="w-3 h-3 animate-spin text-[#68748A]" />
+        </div>
+      ) : (
+        <span
+          className="text-[#CBD5E1] text-[10px] select-none mx-0.5"
+          title={`Score net : ${scoreFormatted}`}
+        >
+          •
+        </span>
+      )}
 
-      {/* Downvote Button */}
+      {/* Downvote Button with count */}
       <button
         type="button"
         onClick={(e) => {
@@ -179,17 +202,20 @@ export function ResourceVoteControl({
         }}
         disabled={isPending}
         className={cn(
-          "transition-all cursor-pointer rounded-md flex items-center justify-center focus:outline-hidden focus:ring-1 focus:ring-rose-500",
-          size === "sm" ? "p-1 w-6 h-6" : "p-1.5 w-7 h-7",
+          "transition-all cursor-pointer rounded-full flex items-center justify-center space-x-1 focus:outline-hidden",
+          size === "sm" ? "px-1.5 py-0.5 h-6 min-w-[28px]" : "px-2 py-1 h-7 min-w-[34px]",
           isDownvoted
-            ? "bg-rose-50 text-rose-600 font-bold shadow-2xs"
-            : "text-[#68748A] hover:text-rose-600 hover:bg-white"
+            ? "bg-rose-600 text-white font-bold shadow-xs hover:bg-rose-700"
+            : "text-[#55647e] hover:text-rose-600 hover:bg-white/90"
         )}
-        title="Peu utile (-1)"
+        title={`Peu utile : ${downvotes} vote${downvotes > 1 ? "s" : ""}`}
         aria-label="Signaler comme peu pertinent"
         aria-pressed={isDownvoted}
       >
-        <ChevronDown className={cn(size === "sm" ? "w-4 h-4" : "w-5 h-5", isDownvoted && "stroke-[2.5]")} />
+        <ChevronDown className={cn(size === "sm" ? "w-3.5 h-3.5" : "w-4 h-4", isDownvoted ? "stroke-[2.5]" : "stroke-2")} />
+        <span className={cn("font-mono font-bold leading-none", size === "sm" ? "text-[11px]" : "text-xs")}>
+          {downvotes}
+        </span>
       </button>
 
       {/* Error Feedback Tooltip Popover */}

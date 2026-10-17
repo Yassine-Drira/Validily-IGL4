@@ -10,6 +10,11 @@ test("Focus Coherence & Per-User Achievement Integrity", async (t) => {
   const USER_A_ID = "11111111-aaaa-aaaa-aaaa-111111111111";
   const USER_B_ID = "22222222-bbbb-bbbb-bbbb-222222222222";
 
+  await forestActions.resetUserForestData(USER_A_ID);
+  await forestActions.resetUserForestData(USER_B_ID);
+  await analyticsActions.resetUserDailyFocus(USER_A_ID);
+  await analyticsActions.resetUserDailyFocus(USER_B_ID);
+
   await t.test("1. Dead trees do not contribute phantom 1500s (25 min) to focus accumulation", async () => {
     authModule.setTestUser({
       id: USER_A_ID,
@@ -81,6 +86,7 @@ test("Focus Coherence & Per-User Achievement Integrity", async (t) => {
       name: "User B",
       avatarUrl: null,
     });
+    await forestActions.resetUserForestData(USER_B_ID);
 
     const forestB = await forestActions.getMyForest(USER_B_ID);
     assert.equal(forestB.authenticated, true);

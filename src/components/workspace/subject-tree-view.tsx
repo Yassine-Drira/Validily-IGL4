@@ -29,9 +29,11 @@ import {
   X,
   Layers,
   FolderPlus,
+  Settings2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { getFolderVisual } from "@/lib/utils/folder-visual";
 
 interface SubjectTreeViewProps {
   subject: Subject;
@@ -119,9 +121,10 @@ export function SubjectTreeView({
     }
 
     // Group resources by chapter (folder_id)
+    const knownFolderIds = new Set(folders.map((f) => f.id));
     const filesMap = new Map<string | null, AcademicResource[]>();
     for (const res of resources) {
-      const folderId = res.chapter || null;
+      const folderId = res.chapter && knownFolderIds.has(res.chapter) ? res.chapter : null;
       if (!filesMap.has(folderId)) filesMap.set(folderId, []);
       filesMap.get(folderId)!.push(res);
     }
@@ -322,6 +325,9 @@ export function SubjectTreeView({
       ? ""
       : ancestorPrefix + (isLastNode ? "    " : "│   ");
 
+    const visual = item.folder ? getFolderVisual(item.folder.color, item.folder.icon) : null;
+    const FolderIconComp = visual ? visual.Icon : isCollapsed ? Folder : FolderOpen;
+
     return (
       <div key={item.id} className="space-y-0.5">
         {/* Folder Header Row */}
@@ -357,11 +363,16 @@ export function SubjectTreeView({
               }}
               className="flex items-center space-x-2 min-w-0 flex-1 cursor-pointer"
             >
-              {isCollapsed ? (
-                <Folder className="w-4 h-4 text-amber-500 fill-amber-500/20 shrink-0" />
-              ) : (
-                <FolderOpen className="w-4 h-4 text-[#2855D9] fill-[#2855D9]/20 shrink-0" />
-              )}
+              <FolderIconComp
+                className={cn(
+                  "w-4 h-4 shrink-0",
+                  visual
+                    ? cn(visual.color.text, visual.color.fill)
+                    : isCollapsed
+                    ? "text-amber-500 fill-amber-500/20"
+                    : "text-[#2855D9] fill-[#2855D9]/20"
+                )}
+              />
               <span className={cn("font-bold text-[#111A2E] group-hover:text-[#2855D9] transition-colors truncate", isRoot ? "text-sm text-[#2855D9]" : "")}>
                 {item.name}
               </span>
@@ -404,9 +415,9 @@ export function SubjectTreeView({
                   type="button"
                   onClick={() => onRenameFolder(item.folder!)}
                   className="p-1 rounded-md text-[#68748A] hover:text-[#182235] hover:bg-stone-100 cursor-pointer"
-                  title="Renommer le dossier"
+                  title="Paramètres du dossier (renommer, couleur, icône, description)"
                 >
-                  <Edit2 className="w-3 h-3" />
+                  <Settings2 className="w-3 h-3" />
                 </button>
                 <button
                   type="button"

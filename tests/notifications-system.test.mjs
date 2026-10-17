@@ -8,6 +8,8 @@ import {
   markNotificationAsRead,
   markAllNotificationsAsRead,
   deleteNotification,
+  getActiveGlobalAnnouncements,
+  resetUserAnnouncementState,
 } from "../src/lib/actions/notification-actions.ts";
 import { setTestUser } from "../src/lib/auth/authorization.ts";
 import { sendClassmateCheer } from "../src/lib/actions/forest-actions.ts";
@@ -166,3 +168,87 @@ test("System Notifications: sendClassmateCheer dispatches persistent notificatio
 
   setTestUser(null);
 });
+
+test("Global Announcement v1.1: Registry, user isolation, and read/dismiss lifecycle", async () => {
+  // 1. Check registry definition
+  const announcements = await getActiveGlobalAnnouncements();
+  const v1_1 = announcements.find((a) => a.id === "announcement-v1-1-release");
+  assert.ok(v1_1, "v1.1 global announcement must exist in registry");
+  assert.equal(v1_1.release_version, "v1.1");
+  assert.equal(v1_1.is_active, true);
+  assert.ok(v1_1.title.includes("v1.1"), "Title must state v1.1 release");
+  assert.ok(v1_1.content.includes("Resource Sharing"), "Pillar 1 must be present");
+  assert.ok(v1_1.content.includes("More Ways to Learn"), "Pillar 2 must be present");
+  assert.ok(v1_1.content.includes("Voting"), "Pillar 3 must be present");
+  assert.ok(v1_1.content.includes("Focus Hub"), "Pillar 4 must be present");
+  assert.ok(v1_1.content.includes("Forest"), "Pillar 5 must be present");
+  assert.ok(v1_1.content.includes("Performance"), "Pillar 6 must be present");
+
+  // 2. User A logs in -> announcement is unread
+  const userA = {
+    id: "user-ann-test-alpha-01",
+    email: "alpha@validily.com",
+    role: "student",
+    name: "User Alpha",
+    avatarUrl: null,
+  };
+  await resetUserAnnouncementState(userA.id);
+  setTestUser(userA);
+
+  const notifsA = await getMyNotifications();
+  const annA = notifsA.find((n) => n.id === "announcement-v1-1-release");
+  assert.ok(annA, "User A must see the active broadcast announcement");
+  assert.equal(annA.is_read, false, "Announcement must be unread initially for User A");
+
+  // 3. User A marks announcement as read
+  const markRes = await markNotificationAsRead("announcement-v1-1-release");
+  assert.equal(markRes.success, true);
+
+  const notifsAAfterRead = await getMyNotifications();
+  const annAAfterRead = notifsAAfterRead.find((n) => n.id === "announcement-v1-1-release");
+  assert.equal(annAAfterRead?.is_read, true, "User A must see the announcement marked as read");
+
+  // 4. User B logs in -> announcement must still be UNREAD (per-user isolation!)
+  const userB = {
+    id: "user-ann-test-beta-02",
+    email: "beta@validily.com",
+    role: "student",
+    name: "User Beta",
+    avatarUrl: null,
+  };
+  await resetUserAnnouncementState(userB.id);
+  setTestUser(userB);
+
+  const notifsB = await getMyNotifications();
+  const annB = notifsB.find((n) => n.id === "announcement-v1-1-release");
+  assert.ok(annB, "User B must see the broadcast announcement");
+  assert.equal(annB.is_read, false, "User B's announcement must be unread despite User A reading it");
+
+  // 5. User A dismisses / deletes announcement -> disappears for User A, still present for User B
+  setTestUser(userA);
+  const delRes = await deleteNotification("announcement-v1-1-release");
+  assert.equal(delRes.success, true);
+
+  const notifsAAfterDel = await getMyNotifications();
+  assert.ok(
+    !notifsAAfterDel.some((n) => n.id === "announcement-v1-1-release"),
+    "Dismissed announcement must no longer appear for User A"
+  );
+
+  setTestUser(userB);
+  const notifsBCheck = await getMyNotifications();
+  assert.ok(
+    notifsBCheck.some((n) => n.id === "announcement-v1-1-release"),
+    "Announcement must still be visible for User B"
+  );
+
+  // 6. Component contract: AnnouncementModal must exist and export component
+  const modalPath = path.resolve("src/components/notifications/announcement-modal.tsx");
+  assert.ok(fs.existsSync(modalPath), "announcement-modal.tsx must exist");
+  const modalContent = fs.readFileSync(modalPath, "utf-8");
+  assert.ok(modalContent.includes("AnnouncementModal"), "Must export AnnouncementModal");
+  assert.ok(modalContent.includes("v1.1"), "Must display v1.1 badge");
+
+  setTestUser(null);
+});
+

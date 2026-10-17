@@ -14,13 +14,26 @@ export default function GlobalError({
 }) {
   useEffect(() => {
     console.error("Global application boundary caught error:", error);
-    // If a chunk failed to load (e.g. app was rebuilt while browser tab was open), auto-reload to fetch fresh chunk manifest
-    if (
+    // If a chunk failed to load (e.g. app was rebuilt or Turbopack HMR invalidated chunks), auto-reload once to fetch fresh manifest
+    const isStaleChunkError =
       error?.name === "ChunkLoadError" ||
       error?.message?.includes("ChunkLoadError") ||
-      error?.message?.includes("Failed to load chunk")
-    ) {
-      window.location.reload();
+      error?.message?.includes("Failed to load chunk") ||
+      error?.message?.includes("module factory is not available") ||
+      error?.message?.includes("stale browser cache") ||
+      error?.message?.includes("reading 'parentNode'");
+
+    if (isStaleChunkError) {
+      try {
+        const lastReload = sessionStorage.getItem("validily_last_chunk_reload");
+        const now = Date.now();
+        if (!lastReload || now - Number(lastReload) > 4000) {
+          sessionStorage.setItem("validily_last_chunk_reload", String(now));
+          window.location.reload();
+        }
+      } catch {
+        // SessionStorage unavailable fallback
+      }
     }
   }, [error]);
 
@@ -48,7 +61,12 @@ export default function GlobalError({
             type="button"
             size="sm"
             variant="primary"
-            onClick={() => reset()}
+            onClick={() => {
+              try {
+                sessionStorage.removeItem("validily_last_chunk_reload");
+              } catch {}
+              window.location.reload();
+            }}
             className="w-full sm:w-auto text-xs py-2 px-4 flex items-center justify-center space-x-1.5"
           >
             <RotateCcw className="w-3.5 h-3.5" />

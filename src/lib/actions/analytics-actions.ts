@@ -1,5 +1,7 @@
 "use server";
 
+import fs from "fs";
+import path from "path";
 import type {
   AnalyticsEvent,
   AnalyticsEventType,
@@ -90,86 +92,85 @@ const localAnalyticsEvents = globalAnalyticsState.__localAnalyticsEvents;
 const localUserGoals = globalAnalyticsState.__localUserGoals;
 const localDailyFocusRecords = globalAnalyticsState.__localDailyFocusRecords;
 
-function seedBaselineAnalytics(): AnalyticsEvent[] {
-  const now = Date.now();
-  const routes = ["/forest", "/quizzes", "/resources", "/subjects", "/bookmarks", "/my-space", "/"];
-  const devices: DeviceCategory[] = ["desktop", "desktop", "desktop", "mobile", "tablet"];
-  const browsers = ["Chrome", "Firefox", "Safari", "Edge"];
-  const oses = ["Windows", "macOS", "Linux", "iOS", "Android"];
-  const seeded: AnalyticsEvent[] = [];
-
-  for (let i = 0; i < 75; i++) {
-    const ageMs = Math.floor(Math.random() * 24 * 60 * 60 * 1000 * 5); // past 5 days
-    const sessNum = (i % 18) + 1;
-    seeded.push({
-      id: `evt-seed-${i}`,
-      event_type: "page_view",
-      page_route: routes[i % routes.length],
-      user_id: sessNum <= 10 ? `user-${sessNum}` : null,
-      session_id: `sess-${sessNum}`,
-      device_category: devices[i % devices.length],
-      browser_family: browsers[i % browsers.length],
-      os_family: oses[i % oses.length],
-      created_at: new Date(now - ageMs).toISOString(),
-    });
-  }
-  return seeded;
-}
-
-// Seed baseline realistic metrics for immediate administrative visibility if clean
-if (localAnalyticsEvents.length === 0) {
-  const initial = seedBaselineAnalytics();
-  initial.forEach((e) => localAnalyticsEvents.push(e));
-}
-
-// DB System Document Resilience Helpers for Telemetry
-async function getDbAnalyticsFallback(): Promise<AnalyticsEvent[]> {
+// System helper to obtain a verified UUID for system documents in public.notes
+async function getValidSystemUserId(serviceSupabase: any): Promise<string> {
   try {
-    const serviceSupabase = await getAdminClient();
-    if (!serviceSupabase) return [];
-    const { data } = await serviceSupabase
-      .from("notes")
-      .select("content")
-      .eq("title", "__validily_site_analytics__")
-      .maybeSingle();
-    if (data?.content) {
-      const parsed = JSON.parse(data.content);
-      if (Array.isArray(parsed)) return parsed as AnalyticsEvent[];
+    const authMod = await getAuthModule();
+    const user = authMod ? await authMod.getRequesterUser() : null;
+    if (user?.id && user.id.length === 36 && !user.id.startsWith("simulated-")) {
+      return user.id;
     }
   } catch {}
+
+  try {
+    const { data: admin } = await serviceSupabase
+      .from("profiles")
+      .select("id")
+      .eq("role", "admin")
+      .limit(1)
+      .maybeSingle();
+    if (admin?.id) return admin.id;
+
+    const { data: anyUser } = await serviceSupabase
+      .from("profiles")
+      .select("id")
+      .limit(1)
+      .maybeSingle();
+    if (anyUser?.id) return anyUser.id;
+  } catch {}
+
+  return "12b54e6a-f1e0-4bee-b520-b4e479da3044";
+}
+
+// Clean in-memory events from any legacy synthetic seeds or historical mocks
+for (let i = localAnalyticsEvents.length - 1; i >= 0; i--) {
+  if (localAnalyticsEvents[i].id?.startsWith("evt-seed-") || localAnalyticsEvents[i].id?.startsWith("evt-hist-")) {
+    localAnalyticsEvents.splice(i, 1);
+  }
+}
+
+
+const CACHE_DIR = path.join(process.cwd(), ".validily-cache");
+
+function readDiskAnalyticsJson(filename: string): any {
+  try {
+    const file = path.join(CACHE_DIR, filename);
+    if (fs.existsSync(file)) {
+      return JSON.parse(fs.readFileSync(file, "utf8"));
+    }
+  } catch {}
+  return null;
+}
+
+function writeDiskAnalyticsJson(filename: string, data: any): void {
+  try {
+    if (!fs.existsSync(CACHE_DIR)) {
+      fs.mkdirSync(CACHE_DIR, { recursive: true });
+    }
+    const file = path.join(CACHE_DIR, filename);
+    fs.writeFileSync(file, JSON.stringify(data, null, 2), "utf8");
+  } catch {}
+}
+
+// Telemetry Persistence Helpers (Disk Cache & Memory Store - Never touches notes table)
+async function getDbAnalyticsFallback(): Promise<AnalyticsEvent[]> {
+  const disk = readDiskAnalyticsJson("site_analytics.json");
+  if (Array.isArray(disk) && disk.length > 0) {
+    return disk.filter(
+      (e: any) =>
+        e?.id &&
+        !e.id.startsWith("evt-seed-") &&
+        !e.id.startsWith("evt-hist-")
+    ) as AnalyticsEvent[];
+  }
   return [];
 }
 
 async function saveDbAnalyticsFallback(events: AnalyticsEvent[]): Promise<void> {
-  try {
-    const serviceSupabase = await getAdminClient();
-    if (!serviceSupabase) return;
-    const { data: existing } = await serviceSupabase
-      .from("notes")
-      .select("id")
-      .eq("title", "__validily_site_analytics__")
-      .maybeSingle();
-
-    const payload = events.slice(0, 300);
-
-    if (existing?.id) {
-      await serviceSupabase
-        .from("notes")
-        .update({
-          content: JSON.stringify(payload),
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", existing.id);
-    } else {
-      await serviceSupabase.from("notes").insert({
-        user_id: "00000000-0000-0000-0000-000000000000",
-        title: "__validily_site_analytics__",
-        content: JSON.stringify(payload),
-        tags: ["system_analytics"],
-        visibility: "private",
-      });
-    }
-  } catch {}
+  const cleanPayload = events
+    .filter((e) => !e.id?.startsWith("evt-seed-") && !e.id?.startsWith("evt-hist-"))
+    .slice(0, 2500);
+  writeDiskAnalyticsJson("site_analytics.json", cleanPayload);
 }
 
 const DEFAULT_GOALS: UserStudyGoals = {
@@ -191,22 +192,10 @@ export async function getUserStudyGoals(userId?: string): Promise<UserStudyGoals
     const inMem = localUserGoals.get(effectiveUserId);
     if (inMem) return inMem;
 
-    const serviceSupabase = await getAdminClient();
-    if (serviceSupabase) {
-      const { data } = await serviceSupabase
-        .from("notes")
-        .select("content")
-        .eq("user_id", effectiveUserId)
-        .eq("title", "__validily_user_goals__")
-        .maybeSingle();
-
-      if (data?.content) {
-        const parsed = JSON.parse(data.content);
-        if (parsed?.dailyFocusMinutes) {
-          localUserGoals.set(effectiveUserId, parsed);
-          return parsed;
-        }
-      }
+    const disk = readDiskAnalyticsJson(`goals_${effectiveUserId}.json`);
+    if (disk?.dailyFocusMinutes) {
+      localUserGoals.set(effectiveUserId, disk);
+      return disk;
     }
 
     return DEFAULT_GOALS;
@@ -256,35 +245,7 @@ export async function saveUserStudyGoals(
     };
 
     localUserGoals.set(effectiveUserId, updated);
-
-    const serviceSupabase = await getAdminClient();
-    if (serviceSupabase) {
-      const { data: existing } = await serviceSupabase
-        .from("notes")
-        .select("id")
-        .eq("user_id", effectiveUserId)
-        .eq("title", "__validily_user_goals__")
-        .maybeSingle();
-
-      if (existing?.id) {
-        await serviceSupabase
-          .from("notes")
-          .update({
-            content: JSON.stringify(updated),
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", existing.id);
-      } else {
-        await serviceSupabase.from("notes").insert({
-          user_id: effectiveUserId,
-          title: "__validily_user_goals__",
-          content: JSON.stringify(updated),
-          tags: ["system_study_goals"],
-          visibility: "private",
-        });
-      }
-    }
-
+    writeDiskAnalyticsJson(`goals_${effectiveUserId}.json`, updated);
     return { success: true, goals: updated };
   } catch (err: any) {
     return {
@@ -292,6 +253,30 @@ export async function saveUserStudyGoals(
       goals: DEFAULT_GOALS,
       error: err?.message || "Erreur de sauvegarde des objectifs.",
     };
+  }
+}
+
+export async function resetUserStudyGoals(userId?: string): Promise<void> {
+  if (userId) {
+    localUserGoals.delete(userId);
+    try {
+      const file = path.join(CACHE_DIR, `goals_${userId}.json`);
+      if (fs.existsSync(file)) fs.unlinkSync(file);
+    } catch {}
+  } else {
+    localUserGoals.clear();
+  }
+}
+
+export async function resetUserDailyFocus(userId?: string): Promise<void> {
+  if (userId) {
+    localDailyFocusRecords.delete(userId);
+    try {
+      const file = path.join(CACHE_DIR, `daily_focus_${userId}.json`);
+      if (fs.existsSync(file)) fs.unlinkSync(file);
+    } catch {}
+  } else {
+    localDailyFocusRecords.clear();
   }
 }
 
@@ -336,40 +321,7 @@ export async function recordUserDailyFocus(input: {
 
     userHistory[todayStr] = updatedRecord;
     localDailyFocusRecords.set(effectiveUserId, userHistory);
-
-    const serviceSupabase = await getAdminClient();
-    if (serviceSupabase) {
-      const { data: existing } = await serviceSupabase
-        .from("notes")
-        .select("id, content")
-        .eq("user_id", effectiveUserId)
-        .eq("title", "__validily_user_daily_focus__")
-        .maybeSingle();
-
-      if (existing?.id) {
-        let mergedFromDb: Record<string, any> = {};
-        try {
-          if (existing.content) mergedFromDb = JSON.parse(existing.content);
-        } catch {}
-        mergedFromDb[todayStr] = updatedRecord;
-
-        await serviceSupabase
-          .from("notes")
-          .update({
-            content: JSON.stringify(mergedFromDb),
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", existing.id);
-      } else {
-        await serviceSupabase.from("notes").insert({
-          user_id: effectiveUserId,
-          title: "__validily_user_daily_focus__",
-          content: JSON.stringify(userHistory),
-          tags: ["system_daily_focus"],
-          visibility: "private",
-        });
-      }
-    }
+    writeDiskAnalyticsJson(`daily_focus_${effectiveUserId}.json`, userHistory);
 
     return {
       success: true,
@@ -409,32 +361,18 @@ export async function getUserDailyFocusHistory(
       }
     }
 
-    const serviceSupabase = await getAdminClient();
-    if (serviceSupabase) {
-      const { data } = await serviceSupabase
-        .from("notes")
-        .select("content")
-        .eq("user_id", effectiveUserId)
-        .eq("title", "__validily_user_daily_focus__")
-        .maybeSingle();
-
-      if (data?.content) {
-        try {
-          const parsed = JSON.parse(data.content);
-          if (parsed && typeof parsed === "object") {
-            for (const [date, rec] of Object.entries(parsed as Record<string, any>)) {
-              const sec = rec.totalSeconds || (rec.totalMinutes ? rec.totalMinutes * 60 : 0) || 0;
-              const pom = rec.completedPomodoros || 0;
-              if (!result[date] || sec > result[date].totalSeconds) {
-                result[date] = {
-                  totalSeconds: sec,
-                  completedPomodoros: pom,
-                  totalMinutes: Math.floor(sec / 60),
-                };
-              }
-            }
-          }
-        } catch {}
+    const disk = readDiskAnalyticsJson(`daily_focus_${effectiveUserId}.json`);
+    if (disk && typeof disk === "object") {
+      for (const [date, rec] of Object.entries(disk as Record<string, any>)) {
+        const sec = rec.totalSeconds || (rec.totalMinutes ? rec.totalMinutes * 60 : 0) || 0;
+        const pom = rec.completedPomodoros || 0;
+        if (!result[date] || sec > result[date].totalSeconds) {
+          result[date] = {
+            totalSeconds: sec,
+            completedPomodoros: pom,
+            totalMinutes: Math.floor(sec / 60),
+          };
+        }
       }
     }
 
@@ -606,40 +544,50 @@ export async function getAnalyticsOverview(
       }
     }
 
-    // 2. Load resilient DB fallback and merge
+    // 2. Load resilient DB fallback and merge genuine telemetry
     const fallbackEvents = await getDbAnalyticsFallback();
     const eventMap = new Map<string, AnalyticsEvent>();
 
-    // Initial seed if completely empty
-    if (localAnalyticsEvents.length === 0 && fallbackEvents.length === 0 && dbEvents.length === 0) {
-      const seeded = seedBaselineAnalytics();
-      seeded.forEach((e) => {
-        localAnalyticsEvents.push(e);
-        eventMap.set(e.id, e);
-      });
-      await saveDbAnalyticsFallback(seeded);
-    }
-
     localAnalyticsEvents.forEach((e) => {
-      if (new Date(e.created_at) >= cutoff) eventMap.set(e.id, e);
+      if (!e.id?.startsWith("evt-seed-") && !e.id?.startsWith("evt-hist-")) {
+        eventMap.set(e.id, e);
+      }
     });
     fallbackEvents.forEach((e) => {
-      if (new Date(e.created_at) >= cutoff) eventMap.set(e.id, e);
+      if (!e.id?.startsWith("evt-seed-") && !e.id?.startsWith("evt-hist-")) {
+        eventMap.set(e.id, e);
+      }
     });
     dbEvents.forEach((e) => {
-      if (new Date(e.created_at) >= cutoff) eventMap.set(e.id, e);
+      if (!e.id?.startsWith("evt-seed-") && !e.id?.startsWith("evt-hist-")) {
+        eventMap.set(e.id, e);
+      }
     });
 
-    const events = Array.from(eventMap.values());
-    if (activeSessionsCount === 0 && activeUsersEstimate > 0) {
-      activeSessionsCount = Math.max(1, Math.floor(activeUsersEstimate / 2));
-    }
+    const allEvents = Array.from(eventMap.values());
 
-    // Compute unique visitors
-    const uniqueSessionIds = new Set(events.map((e) => e.session_id));
-    const totalPageViews = events.filter((e) => e.event_type === "page_view").length;
+    // 3. Multi-window unique counts computed across the complete dataset
+    const dayAgo = new Date(now - 24 * 60 * 60 * 1000);
+    const sevenDaysAgo = new Date(now - 7 * 24 * 60 * 60 * 1000);
+    const thirtyDaysAgo = new Date(now - 30 * 24 * 60 * 60 * 1000);
 
-    // Top visited pages
+    const uniqueVisitors24h = new Set(
+      allEvents.filter((e) => new Date(e.created_at) >= dayAgo).map((e) => e.session_id)
+    ).size;
+
+    const uniqueVisitors7d = new Set(
+      allEvents.filter((e) => new Date(e.created_at) >= sevenDaysAgo).map((e) => e.session_id)
+    ).size;
+
+    const uniqueVisitors30d = new Set(
+      allEvents.filter((e) => new Date(e.created_at) >= thirtyDaysAgo).map((e) => e.session_id)
+    ).size;
+
+    // 4. Filter events strictly for the active selected timeRange window
+    const rangeEvents = allEvents.filter((e) => new Date(e.created_at) >= cutoff);
+    const totalPageViews = rangeEvents.filter((e) => e.event_type === "page_view").length;
+
+    // Top visited pages strictly in this timeRange
     const pageCounts: Record<string, number> = {};
     const deviceCounts: Record<DeviceCategory, number> = {
       desktop: 0,
@@ -649,16 +597,12 @@ export async function getAnalyticsOverview(
     };
     const browserCounts: Record<string, number> = {};
     const osCounts: Record<string, number> = {};
-    const dayBuckets: Record<string, number> = {};
 
-    events.forEach((e) => {
+    rangeEvents.forEach((e) => {
       pageCounts[e.page_route] = (pageCounts[e.page_route] || 0) + 1;
       deviceCounts[e.device_category] = (deviceCounts[e.device_category] || 0) + 1;
       browserCounts[e.browser_family] = (browserCounts[e.browser_family] || 0) + 1;
       osCounts[e.os_family] = (osCounts[e.os_family] || 0) + 1;
-
-      const dayKey = e.created_at.split("T")[0];
-      dayBuckets[dayKey] = (dayBuckets[dayKey] || 0) + 1;
     });
 
     const topPages = Object.entries(pageCounts)
@@ -666,23 +610,57 @@ export async function getAnalyticsOverview(
       .sort((a, b) => b.count - a.count)
       .slice(0, 8);
 
-    const pageViewsByDay = Object.entries(dayBuckets)
-      .map(([date, views]) => ({ date, views }))
-      .sort((a, b) => a.date.localeCompare(b.date));
+    // 5. Build timeline buckets matching the selected timeRange
+    let pageViewsByDay: Array<{ date: string; views: number }> = [];
 
-    // Multi-window unique counts
-    const dayAgo = new Date(now - 24 * 60 * 60 * 1000);
-    const sevenDaysAgo = new Date(now - 7 * 24 * 60 * 60 * 1000);
+    if (timeRange === "24h") {
+      const blocks = [
+        { label: "00h - 04h", minH: 0, maxH: 4 },
+        { label: "04h - 08h", minH: 4, maxH: 8 },
+        { label: "08h - 12h", minH: 8, maxH: 12 },
+        { label: "12h - 16h", minH: 12, maxH: 16 },
+        { label: "16h - 20h", minH: 16, maxH: 20 },
+        { label: "20h - 24h", minH: 20, maxH: 24 },
+      ];
+      const blockCounts: Record<string, number> = {};
+      blocks.forEach((b) => (blockCounts[b.label] = 0));
 
-    const uniqueVisitors24h = new Set(
-      events.filter((e) => new Date(e.created_at) >= dayAgo).map((e) => e.session_id)
-    ).size;
+      rangeEvents.forEach((e) => {
+        const h = new Date(e.created_at).getHours();
+        const matched = blocks.find((b) => h >= b.minH && h < b.maxH);
+        if (matched) {
+          blockCounts[matched.label] = (blockCounts[matched.label] || 0) + 1;
+        }
+      });
 
-    const uniqueVisitors7d = new Set(
-      events.filter((e) => new Date(e.created_at) >= sevenDaysAgo).map((e) => e.session_id)
-    ).size;
+      pageViewsByDay = blocks.map((b) => ({
+        date: b.label,
+        views: blockCounts[b.label],
+      }));
+    } else {
+      const dayCount = timeRange === "7d" ? 7 : 30;
+      const dayBuckets: Record<string, number> = {};
+      const dateKeys: string[] = [];
 
-    const uniqueVisitors30d = uniqueSessionIds.size;
+      for (let i = dayCount - 1; i >= 0; i--) {
+        const d = new Date(now - i * 24 * 60 * 60 * 1000);
+        const key = d.toISOString().split("T")[0];
+        dayBuckets[key] = 0;
+        dateKeys.push(key);
+      }
+
+      rangeEvents.forEach((e) => {
+        const dayKey = e.created_at.split("T")[0];
+        if (dayBuckets[dayKey] !== undefined) {
+          dayBuckets[dayKey] += 1;
+        }
+      });
+
+      pageViewsByDay = dateKeys.map((date) => ({
+        date,
+        views: dayBuckets[date] || 0,
+      }));
+    }
 
     return {
       success: true,

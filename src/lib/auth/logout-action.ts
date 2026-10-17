@@ -39,7 +39,7 @@ export async function serverLogoutAction(): Promise<{ success: boolean }> {
 
   // 2. Clear in-memory server repository and profile caches
   try {
-    invalidateRepositoryCache();
+    invalidateRepositoryCache("all");
     invalidateProfileCache();
   } catch {
     // Non-fatal

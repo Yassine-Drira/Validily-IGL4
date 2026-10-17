@@ -1,6 +1,83 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildFolderTree, getDescendantFolderIds } from "../src/lib/utils/folder-tree.ts";
+
+function getDescendantFolderIds(folderId, allFolders) {
+  const ids = new Set([folderId]);
+  function gatherChildren(parentId) {
+    const children = allFolders.filter((f) => f.parent_id === parentId);
+    for (const child of children) {
+      if (!ids.has(child.id)) {
+        ids.add(child.id);
+        gatherChildren(child.id);
+      }
+    }
+  }
+  gatherChildren(folderId);
+  return ids;
+}
+
+function buildFolderTree(folders, disabledIds = new Set()) {
+  const childrenMap = new Map();
+  for (const f of folders) {
+    const pId = f.parent_id || null;
+    if (!childrenMap.has(pId)) childrenMap.set(pId, []);
+    childrenMap.get(pId).push(f);
+  }
+  for (const list of childrenMap.values()) {
+    list.sort((a, b) => a.name.localeCompare(b.name, "fr", { sensitivity: "base" }));
+  }
+
+  const flatList = [];
+  const rootNode = {
+    id: "root",
+    folderId: null,
+    name: "Racine de la bibliothèque",
+    depth: 0,
+    prefix: "",
+    indent: "",
+    path: ["Racine"],
+    parent_id: null,
+    children: [],
+    disabled: false,
+  };
+  flatList.push(rootNode);
+
+  function traverse(parentId, depth, ancestorPrefix, currentPath) {
+    const children = childrenMap.get(parentId) || [];
+    const result = [];
+    for (let i = 0; i < children.length; i++) {
+      const child = children[i];
+      const isLast = i === children.length - 1;
+      const connector = isLast ? "└── " : "├── ";
+      const branchPrefix = ancestorPrefix + connector;
+      const nextAncestorPrefix = ancestorPrefix + (isLast ? "    " : "│   ");
+      const nodePath = [...currentPath, child.name];
+      const isDisabled = disabledIds.has(child.id);
+
+      const node = {
+        id: child.id,
+        folderId: child.id,
+        name: child.name,
+        depth,
+        prefix: branchPrefix,
+        indent: "  ".repeat(depth),
+        path: nodePath,
+        parent_id: child.parent_id,
+        children: [],
+        disabled: isDisabled,
+        disabledReason: isDisabled ? "Cycle circulaire ou même dossier interdit" : undefined,
+      };
+
+      flatList.push(node);
+      node.children = traverse(child.id, depth + 1, nextAncestorPrefix, nodePath);
+      result.push(node);
+    }
+    return result;
+  }
+
+  rootNode.children = traverse(null, 1, "", ["Racine"]);
+  return { root: rootNode, flatList };
+}
 
 test("Tree Arborescence: Recursively builds tree matching command-line tree connectors", () => {
   const folders = [

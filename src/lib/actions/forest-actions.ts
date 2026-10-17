@@ -1,5 +1,7 @@
 "use server";
 
+import fs from "fs";
+import path from "path";
 import type {
   FocusSession,
   ForestEntry,
@@ -121,103 +123,48 @@ const localFocusSessions = globalForestState.__localFocusSessions;
 const localForestEntries = globalForestState.__localForestEntries;
 const localForestPreferences = globalForestState.__localForestPreferences;
 
-// Supabase DB System Record Resilience Helpers (Guarantees forest tree persistence across restarts)
-async function getDbForestFallback(userId: string): Promise<ForestEntry[]> {
-  try {
-    const serviceSupabase = await getAdminClient();
-    if (!serviceSupabase) return [];
-    const { data } = await serviceSupabase
-      .from("notes")
-      .select("content")
-      .eq("user_id", userId)
-      .eq("title", "__validily_forest_trees__")
-      .maybeSingle();
-    if (data?.content) {
-      const parsed = JSON.parse(data.content);
-      if (Array.isArray(parsed)) return parsed as ForestEntry[];
-    }
-  } catch {}
-  return [];
-}
 
-async function saveDbForestFallback(userId: string, entries: ForestEntry[]): Promise<void> {
-  try {
-    const serviceSupabase = await getAdminClient();
-    if (!serviceSupabase) return;
-    const { data: existing } = await serviceSupabase
-      .from("notes")
-      .select("id")
-      .eq("user_id", userId)
-      .eq("title", "__validily_forest_trees__")
-      .maybeSingle();
+const CACHE_DIR = path.join(process.cwd(), ".validily-cache");
 
-    if (existing?.id) {
-      await serviceSupabase
-        .from("notes")
-        .update({
-          content: JSON.stringify(entries),
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", existing.id);
-    } else {
-      await serviceSupabase.from("notes").insert({
-        user_id: userId,
-        title: "__validily_forest_trees__",
-        content: JSON.stringify(entries),
-        tags: ["system_forest_trees"],
-        visibility: "private",
-      });
-    }
-  } catch {}
-}
-
-async function getDbForestPreferences(userId: string): Promise<ForestPreferences | null> {
+function readDiskForestJson(filename: string): any {
   try {
-    const serviceSupabase = await getAdminClient();
-    if (!serviceSupabase) return null;
-    const { data } = await serviceSupabase
-      .from("notes")
-      .select("content")
-      .eq("user_id", userId)
-      .eq("title", "__validily_forest_preferences__")
-      .maybeSingle();
-    if (data?.content) {
-      const parsed = JSON.parse(data.content);
-      if (parsed && parsed.visibility) return parsed as ForestPreferences;
+    const file = path.join(CACHE_DIR, filename);
+    if (fs.existsSync(file)) {
+      return JSON.parse(fs.readFileSync(file, "utf8"));
     }
   } catch {}
   return null;
 }
 
-async function saveDbForestPreferences(userId: string, pref: ForestPreferences): Promise<void> {
+function writeDiskForestJson(filename: string, data: any): void {
   try {
-    const serviceSupabase = await getAdminClient();
-    if (!serviceSupabase) return;
-    const { data: existing } = await serviceSupabase
-      .from("notes")
-      .select("id")
-      .eq("user_id", userId)
-      .eq("title", "__validily_forest_preferences__")
-      .maybeSingle();
-
-    if (existing?.id) {
-      await serviceSupabase
-        .from("notes")
-        .update({
-          content: JSON.stringify(pref),
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", existing.id);
-    } else {
-      await serviceSupabase.from("notes").insert({
-        user_id: userId,
-        title: "__validily_forest_preferences__",
-        content: JSON.stringify(pref),
-        tags: ["system_forest_preferences"],
-        visibility: "private",
-      });
+    if (!fs.existsSync(CACHE_DIR)) {
+      fs.mkdirSync(CACHE_DIR, { recursive: true });
     }
+    const file = path.join(CACHE_DIR, filename);
+    fs.writeFileSync(file, JSON.stringify(data, null, 2), "utf8");
   } catch {}
+}
+
+// Forest Resilience Helpers (Disk Cache & Memory Store - Never touches notes table)
+async function getDbForestFallback(userId: string): Promise<ForestEntry[]> {
+  const disk = readDiskForestJson(`forest_${userId}.json`);
+  if (Array.isArray(disk)) return disk as ForestEntry[];
+  return [];
+}
+
+async function saveDbForestFallback(userId: string, entries: ForestEntry[]): Promise<void> {
+  writeDiskForestJson(`forest_${userId}.json`, entries);
+}
+
+async function getDbForestPreferences(userId: string): Promise<ForestPreferences | null> {
+  const disk = readDiskForestJson(`forest_prefs_${userId}.json`);
+  if (disk && disk.visibility) return disk as ForestPreferences;
+  return null;
+}
+
+async function saveDbForestPreferences(userId: string, pref: ForestPreferences): Promise<void> {
+  writeDiskForestJson(`forest_prefs_${userId}.json`, pref);
 }
 
 const DEFAULT_PREFERENCES: ForestPreferences = {
@@ -228,6 +175,32 @@ const DEFAULT_PREFERENCES: ForestPreferences = {
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
 };
+
+export async function resetUserForestData(userId?: string): Promise<void> {
+  if (userId) {
+    localForestPreferences.delete(userId);
+    for (const [id, entry] of localForestEntries.entries()) {
+      if (entry.user_id === userId) {
+        localForestEntries.delete(id);
+      }
+    }
+    for (const [id, sess] of localFocusSessions.entries()) {
+      if (sess.user_id === userId) {
+        localFocusSessions.delete(id);
+      }
+    }
+    try {
+      const f1 = path.join(CACHE_DIR, `forest_${userId}.json`);
+      if (fs.existsSync(f1)) fs.unlinkSync(f1);
+      const f2 = path.join(CACHE_DIR, `forest_prefs_${userId}.json`);
+      if (fs.existsSync(f2)) fs.unlinkSync(f2);
+    } catch {}
+  } else {
+    localForestPreferences.clear();
+    localForestEntries.clear();
+    localFocusSessions.clear();
+  }
+}
 
 /**
  * 1. Start a verified Pomodoro session on the server
@@ -1500,20 +1473,6 @@ export async function getCommunityForests(): Promise<MemberForestSummary[]> {
         }
       } catch {}
 
-      try {
-        const { data: notePrefs } = await serviceSupabase
-          .from("notes")
-          .select("user_id, content")
-          .eq("title", "__validily_forest_preferences__");
-        if (notePrefs) {
-          for (const np of notePrefs) {
-            try {
-              const parsed = JSON.parse(np.content);
-              if (parsed?.visibility) prefsMap.set(np.user_id, parsed);
-            } catch {}
-          }
-        }
-      } catch {}
     }
 
     for (const [uid, p] of localForestPreferences.entries()) {
@@ -1555,29 +1514,6 @@ export async function getCommunityForests(): Promise<MemberForestSummary[]> {
         }
       } catch {}
 
-      try {
-        const { data: noteTrees } = await serviceSupabase
-          .from("notes")
-          .select("user_id, content")
-          .eq("title", "__validily_forest_trees__")
-          .in("user_id", visibleUserIds);
-        if (noteTrees) {
-          for (const nt of noteTrees) {
-            try {
-              const parsed = JSON.parse(nt.content);
-              if (Array.isArray(parsed)) {
-                const existing = allTreesByUser.get(nt.user_id) || [];
-                for (const t of parsed) {
-                  if (!existing.some((e) => e.id === t.id || (e.session_id && t.session_id && e.session_id === t.session_id))) {
-                    existing.push(t);
-                  }
-                }
-                allTreesByUser.set(nt.user_id, existing);
-              }
-            } catch {}
-          }
-        }
-      } catch {}
     }
 
     // Also include in-memory localForestEntries
@@ -1671,12 +1607,6 @@ export async function resetAllForestProgressAction(): Promise<{
         } catch {}
         try {
           await serviceSupabase.from("forest_cheers").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-        } catch {}
-        try {
-          await serviceSupabase.from("notes").delete().eq("title", "__validily_forest_trees__");
-        } catch {}
-        try {
-          await serviceSupabase.from("notes").delete().eq("title", "__validily_forest_preferences__");
         } catch {}
       }
     }

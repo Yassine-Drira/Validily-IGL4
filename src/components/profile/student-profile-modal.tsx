@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
+import Link from "next/link";
 import {
   X,
   Trees,
@@ -19,6 +21,8 @@ import {
   Heart,
   Droplets,
   Calendar,
+  ExternalLink,
+  User,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TreeSvg, SPECIES_METADATA } from "@/components/forest/tree-models";
@@ -38,6 +42,20 @@ interface StudentProfileModalProps {
   initialProfile?: StudentPublicProfile | null;
 }
 
+function sanitizeErrorMessage(msg?: string): string {
+  if (!msg) return "";
+  if (
+    msg.includes("use server") ||
+    msg.includes("POST") ||
+    msg.includes("module evaluation") ||
+    msg.includes("chunk") ||
+    msg.includes("digest")
+  ) {
+    return "Synchronisation détaillée temporairement indisponible.";
+  }
+  return msg;
+}
+
 export function StudentProfileModal({
   studentId,
   isOpen,
@@ -50,6 +68,22 @@ export function StudentProfileModal({
   const [activeTab, setActiveTab] = useState<"bosquet" | "achievements" | "streak">("bosquet");
   const [cheerFeedback, setCheerFeedback] = useState<string>("");
   const [isCheering, setIsCheering] = useState<boolean>(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Prevent background scroll when modal is active
+  useEffect(() => {
+    if (isOpen) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = originalOverflow;
+      };
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen || !studentId) {
@@ -61,14 +95,17 @@ export function StudentProfileModal({
       return;
     }
 
+    let isCancelled = false;
     if (initialProfile && initialProfile.id === studentId) {
       setProfile(initialProfile);
-      setIsLoading(false);
-      return;
+      if (initialProfile.trees && initialProfile.trees.length > 0) {
+        setIsLoading(false);
+      } else {
+        setIsLoading(true);
+      }
+    } else {
+      setIsLoading(true);
     }
-
-    let isCancelled = false;
-    setIsLoading(true);
     setError("");
 
     getStudentPublicProfile(studentId)
@@ -76,14 +113,15 @@ export function StudentProfileModal({
         if (!isCancelled) {
           if (res.success && res.profile) {
             setProfile(res.profile);
-          } else {
-            setError(res.error || "Impossible de charger le profil de cet étudiant.");
+            setError("");
+          } else if (!initialProfile || !initialProfile.displayName) {
+            setError(sanitizeErrorMessage(res.error) || "Impossible de charger le profil de cet étudiant.");
           }
         }
       })
       .catch((err) => {
-        if (!isCancelled) {
-          setError(err?.message || "Erreur de connexion lors du chargement.");
+        if (!isCancelled && (!initialProfile || !initialProfile.displayName)) {
+          setError(sanitizeErrorMessage(err?.message) || "Erreur de connexion lors du chargement.");
         }
       })
       .finally(() => {
@@ -95,7 +133,7 @@ export function StudentProfileModal({
     };
   }, [isOpen, studentId, initialProfile]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted || typeof document === "undefined" || !document.body) return null;
 
   const handleSendCheer = async (type: "water" | "clap" | "fire" | "muscle") => {
     if (!profile || isCheering) return;
@@ -136,9 +174,9 @@ export function StudentProfileModal({
   const totalHours = profile ? Math.floor(profile.stats.totalFocusedMinutes / 60) : 0;
   const totalMinsRemainder = profile ? profile.stats.totalFocusedMinutes % 60 : 0;
 
-  return (
+  const modalContent = (
     <div
-      className="fixed inset-0 z-50 bg-[#111A2E]/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-200"
+      className="fixed inset-0 z-[100] bg-[#111A2E]/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-200"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -168,9 +206,17 @@ export function StudentProfileModal({
                 <div className="h-3.5 w-32 bg-[#E4E8F0] rounded-md animate-pulse" />
               </div>
             </div>
-          ) : error || !profile ? (
-            <div className="py-2 text-rose-700 text-sm font-medium">
-              {error || "Profil introuvable."}
+          ) : !profile ? (
+            <div className="flex items-center space-x-3 py-1">
+              <div className="w-12 h-12 rounded-2xl bg-white border border-[#E4E8F0] shadow-xs flex items-center justify-center text-[#68748A]">
+                <User className="w-6 h-6 text-[#94A3B8]" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-[#111A2E]">Profil Étudiant</h3>
+                <span className="text-xs text-rose-600 font-medium">
+                  {error || "Espace confidentiel ou introuvable"}
+                </span>
+              </div>
             </div>
           ) : (
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -296,12 +342,22 @@ export function StudentProfileModal({
               <Loader2 className="w-8 h-8 text-[#2855D9] animate-spin" />
               <p className="text-xs text-[#68748A]">Chargement des données académiques...</p>
             </div>
-          ) : error || !profile ? (
-            <div className="py-12 text-center space-y-2">
-              <p className="text-sm font-semibold text-[#182235]">Profil non disponible</p>
-              <p className="text-xs text-[#68748A] max-w-sm mx-auto">
-                {error || "Ce compte étudiant est privé ou introuvable."}
-              </p>
+          ) : !profile ? (
+            <div className="py-12 text-center space-y-4 max-w-sm mx-auto">
+              <div className="w-14 h-14 rounded-2xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center mx-auto shadow-2xs">
+                <Lock className="w-7 h-7" />
+              </div>
+              <div className="space-y-1.5">
+                <p className="text-base font-bold text-[#111A2E]">Profil Privé ou Indisponible</p>
+                <p className="text-xs text-[#68748A] leading-relaxed">
+                  {error || "Cet étudiant a configuré son espace d'étude en mode privé ou ce profil n'est plus accessible."}
+                </p>
+              </div>
+              <div className="pt-2">
+                <Button size="sm" variant="outline" onClick={onClose} className="text-xs cursor-pointer">
+                  Fermer la vue
+                </Button>
+              </div>
             </div>
           ) : activeTab === "bosquet" ? (
             <div className="space-y-4">
@@ -545,4 +601,7 @@ export function StudentProfileModal({
       </div>
     </div>
   );
+
+  if (typeof document === "undefined" || !document.body) return null;
+  return createPortal(modalContent, document.body);
 }

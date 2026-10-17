@@ -163,10 +163,12 @@ export async function getLivePresenceList(): Promise<{
     const totalActive = users.filter((u: any) => !u.isRecent).length;
 
     // Purge stale records (> 30m) periodically in background
-    serviceSupabase
-      .from("user_presence")
-      .delete()
-      .lt("last_seen_at", new Date(now - 30 * 60 * 1000).toISOString())
+    Promise.resolve(
+      serviceSupabase
+        .from("user_presence")
+        .delete()
+        .lt("last_seen_at", new Date(now - 30 * 60 * 1000).toISOString())
+    )
       .then(() => {})
       .catch(() => {});
 

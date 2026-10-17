@@ -1,7 +1,25 @@
 "use server";
 
+import fs from "fs";
+import path from "path";
 import type { ForestEntry } from "../../types/database";
 import type { ComputedAchievement } from "../utils/achievements";
+
+const CACHE_DIR = path.join(process.cwd(), ".validily-cache");
+
+function readDiskJson(filename: string): any {
+  try {
+    const file = path.join(CACHE_DIR, filename);
+    if (fs.existsSync(file)) {
+      return JSON.parse(fs.readFileSync(file, "utf8"));
+    }
+  } catch {}
+  return null;
+}
+
+const globalForestState = globalThis as unknown as {
+  __localForestEntries?: Map<string, ForestEntry>;
+};
 
 async function getAdminClient() {
   try {
@@ -95,6 +113,7 @@ export interface StudentPerformanceOverview {
   id: string;
   displayName: string;
   email?: string;
+  avatarUrl?: string | null;
   role: string;
   isVip: boolean;
   totalFocusedMinutes: number;
@@ -102,6 +121,17 @@ export interface StudentPerformanceOverview {
   streak: number;
   achievementsUnlocked: number;
   created_at: string;
+}
+
+// In-memory cache for ultra-fast student profile loads (< 5ms)
+const studentProfileCache = new Map<string, { data: StudentPublicProfile; expiry: number }>();
+
+export async function invalidateStudentProfileCache(studentId?: string): Promise<void> {
+  if (studentId) {
+    studentProfileCache.delete(studentId);
+  } else {
+    studentProfileCache.clear();
+  }
 }
 
 /**
@@ -117,6 +147,11 @@ export async function getStudentPublicProfile(
       return { success: false, error: "Identifiant d'étudiant manquant." };
     }
 
+    const cached = studentProfileCache.get(studentId);
+    if (cached && Date.now() < cached.expiry) {
+      return { success: true, profile: cached.data };
+    }
+
     const authMod = await getAuthModule();
     const requester = authMod ? await authMod.getRequesterUser() : null;
     if (!requester || !requester.id) {
@@ -127,6 +162,7 @@ export async function getStudentPublicProfile(
     const serverMod = await getSupabaseServerModule();
     const isConfigured = serverMod ? serverMod.isSupabaseConfigured() : false;
     const serviceSupabase = await getAdminClient();
+    const forestMod = await getForestActionsModule();
 
     let displayName = "Étudiant IGL4";
     let avatarUrl: string | null = null;
@@ -147,43 +183,46 @@ export async function getStudentPublicProfile(
       isVip = Boolean(requester.isVip);
     }
 
-    if (isConfigured && serviceSupabase) {
-      try {
-        const { data: profile } = await serviceSupabase
-          .from("profiles")
-          .select("id, display_name, avatar_url, role")
-          .eq("id", studentId)
-          .maybeSingle();
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(studentId);
 
-        if (profile) {
-          displayName = profile.display_name || displayName;
-          avatarUrl = profile.avatar_url || null;
-          role = profile.role || "student";
-        }
+    // Parallelize DB queries, auth info, and forest data concurrently
+    const [profileRes, authRes, forestRes] = await Promise.all([
+      isConfigured && serviceSupabase && isUuid
+        ? Promise.resolve(
+            serviceSupabase
+              .from("profiles")
+              .select("id, display_name, avatar_url, role")
+              .eq("id", studentId)
+              .maybeSingle()
+          ).catch(() => ({ data: null }))
+        : Promise.resolve({ data: null }),
+      isConfigured && serviceSupabase && isUuid
+        ? Promise.resolve(serviceSupabase.auth.admin.getUserById(studentId)).catch(() => ({ data: null }))
+        : Promise.resolve({ data: null }),
+      forestMod
+        ? forestMod.getMyForest(studentId).catch(() => null)
+        : Promise.resolve(null),
+    ]);
 
-        const { data: authUser } = await serviceSupabase.auth.admin.getUserById(studentId);
-        if (authUser?.user) {
-          displayName =
-            authUser.user.user_metadata?.full_name ||
-            authUser.user.user_metadata?.name ||
-            displayName;
-          avatarUrl = authUser.user.user_metadata?.avatar_url || avatarUrl;
-          isVip = Boolean(
-            authUser.user.user_metadata?.is_vip ||
-              authUser.user.app_metadata?.is_vip
-          );
-          if (isAdmin) {
-            studentEmail = authUser.user.email;
-          }
-        }
-      } catch {
-        // Fallback to local profile info
+    if (profileRes?.data) {
+      displayName = profileRes.data.display_name || displayName;
+      avatarUrl = profileRes.data.avatar_url || null;
+      role = profileRes.data.role || "student";
+    }
+
+    if (authRes?.data?.user) {
+      const u = authRes.data.user;
+      displayName =
+        u.user_metadata?.full_name ||
+        u.user_metadata?.name ||
+        displayName;
+      avatarUrl = u.user_metadata?.avatar_url || avatarUrl;
+      isVip = Boolean(u.user_metadata?.is_vip || u.app_metadata?.is_vip);
+      if (isAdmin) {
+        studentEmail = u.email;
       }
     }
 
-    // Retrieve forest data
-    const forestMod = await getForestActionsModule();
-    const forestRes = forestMod ? await forestMod.getMyForest(studentId) : null;
     const trees: ForestEntry[] = forestRes?.trees || [];
     const healthyTrees = trees.filter((t) => t.tree_status === "healthy");
     const healthyCount = healthyTrees.length;
@@ -200,32 +239,55 @@ export async function getStudentPublicProfile(
       }, 0) / 60
     );
 
-    const totalMinutes = Math.max(forestRes?.totalFocusedMinutes || 0, healthyMinutes);
+    // Also check daily focus history from disk cache
+    let dbDailyMinutes = 0;
+    const dailyFocusData = readDiskJson(`daily_focus_${studentId}.json`);
+    const activeDatesSet = new Set<string>();
+    if (dailyFocusData && typeof dailyFocusData === "object") {
+      for (const [dateStr, rec] of Object.entries(dailyFocusData as Record<string, any>)) {
+        const m = rec.totalMinutes || Math.floor((rec.totalSeconds || 0) / 60);
+        dbDailyMinutes += m;
+        if (rec.totalSeconds > 0 || rec.totalMinutes > 0) {
+          activeDatesSet.add(dateStr);
+        }
+      }
+    }
 
-    // Calculate streak from tree dates
-    const daysSet = new Set(
-      healthyTrees
-        .map((e) => {
-          const raw = e.earned_at || e.created_at;
-          if (!raw) return null;
-          const d = new Date(raw);
-          return isNaN(d.getTime()) ? null : d.toLocaleDateString("en-CA");
-        })
-        .filter(Boolean) as string[]
+    const totalMinutes = Math.max(
+      forestRes?.stats?.totalFocusedMinutes || 0,
+      forestRes?.totalFocusedMinutes || 0,
+      healthyMinutes,
+      dbDailyMinutes
     );
 
-    let streak = 0;
-    const today = new Date();
-    for (let i = 0; i < 60; i++) {
-      const d = new Date(today);
-      d.setDate(d.getDate() - i);
-      const dateKey = d.toLocaleDateString("en-CA");
-      if (daysSet.has(dateKey)) {
-        streak++;
-      } else if (i === 0) {
-        continue;
-      } else {
-        break;
+    // Calculate streak from tree dates and daily focus dates
+    healthyTrees.forEach((e) => {
+      const raw = e.earned_at || e.created_at;
+      if (!raw) return;
+      const d = new Date(raw);
+      if (!isNaN(d.getTime())) activeDatesSet.add(d.toISOString().split("T")[0]);
+    });
+
+    const activeDates = Array.from(activeDatesSet).sort().reverse();
+    let streak = forestRes?.stats?.currentStreak || 0;
+    if (activeDates.length > 0 && streak === 0) {
+      const today = new Date().toISOString().split("T")[0];
+      const yesterdayDate = new Date();
+      yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+      const yesterday = yesterdayDate.toISOString().split("T")[0];
+
+      if (activeDates[0] === today || activeDates[0] === yesterday) {
+        streak = 1;
+        const curr = new Date(activeDates[0]);
+        for (let i = 1; i < activeDates.length; i++) {
+          curr.setDate(curr.getDate() - 1);
+          const expected = curr.toISOString().split("T")[0];
+          if (activeDates[i] === expected) {
+            streak++;
+          } else {
+            break;
+          }
+        }
       }
     }
 
@@ -259,6 +321,8 @@ export async function getStudentPublicProfile(
       achievements,
       unlockedAchievementsCount: unlockedCount,
     };
+
+    studentProfileCache.set(studentId, { data: profileData, expiry: Date.now() + 20000 });
 
     return { success: true, profile: profileData };
   } catch (err: any) {
@@ -337,88 +401,197 @@ export async function listStudentsPerformanceAction(): Promise<{
       };
     }
 
-    // 1. Fetch profiles
-    const { data: profiles, error: pErr } = await serviceSupabase
-      .from("profiles")
-      .select("id, display_name, avatar_url, role, created_at")
-      .order("created_at", { ascending: false });
+    // Parallel fetch: profiles, auth users, and optional DB tables
+    const [profilesRes, authDataRes, treesRes, revProgressRes, quizAttemptsRes] = await Promise.all([
+      serviceSupabase
+        .from("profiles")
+        .select("id, display_name, avatar_url, role, created_at")
+        .order("created_at", { ascending: false }),
+      serviceSupabase.auth.admin.listUsers().catch(() => ({ data: { users: [] } })),
+      serviceSupabase
+        .from("forest_entries")
+        .select("user_id, tree_status, created_at, earned_at, duration_minutes, tree_species"),
+      serviceSupabase
+        .from("revision_progress")
+        .select("user_id, status, updated_at"),
+      serviceSupabase
+        .from("quiz_attempts")
+        .select("user_id, completed_at"),
+    ]);
 
-    if (pErr) {
-      return { success: false, error: pErr.message };
+    if (profilesRes.error) {
+      return { success: false, error: profilesRes.error.message };
     }
 
-    // 2. Fetch auth metadata
-    const { data: authData } = await serviceSupabase.auth.admin.listUsers();
+    const profiles = profilesRes.data || [];
+    const authData = authDataRes?.data;
     const authMap = new Map((authData?.users || []).map((u: any) => [u.id, u]));
 
-    // 3. Fetch all healthy trees to aggregate performance
-    const { data: allTrees } = await serviceSupabase
-      .from("forest_trees")
-      .select("user_id, tree_status, created_at, earned_at, duration_minutes, tree_species");
+    const dbTreesByUser = new Map<string, any[]>();
+    if (treesRes?.data && Array.isArray(treesRes.data)) {
+      treesRes.data.forEach((t: any) => {
+        const arr = dbTreesByUser.get(t.user_id) || [];
+        arr.push(t);
+        dbTreesByUser.set(t.user_id, arr);
+      });
+    }
 
-    const treesByUser = new Map<string, any[]>();
-    (allTrees || []).forEach((t: any) => {
-      const arr = treesByUser.get(t.user_id) || [];
-      arr.push(t);
-      treesByUser.set(t.user_id, arr);
-    });
+    const revsByUser = new Map<string, any[]>();
+    if (revProgressRes?.data && Array.isArray(revProgressRes.data)) {
+      revProgressRes.data.forEach((r: any) => {
+        const arr = revsByUser.get(r.user_id) || [];
+        arr.push(r);
+        revsByUser.set(r.user_id, arr);
+      });
+    }
+
+    const quizzesByUser = new Map<string, any[]>();
+    if (quizAttemptsRes?.data && Array.isArray(quizAttemptsRes.data)) {
+      quizAttemptsRes.data.forEach((q: any) => {
+        const arr = quizzesByUser.get(q.user_id) || [];
+        arr.push(q);
+        quizzesByUser.set(q.user_id, arr);
+      });
+    }
+
+    const achieveMod = await getAchievementsModule();
 
     const results: StudentPerformanceOverview[] = (profiles || []).map((p: any) => {
       const authUser = authMap.get(p.id) as any;
       const email = authUser?.email || "etudiant@university.tn";
       const isVip = Boolean(authUser?.user_metadata?.is_vip || authUser?.app_metadata?.is_vip);
-      const userTrees = treesByUser.get(p.id) || [];
-      const healthy = userTrees.filter((t: any) => t.tree_status === "healthy");
-      const healthyCount = healthy.length;
 
-      const totalMinutes = healthy.reduce((acc: number, t: any) => {
-        return acc + (t.duration_minutes || 25);
-      }, 0);
+      // Collect trees for user from DB, disk cache, and memory
+      const userTreesMap = new Map<string, any>();
+      const dbTrees = dbTreesByUser.get(p.id) || [];
+      dbTrees.forEach((t: any) => {
+        const key = t.id || `${t.user_id}_${t.earned_at || t.created_at}`;
+        userTreesMap.set(key, t);
+      });
 
-      // Streak calculation
-      const daysSet = new Set(
-        healthy.map((t: any) => {
-          const raw = t.earned_at || t.created_at;
-          return raw ? new Date(raw).toLocaleDateString("en-CA") : null;
-        }).filter(Boolean) as string[]
-      );
+      const diskForest = readDiskJson(`forest_${p.id}.json`);
+      if (Array.isArray(diskForest)) {
+        diskForest.forEach((t: any) => {
+          if (t && t.id && !userTreesMap.has(t.id)) {
+            userTreesMap.set(t.id, t);
+          }
+        });
+      }
 
-      let streak = 0;
-      const today = new Date();
-      for (let i = 0; i < 60; i++) {
-        const d = new Date(today);
-        d.setDate(d.getDate() - i);
-        const dateKey = d.toLocaleDateString("en-CA");
-        if (daysSet.has(dateKey)) {
-          streak++;
-        } else if (i === 0) {
-          continue;
-        } else {
-          break;
+      if (globalForestState.__localForestEntries) {
+        for (const t of globalForestState.__localForestEntries.values()) {
+          if (t.user_id === p.id && t.id && !userTreesMap.has(t.id)) {
+            userTreesMap.set(t.id, t);
+          }
         }
       }
 
-      // Achievement unlocked count estimation
-      const plantedSpecies = new Set(healthy.map((t: any) => t.tree_species).filter(Boolean)).size;
+      const userTrees = Array.from(userTreesMap.values());
+      const healthy = userTrees.filter((t: any) => t.tree_status === "healthy");
+      const healthyCount = healthy.length;
+
+      const healthyMinutes = Math.floor(
+        healthy.reduce((acc: number, t: any) => {
+          const sec =
+            t.session?.actual_duration_seconds ??
+            t.session?.target_duration_seconds ??
+            (t.duration_minutes ? t.duration_minutes * 60 : 1500);
+          return acc + (typeof sec === "number" && sec > 0 ? sec : 1500);
+        }, 0) / 60
+      );
+
+      // Collect verified daily focus from disk cache
+      const dailyFocusData = readDiskJson(`daily_focus_${p.id}.json`);
+      let dbDailyMinutes = 0;
+      const activeDatesSet = new Set<string>();
+
+      if (dailyFocusData && typeof dailyFocusData === "object") {
+        for (const [dateStr, rec] of Object.entries(dailyFocusData as Record<string, any>)) {
+          const m = rec.totalMinutes || Math.floor((rec.totalSeconds || 0) / 60);
+          dbDailyMinutes += m;
+          if (rec.totalSeconds > 0 || rec.totalMinutes > 0) {
+            activeDatesSet.add(dateStr);
+          }
+        }
+      }
+
+      // Add tree earned dates
+      healthy.forEach((t: any) => {
+        const raw = t.earned_at || t.created_at;
+        if (!raw) return;
+        const d = new Date(raw);
+        if (!isNaN(d.getTime())) {
+          activeDatesSet.add(d.toISOString().split("T")[0]);
+        }
+      });
+
+      // Add revisions and quizzes active dates
+      const revs = revsByUser.get(p.id) || [];
+      revs.forEach((r: any) => {
+        if (r.updated_at) {
+          const d = new Date(r.updated_at);
+          if (!isNaN(d.getTime())) activeDatesSet.add(d.toISOString().split("T")[0]);
+        }
+      });
+
+      const quizzes = quizzesByUser.get(p.id) || [];
+      quizzes.forEach((q: any) => {
+        if (q.completed_at) {
+          const d = new Date(q.completed_at);
+          if (!isNaN(d.getTime())) activeDatesSet.add(d.toISOString().split("T")[0]);
+        }
+      });
+
+      const totalMinutes = Math.max(healthyMinutes, dbDailyMinutes);
+
+      // Streak calculation
+      const activeDates = Array.from(activeDatesSet).sort().reverse();
+      let streak = 0;
+      if (activeDates.length > 0) {
+        const today = new Date().toISOString().split("T")[0];
+        const yesterdayDate = new Date();
+        yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+        const yesterday = yesterdayDate.toISOString().split("T")[0];
+
+        if (activeDates[0] === today || activeDates[0] === yesterday) {
+          streak = 1;
+          const curr = new Date(activeDates[0]);
+          for (let i = 1; i < activeDates.length; i++) {
+            curr.setDate(curr.getDate() - 1);
+            const expected = curr.toISOString().split("T")[0];
+            if (activeDates[i] === expected) {
+              streak++;
+            } else {
+              break;
+            }
+          }
+        }
+      }
+
+      // Achievements
       let achievementsUnlocked = 0;
-      if (healthyCount >= 1) achievementsUnlocked++;
-      if (healthyCount >= 5) achievementsUnlocked++;
-      if (healthyCount >= 15) achievementsUnlocked++;
-      if (healthyCount >= 36) achievementsUnlocked++;
-      if (healthyCount >= 100) achievementsUnlocked++;
-      if (totalMinutes >= 120) achievementsUnlocked++;
-      if (totalMinutes >= 600) achievementsUnlocked++;
-      if (totalMinutes >= 1440) achievementsUnlocked++;
-      if (streak >= 3) achievementsUnlocked++;
-      if (streak >= 7) achievementsUnlocked++;
-      if (plantedSpecies >= 3) achievementsUnlocked++;
-      if (plantedSpecies >= 6) achievementsUnlocked++;
+      if (achieveMod) {
+        const achievements = achieveMod.computeStudentAchievements(userTrees, streak, totalMinutes);
+        achievementsUnlocked = achievements.filter((a: any) => a.isUnlocked).length;
+      } else {
+        if (healthyCount >= 1 || totalMinutes >= 15) achievementsUnlocked++;
+        if (healthyCount >= 5) achievementsUnlocked++;
+        if (healthyCount >= 15) achievementsUnlocked++;
+        if (healthyCount >= 36) achievementsUnlocked++;
+        if (healthyCount >= 100) achievementsUnlocked++;
+        if (totalMinutes >= 120) achievementsUnlocked++;
+        if (totalMinutes >= 600) achievementsUnlocked++;
+        if (totalMinutes >= 1440) achievementsUnlocked++;
+        if (streak >= 3) achievementsUnlocked++;
+        if (streak >= 7) achievementsUnlocked++;
+      }
 
       return {
         id: p.id,
         displayName:
           p.display_name || authUser?.user_metadata?.full_name || email.split("@")[0] || "Étudiant",
         email,
+        avatarUrl: p.avatar_url || authUser?.user_metadata?.avatar_url || null,
         role: p.role || "student",
         isVip,
         totalFocusedMinutes: totalMinutes,

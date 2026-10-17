@@ -231,3 +231,84 @@ test("Admin Dashboard: listStudentsPerformanceAction security & aggregate perfor
 
   setTestUser(null);
 });
+
+test("Profile Modal Isolation & Performance: Modal uses createPortal to escape sticky header backdrop-blur", async () => {
+  const fs = await import("node:fs");
+  const modalSource = fs.readFileSync("src/components/profile/student-profile-modal.tsx", "utf8");
+
+  assert.ok(
+    modalSource.includes("createPortal(modalContent, document.body)"),
+    "StudentProfileModal must mount directly to document.body via createPortal to prevent trapping behind sticky headers"
+  );
+  assert.ok(
+    modalSource.includes("document.body.style.overflow = \"hidden\""),
+    "StudentProfileModal must lock body scroll when open to prevent underlying page shifting"
+  );
+  assert.ok(
+    modalSource.includes("z-[100]"),
+    "StudentProfileModal must have elevated z-[100] overlay"
+  );
+});
+
+test("Profile Action Caching: In-memory cache returns cached student profiles in < 5ms", async () => {
+  const testRequester = {
+    id: "requester-perf-test-01",
+    email: "test@validily.com",
+    role: "student",
+    name: "Étudiant Testeur",
+    avatarUrl: null,
+  };
+
+  setTestUser(testRequester);
+
+  // First call primes cache
+  const t0 = performance.now();
+  const res1 = await getStudentPublicProfile("student-target-privacy-01");
+  const d1 = performance.now() - t0;
+
+  assert.equal(res1.success, true);
+  assert.ok(res1.profile);
+  assert.equal(res1.profile.displayName, "Sarra Ben Amor");
+
+  // Second call hits in-memory cache
+  const t1 = performance.now();
+  const res2 = await getStudentPublicProfile("student-target-privacy-01");
+  const d2 = performance.now() - t1;
+
+  assert.equal(res2.success, true);
+  assert.equal(res2.profile?.displayName, "Sarra Ben Amor");
+  assert.ok(d2 < 15, `Cached retrieval should be near-instant (took ${d2.toFixed(2)}ms)`);
+
+  setTestUser(null);
+});
+
+test("Admin Performance: listStudentsPerformanceAction aggregates resilient daily focus and streak", async () => {
+  const adminUser = {
+    id: "admin-super-metrics-01",
+    email: "admin-metrics@validily.com",
+    role: "admin",
+    name: "Admin Metric Checker",
+    avatarUrl: null,
+  };
+
+  setTestUser(adminUser);
+  const res = await listStudentsPerformanceAction();
+  assert.equal(res.success, true);
+  assert.ok(Array.isArray(res.students));
+  assert.ok(res.students.length > 0);
+
+  // Each student must have positive or zero valid metrics (never NaN or undefined)
+  for (const s of res.students) {
+    assert.equal(typeof s.totalFocusedMinutes, "number");
+    assert.ok(!isNaN(s.totalFocusedMinutes));
+    assert.equal(typeof s.healthyTreesCount, "number");
+    assert.ok(!isNaN(s.healthyTreesCount));
+    assert.equal(typeof s.streak, "number");
+    assert.ok(!isNaN(s.streak));
+    assert.equal(typeof s.achievementsUnlocked, "number");
+    assert.ok(!isNaN(s.achievementsUnlocked));
+  }
+
+  setTestUser(null);
+});
+

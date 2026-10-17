@@ -47,5 +47,6 @@ scripts/agent-bridge.mjs
 supabase/.temp/
 template-prompt-html-quiz.md
 scratch/
+.validily-cache/
 
 

@@ -6,7 +6,6 @@ import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { ResourceCard } from "@/components/academic/resource-card";
 import { Button } from "@/components/ui/button";
 import { UploadDropzone } from "@/components/resources/upload-dropzone";
-import { ContributeTrigger } from "@/components/resources/contribute-trigger";
 import {
   UploadCloud,
   FolderArchive,
@@ -47,9 +46,11 @@ export default async function LibraryPage({ searchParams }: LibraryPageProps) {
     redirect(`/login?next=${encodeURIComponent("/library?action=upload")}`);
   }
 
-  const subjects = await getSubjects(undefined, requester?.id);
-  const categories = await getCategories();
-  const userStats = requester?.id ? await getUserContributionsStatsAction(requester.id) : null;
+  const [subjects, categories, userStats] = await Promise.all([
+    getSubjects(undefined, requester?.id),
+    getCategories(),
+    requester?.id ? getUserContributionsStatsAction(requester.id) : Promise.resolve(null),
+  ]);
 
   // Support both slug (category=exams) and ID (categoryId=uuid)
   const effectiveCategoryParam = categoryId || category;
@@ -64,6 +65,10 @@ export default async function LibraryPage({ searchParams }: LibraryPageProps) {
     : null;
 
   const targetCategoryId = matchedCategory ? matchedCategory.id : effectiveCategoryParam;
+
+  const matchedSubject = subjectId
+    ? subjects.find((s) => s.id === subjectId || s.slug === subjectId)
+    : null;
 
   // Dynamic PostgreSQL query with search, sort, and type filters (strict privacy boundary)
   const resources = await getResources({
@@ -126,12 +131,12 @@ export default async function LibraryPage({ searchParams }: LibraryPageProps) {
 
         {!isUploadModalOpen && (
           <div className="flex items-center gap-2">
-            <ContributeTrigger
-              subjects={subjects}
-              categories={categories}
-              label="Contribuer une ressource"
-              showSparkle={true}
-            />
+            <Link href={buildQuery({ action: "upload" })}>
+              <Button size="sm" variant="primary">
+                <UploadCloud className="w-4 h-4 mr-1.5" />
+                <span>Déposer un document</span>
+              </Button>
+            </Link>
           </div>
         )}
       </div>
@@ -182,9 +187,9 @@ export default async function LibraryPage({ searchParams }: LibraryPageProps) {
                   : "bg-white border border-[#E4E8F0] text-[#68748A] hover:text-[#182235]"
               }`}
             >
-              Toutes les matières
+              Toutes les catégories
             </Link>
-            {categories.slice(0, 5).map((cat) => {
+            {categories.map((cat) => {
               const isSelected =
                 matchedCategory?.id === cat.id ||
                 effectiveCategoryParam === cat.id ||
@@ -207,6 +212,15 @@ export default async function LibraryPage({ searchParams }: LibraryPageProps) {
 
           {/* Active Filter Tags */}
           <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+            {matchedSubject && (
+              <div className="flex items-center space-x-1.5 text-xs text-[#2855D9] bg-[#EDF2FF] px-2.5 py-1 rounded border border-[#2855D9]/20">
+                <span className="font-medium">Matière : {matchedSubject.name}</span>
+                <Link href={buildQuery({ subjectId: undefined })} className="text-[#2855D9] hover:text-[#111A2E]" title="Effacer la matière">
+                  <X className="w-3.5 h-3.5" />
+                </Link>
+              </div>
+            )}
+
             {matchedCategory && (
               <div className="flex items-center space-x-1.5 text-xs text-[#2855D9] bg-[#EDF2FF] px-2.5 py-1 rounded border border-[#2855D9]/20">
                 <span className="font-medium">{matchedCategory.name}</span>
@@ -313,12 +327,12 @@ export default async function LibraryPage({ searchParams }: LibraryPageProps) {
                 : "Aucune ressource enregistrée avec ces critères pour l'instant. Soyez le premier à enrichir la bibliothèque avec un cours, quiz ou lien !"}
             </p>
             <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
-              <ContributeTrigger
-                subjects={subjects}
-                categories={categories}
-                label="Contribuer le premier contenu"
-                showSparkle={true}
-              />
+              <Link href={buildQuery({ action: "upload" })}>
+                <Button size="sm" variant="primary">
+                  <UploadCloud className="w-4 h-4 mr-1.5" />
+                  <span>Déposer le premier document</span>
+                </Button>
+              </Link>
               <Link href="/library">
                 <Button size="sm" variant="outline">
                   Réinitialiser les filtres

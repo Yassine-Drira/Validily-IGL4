@@ -54,16 +54,16 @@ export function AdminAnalyticsView({ initialOverview }: AdminAnalyticsViewProps)
     );
   }
 
-  // Device breakdown calculations
+  // Device breakdown calculations (strictly authentic, zero fabricated baseline)
   const totalDevices =
     overview.deviceDistribution.desktop +
     overview.deviceDistribution.mobile +
     overview.deviceDistribution.tablet +
-    overview.deviceDistribution.unknown || 1;
+    overview.deviceDistribution.unknown;
 
-  const desktopPct = Math.round((overview.deviceDistribution.desktop / totalDevices) * 100);
-  const mobilePct = Math.round((overview.deviceDistribution.mobile / totalDevices) * 100);
-  const tabletPct = Math.round((overview.deviceDistribution.tablet / totalDevices) * 100);
+  const desktopPct = totalDevices > 0 ? Math.round((overview.deviceDistribution.desktop / totalDevices) * 100) : 0;
+  const mobilePct = totalDevices > 0 ? Math.round((overview.deviceDistribution.mobile / totalDevices) * 100) : 0;
+  const tabletPct = totalDevices > 0 ? Math.round((overview.deviceDistribution.tablet / totalDevices) * 100) : 0;
 
   // Daily views max for relative scaling
   const maxDailyViews = Math.max(
@@ -93,13 +93,16 @@ export function AdminAnalyticsView({ initialOverview }: AdminAnalyticsViewProps)
                 type="button"
                 onClick={() => handleTimeRangeChange(range)}
                 disabled={isLoading}
-                className={`px-3 py-1 rounded-lg font-semibold transition cursor-pointer ${
+                className={`px-3 py-1 rounded-lg font-semibold transition cursor-pointer flex items-center space-x-1.5 ${
                   timeRange === range
                     ? "bg-[#2855D9] text-white shadow-2xs"
                     : "text-[#68748A] hover:text-[#111A2E]"
                 }`}
               >
-                {range === "24h" ? "24 Heures" : range === "7d" ? "7 Jours" : "30 Jours"}
+                {isLoading && timeRange === range && (
+                  <RefreshCw className="w-3 h-3 animate-spin shrink-0" />
+                )}
+                <span>{range === "24h" ? "24 Heures" : range === "7d" ? "7 Jours" : "30 Jours"}</span>
               </button>
             ))}
           </div>
@@ -131,7 +134,7 @@ export function AdminAnalyticsView({ initialOverview }: AdminAnalyticsViewProps)
 
           <div className="bg-white border border-[#E4E8F0] p-4 rounded-xl shadow-xs">
             <div className="flex items-center justify-between text-xs text-[#68748A]">
-              <span>Visiteurs Uniques ({timeRange})</span>
+              <span>Visiteurs Uniques ({timeRange === "24h" ? "24h" : timeRange === "7d" ? "7 Jours" : "30 Jours"})</span>
               <Users className="w-3.5 h-3.5 text-[#2855D9]" />
             </div>
             <div className="text-2xl font-bold font-mono text-[#111A2E] mt-1">
@@ -146,13 +149,13 @@ export function AdminAnalyticsView({ initialOverview }: AdminAnalyticsViewProps)
 
           <div className="bg-white border border-[#E4E8F0] p-4 rounded-xl shadow-xs">
             <div className="flex items-center justify-between text-xs text-[#68748A]">
-              <span>Pages Vues Totales</span>
+              <span>Pages Vues ({timeRange === "24h" ? "24h" : timeRange === "7d" ? "7 Jours" : "30 Jours"})</span>
               <Eye className="w-3.5 h-3.5 text-[#2855D9]" />
             </div>
             <div className="text-2xl font-bold font-mono text-[#111A2E] mt-1">
               {overview.totalPageViews}
             </div>
-            <div className="text-[10px] text-[#68748A] mt-0.5">Événements télémétriques</div>
+            <div className="text-[10px] text-[#68748A] mt-0.5">Événements sur cette fenêtre</div>
           </div>
         </div>
 
@@ -199,9 +202,17 @@ export function AdminAnalyticsView({ initialOverview }: AdminAnalyticsViewProps)
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-[#111A2E] flex items-center space-x-2">
               <Calendar className="w-3.5 h-3.5 text-[#2855D9]" />
-              <span>Activité par Jour ({timeRange})</span>
+              <span>
+                {timeRange === "24h"
+                  ? "Activité par Créneau Horaire (24 Heures)"
+                  : timeRange === "7d"
+                  ? "Activité par Jour (7 Derniers Jours)"
+                  : "Activité par Jour (30 Derniers Jours)"}
+              </span>
             </span>
-            <span className="text-[11px] text-[#68748A]">Pages vues</span>
+            <span className="text-[11px] text-[#68748A]">
+              {timeRange === "24h" ? "Pages vues / bloc 4h" : "Pages vues"}
+            </span>
           </div>
 
           {overview.pageViewsByDay.length === 0 ? (
@@ -209,7 +220,7 @@ export function AdminAnalyticsView({ initialOverview }: AdminAnalyticsViewProps)
               Aucun événement dans cette fenêtre temporelle.
             </div>
           ) : (
-            <div className="space-y-2 pt-2">
+            <div className="space-y-2 pt-2 max-h-[380px] overflow-y-auto pr-1">
               {overview.pageViewsByDay.map((day) => {
                 const pct = Math.max(5, Math.round((day.views / maxDailyViews) * 100));
                 return (
@@ -236,7 +247,7 @@ export function AdminAnalyticsView({ initialOverview }: AdminAnalyticsViewProps)
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-[#111A2E] flex items-center space-x-2">
               <Compass className="w-3.5 h-3.5 text-[#2855D9]" />
-              <span>Sections les Plus Consultées</span>
+              <span>Sections les Plus Consultées ({timeRange === "24h" ? "24h" : timeRange === "7d" ? "7 Jours" : "30 Jours"})</span>
             </span>
             <span className="text-[11px] text-[#68748A]">Classement</span>
           </div>
@@ -277,7 +288,7 @@ export function AdminAnalyticsView({ initialOverview }: AdminAnalyticsViewProps)
         <div className="bg-white border border-[#E4E8F0] rounded-2xl p-5 shadow-xs space-y-3">
           <div className="text-xs font-bold text-[#111A2E] flex items-center space-x-2">
             <Laptop className="w-3.5 h-3.5 text-[#2855D9]" />
-            <span>Répartition Appareils</span>
+            <span>Répartition Appareils ({timeRange === "24h" ? "24h" : timeRange === "7d" ? "7j" : "30j"})</span>
           </div>
 
           <div className="space-y-2 text-xs">
@@ -286,7 +297,9 @@ export function AdminAnalyticsView({ initialOverview }: AdminAnalyticsViewProps)
                 <Laptop className="w-3 h-3" />
                 <span>Ordinateur de Bureau</span>
               </span>
-              <span className="font-semibold text-[#111A2E]">{desktopPct}%</span>
+              <span className="font-semibold text-[#111A2E]">
+                {desktopPct}% <span className="font-mono text-[#68748A] text-[10px]">({overview.deviceDistribution.desktop})</span>
+              </span>
             </div>
             <div className="w-full h-1.5 rounded-full bg-[#F4F6FA] overflow-hidden">
               <div className="h-full bg-blue-600 rounded-full" style={{ width: `${desktopPct}%` }} />
@@ -297,7 +310,9 @@ export function AdminAnalyticsView({ initialOverview }: AdminAnalyticsViewProps)
                 <Smartphone className="w-3 h-3" />
                 <span>Mobile</span>
               </span>
-              <span className="font-semibold text-[#111A2E]">{mobilePct}%</span>
+              <span className="font-semibold text-[#111A2E]">
+                {mobilePct}% <span className="font-mono text-[#68748A] text-[10px]">({overview.deviceDistribution.mobile})</span>
+              </span>
             </div>
             <div className="w-full h-1.5 rounded-full bg-[#F4F6FA] overflow-hidden">
               <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${mobilePct}%` }} />
@@ -308,7 +323,9 @@ export function AdminAnalyticsView({ initialOverview }: AdminAnalyticsViewProps)
                 <Tablet className="w-3 h-3" />
                 <span>Tablette</span>
               </span>
-              <span className="font-semibold text-[#111A2E]">{tabletPct}%</span>
+              <span className="font-semibold text-[#111A2E]">
+                {tabletPct}% <span className="font-mono text-[#68748A] text-[10px]">({overview.deviceDistribution.tablet})</span>
+              </span>
             </div>
             <div className="w-full h-1.5 rounded-full bg-[#F4F6FA] overflow-hidden">
               <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${tabletPct}%` }} />
@@ -320,7 +337,7 @@ export function AdminAnalyticsView({ initialOverview }: AdminAnalyticsViewProps)
         <div className="bg-white border border-[#E4E8F0] rounded-2xl p-5 shadow-xs space-y-3">
           <div className="text-xs font-bold text-[#111A2E] flex items-center space-x-2">
             <Globe className="w-3.5 h-3.5 text-[#2855D9]" />
-            <span>Navigateurs</span>
+            <span>Navigateurs ({timeRange === "24h" ? "24h" : timeRange === "7d" ? "7j" : "30j"})</span>
           </div>
 
           <div className="space-y-2 text-xs">
@@ -345,7 +362,7 @@ export function AdminAnalyticsView({ initialOverview }: AdminAnalyticsViewProps)
         <div className="bg-white border border-[#E4E8F0] rounded-2xl p-5 shadow-xs space-y-3">
           <div className="text-xs font-bold text-[#111A2E] flex items-center space-x-2">
             <Layers className="w-3.5 h-3.5 text-[#2855D9]" />
-            <span>Systèmes d&apos;Exploitation</span>
+            <span>Systèmes d&apos;Exploitation ({timeRange === "24h" ? "24h" : timeRange === "7d" ? "7j" : "30j"})</span>
           </div>
 
           <div className="space-y-2 text-xs">

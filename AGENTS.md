@@ -26,3 +26,8 @@ CRITICAL: The project is hosted on FREE-TIER Vercel and Supabase accounts. To av
    - Do not upload bulk or dummy test files to live Supabase Storage.
    - Maintain the in-memory repository cache (`src/lib/supabase/repository.ts`) to avoid redundant API queries.
    - Avoid executing high-frequency network polling or repetitive DB scans.
+
+4. **MANDATORY PRODUCTION RELEASE ANNOUNCEMENT GATE**:
+   - For every production release, follow `.agents/skills/release-announcement/SKILL.md`.
+   - Never insert N duplicate notification rows in Supabase. Register releases in `ACTIVE_GLOBAL_ANNOUNCEMENTS` (`src/lib/actions/notification-actions.ts`).
+   - Only announce verified, working capabilities covered by automated tests.

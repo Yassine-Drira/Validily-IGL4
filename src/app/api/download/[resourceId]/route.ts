@@ -72,5 +72,12 @@ export async function GET(
     );
   }
 
-  return NextResponse.redirect(data.signedUrl);
+  const response = NextResponse.redirect(data.signedUrl, 307);
+  if (resource.visibility === "private" || resource.visibility === "shared") {
+    response.headers.set("Cache-Control", "private, no-store, max-age=0");
+  } else {
+    response.headers.set("Cache-Control", "private, max-age=60");
+  }
+  return response;
 }
+

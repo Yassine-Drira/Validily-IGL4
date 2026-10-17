@@ -10,6 +10,7 @@ import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { getStudentQuizAttempts, getStudentMistakes } from "@/lib/actions/quiz-actions";
 import { getMyForest } from "@/lib/actions/forest-actions";
 import { getUserStudyGoals, getUserDailyFocusHistory } from "@/lib/actions/analytics-actions";
+import { getUserSubjectsRevisionProgress, UserOverallRevisionMetrics } from "@/lib/actions/resource-actions";
 import { ResourceCard } from "@/components/academic/resource-card";
 import { InteractiveFlowSelector } from "@/components/academic/interactive-flow-selector";
 import { PersonalAnalyticsDashboard } from "@/components/workspace/personal-analytics-dashboard";
@@ -60,28 +61,64 @@ export default async function HomePage() {
   let userMistakesCount = 0;
   let userForestData: any = null;
   let userGoals: any = null;
+  let userRevisionProgress: UserOverallRevisionMetrics | null = null;
+
+  let metrics: any = { totalSemesters: 0, totalSubjects: 0, totalResources: 0, totalCategories: 0 };
+  let allSubjects: any[] = [];
+  let recentResources: any[] = [];
+  let categories: any[] = [];
+  let dbFocusHistory: Record<string, any> = {};
 
   try {
     const user = await getRequesterUser();
+    const userId = user?.id;
+
     if (user?.id) {
       currentUser = {
         id: user.id,
         name: user.name || user.email?.split("@")[0] || "Étudiant",
         email: user.email,
       };
-      const [attempts, bookmarks, mistakes, forestData, studyGoals] = await Promise.all([
-        getStudentQuizAttempts(user.id),
-        getBookmarks(user.id),
-        getStudentMistakes(user.id),
-        getMyForest(user.id),
-        getUserStudyGoals(user.id),
-      ]);
-      userAttempts = attempts || [];
-      userBookmarksCount = bookmarks.length;
-      userMistakesCount = mistakes?.length || 0;
-      userForestData = forestData;
-      userGoals = studyGoals;
     }
+
+    // Parallelize all 11 independent queries in one single round-trip
+    const [
+      attempts,
+      bookmarks,
+      mistakes,
+      forestData,
+      studyGoals,
+      focusHistory,
+      metricsData,
+      subjectsData,
+      resourcesData,
+      categoriesData,
+      revisionData,
+    ] = await Promise.all([
+      userId ? getStudentQuizAttempts(userId).catch(() => []) : Promise.resolve([]),
+      userId ? getBookmarks(userId).catch(() => []) : Promise.resolve([]),
+      userId ? getStudentMistakes(userId).catch(() => []) : Promise.resolve([]),
+      userId ? getMyForest(userId).catch(() => null) : Promise.resolve(null),
+      userId ? getUserStudyGoals(userId).catch(() => null) : Promise.resolve(null),
+      userId ? getUserDailyFocusHistory(userId).catch(() => ({})) : Promise.resolve({}),
+      getDashboardMetrics().catch(() => ({ totalSemesters: 0, totalSubjects: 0, totalResources: 0, totalCategories: 0 })),
+      getSubjects(undefined, userId).catch(() => []),
+      getResources({ limit: 4, userId }).catch(() => []),
+      getCategories().catch(() => []),
+      userId ? getUserSubjectsRevisionProgress(userId).catch(() => null) : Promise.resolve(null),
+    ]);
+
+    userAttempts = attempts || [];
+    userBookmarksCount = (bookmarks || []).length;
+    userMistakesCount = mistakes?.length || 0;
+    userForestData = forestData;
+    userGoals = studyGoals;
+    dbFocusHistory = focusHistory || {};
+    metrics = metricsData;
+    allSubjects = subjectsData || [];
+    recentResources = resourcesData || [];
+    categories = categoriesData || [];
+    userRevisionProgress = revisionData;
   } catch (err) {
     console.error("HomePage user fetch error:", err);
   }
@@ -97,11 +134,14 @@ export default async function HomePage() {
     return { dateStr, dayLabel, count };
   });
 
-  // Unified study streak: combines Quizzes + Focus Pomodoro sessions + Daily focus records
+  // Unified study streak: combines Quizzes + Revision activity + Focus Pomodoro sessions + Daily focus records
   const allActiveDatesSet = new Set<string>();
   userAttempts.forEach((a) => {
     if (a.completed_at) allActiveDatesSet.add(a.completed_at.split("T")[0]);
   });
+  if (userRevisionProgress?.activeDates) {
+    userRevisionProgress.activeDates.forEach((d: string) => allActiveDatesSet.add(d));
+  }
 
   // Real 7-day focus minutes from completed DB sessions & daily focus records
   const dailyFocusMap: { [dateStr: string]: number } = {};
@@ -109,19 +149,16 @@ export default async function HomePage() {
     dailyFocusMap[d.dateStr] = 0;
   });
 
-  if (currentUser?.id) {
-    try {
-      const dbFocusHistory = await getUserDailyFocusHistory(currentUser.id);
-      Object.entries(dbFocusHistory).forEach(([dateStr, record]) => {
-        if (dailyFocusMap[dateStr] !== undefined) {
-          const mins = Math.floor(record.totalSeconds / 60);
-          dailyFocusMap[dateStr] = Math.max(dailyFocusMap[dateStr], mins);
-        }
-        if (record.totalSeconds > 0) {
-          allActiveDatesSet.add(dateStr);
-        }
-      });
-    } catch {}
+  if (currentUser?.id && dbFocusHistory) {
+    Object.entries(dbFocusHistory).forEach(([dateStr, record]: [string, any]) => {
+      if (dailyFocusMap[dateStr] !== undefined) {
+        const mins = Math.floor((record.totalSeconds || 0) / 60);
+        dailyFocusMap[dateStr] = Math.max(dailyFocusMap[dateStr], mins);
+      }
+      if (record.totalSeconds > 0) {
+        allActiveDatesSet.add(dateStr);
+      }
+    });
   }
 
   // Reconcile healthy trees duration per day with DB daily records (prevents double counting)
@@ -190,6 +227,19 @@ export default async function HomePage() {
       }
     });
   }
+  if (userRevisionProgress?.subjects) {
+    userRevisionProgress.subjects.forEach((s) => {
+      if ((s.revisedCount > 0 || s.inProgressCount > 0) && !practicedSubjectIds.includes(s.subjectId)) {
+        practicedSubjectIds.push(s.subjectId);
+      }
+    });
+  }
+  userAttempts.forEach((a) => {
+    const sid = a.quiz?.subject_id || a.quiz?.subject?.id;
+    if (sid && !practicedSubjectIds.includes(sid)) {
+      practicedSubjectIds.push(sid);
+    }
+  });
 
   const averageScore =
     userAttempts.length > 0
@@ -203,13 +253,6 @@ export default async function HomePage() {
   const weakAttempt = userAttempts.find(
     (a) => a.score / (a.total_questions || 1) < 0.7
   );
-
-  const [metrics, allSubjects, recentResources, categories] = await Promise.all([
-    getDashboardMetrics(),
-    getSubjects(undefined, currentUser?.id),
-    getResources({ limit: 4, userId: currentUser?.id }),
-    getCategories(),
-  ]);
 
   const s1Subjects = allSubjects.filter(
     (s) =>
@@ -276,6 +319,7 @@ export default async function HomePage() {
         allSubjects={allSubjects}
         weakAttempt={weakAttempt}
         recentAttempt={recentAttempt}
+        revisionProgress={userRevisionProgress}
       />
 
       {/* 3. Core Feature Entry Points (What can I do here?) */}
