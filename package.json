@@ -8,7 +8,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --experimental-strip-types --test tests/*.test.mjs"
+    "test": "node --experimental-strip-types --test tests/*.test.mjs",
+    "test:outside": "node scripts/outside_e2e_verification.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
