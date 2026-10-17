@@ -82,6 +82,10 @@ export interface AcademicResource {
   tags: string[];
   visibility: ResourceVisibility;
   publication_status: PublicationStatus;
+  resource_type?: "document" | "quiz" | "link" | "exercise";
+  usefulness_score?: number;
+  upvotes_count?: number;
+  downvotes_count?: number;
   created_at: string;
   updated_at: string;
   // joined fields
@@ -91,6 +95,25 @@ export interface AcademicResource {
   owner_profile?: Profile;
   is_bookmarked?: boolean;
   revision_status?: RevisionStatus;
+  vote_summary?: ResourceVoteSummary;
+}
+
+export type ResourceVoteValue = 1 | -1 | 0;
+
+export interface ResourceVote {
+  id: string;
+  resource_id: string;
+  user_id: string;
+  vote_value: 1 | -1;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface ResourceVoteSummary {
+  score: number;
+  upvotes: number;
+  downvotes: number;
+  userVote: ResourceVoteValue;
 }
 
 export interface Bookmark {

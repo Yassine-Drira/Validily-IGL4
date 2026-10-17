@@ -5,14 +5,16 @@ import { useRouter } from "next/navigation";
 import { Bookmark, Download, ChevronDown, ExternalLink, Trash2, HardDrive } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toggleBookmark, updateRevisionStatus, deleteResource } from "@/lib/actions/resource-actions";
-import { RevisionStatus } from "@/types/database";
+import { RevisionStatus, ResourceVoteSummary } from "@/types/database";
 import { DeleteConfirmModal } from "@/components/ui/delete-confirm-modal";
+import { ResourceVoteControl } from "@/components/resources/resource-vote-control";
 
 interface ResourceActionsBarProps {
   resourceId: string;
   title?: string;
   initialBookmarked?: boolean;
   initialStatus?: RevisionStatus;
+  initialVoteSummary?: ResourceVoteSummary;
   downloadUrl: string;
   filename: string;
   isExternal?: boolean;
@@ -26,6 +28,7 @@ export function ResourceActionsBar({
   title = "Ressource",
   initialBookmarked = false,
   initialStatus = "not_started",
+  initialVoteSummary,
   downloadUrl,
   filename,
   isExternal = false,
@@ -115,6 +118,16 @@ export function ResourceActionsBar({
   return (
     <>
       <div className="flex flex-wrap items-center gap-2 shrink-0">
+        {/* Useful Upvote/Downvote Control */}
+        <ResourceVoteControl
+          resourceId={resourceId}
+          initialScore={initialVoteSummary?.score ?? 0}
+          initialUpvotes={initialVoteSummary?.upvotes ?? 0}
+          initialDownvotes={initialVoteSummary?.downvotes ?? 0}
+          initialUserVote={initialVoteSummary?.userVote ?? 0}
+          size="md"
+        />
+
         {/* Bookmark Button */}
         <button
           type="button"

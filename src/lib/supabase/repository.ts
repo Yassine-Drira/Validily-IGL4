@@ -7,6 +7,7 @@ import type {
   Quiz,
   QuizQuestion,
   Bookmark,
+  ResourceVoteSummary,
 } from "@/types/database";
 
 async function getDbClient(): Promise<any> {
@@ -246,6 +247,77 @@ export async function getCategories(): Promise<ResourceCategory[]> {
   }
 }
 
+export async function getResourceVotes(
+  resourceIds: string[],
+  userId?: string
+): Promise<Record<string, ResourceVoteSummary>> {
+  const result: Record<string, ResourceVoteSummary> = {};
+  if (!resourceIds || resourceIds.length === 0) return result;
+
+  resourceIds.forEach((id) => {
+    result[id] = { score: 0, upvotes: 0, downvotes: 0, userVote: 0 };
+  });
+
+  try {
+    const supabase = await getDbClient();
+    if (supabase) {
+      const { data: votes, error } = await supabase
+        .from("resource_votes")
+        .select("resource_id, user_id, vote_value")
+        .in("resource_id", resourceIds);
+
+      if (!error && votes && votes.length > 0) {
+        votes.forEach((v: { resource_id: string; user_id: string; vote_value: number }) => {
+          const entry = result[v.resource_id];
+          if (!entry) return;
+          if (v.vote_value === 1) entry.upvotes++;
+          else if (v.vote_value === -1) entry.downvotes++;
+
+          if (userId && v.user_id === userId) {
+            entry.userVote = v.vote_value as any;
+          }
+        });
+
+        Object.values(result).forEach((summary) => {
+          summary.score = summary.upvotes - summary.downvotes;
+        });
+
+        return result;
+      }
+    }
+
+    // Fallback if table doesn't exist yet or offline
+    if (supabase) {
+      const { data } = await supabase
+        .from("notes")
+        .select("content")
+        .eq("title", "__validily_resource_votes__")
+        .maybeSingle();
+
+      if (data?.content) {
+        const parsed = JSON.parse(data.content);
+        if (Array.isArray(parsed)) {
+          parsed.forEach((v: any) => {
+            const entry = result[v.resource_id];
+            if (!entry) return;
+            if (v.vote_value === 1) entry.upvotes++;
+            else if (v.vote_value === -1) entry.downvotes++;
+
+            if (userId && v.user_id === userId) {
+              entry.userVote = v.vote_value;
+            }
+          });
+          Object.values(result).forEach((summary) => {
+            summary.score = summary.upvotes - summary.downvotes;
+          });
+        }
+      }
+    }
+  } catch {}
+
+  return result;
+}
+
 export async function getResources(options?: {
   subjectId?: string;
   categoryId?: string;
@@ -253,8 +325,11 @@ export async function getResources(options?: {
   limit?: number;
   userId?: string;
   includeAll?: boolean;
+  sort?: "useful" | "recent" | "voted";
+  resourceType?: string;
+  folderId?: string;
 }): Promise<AcademicResource[]> {
-  const cacheKey = `resources_${options?.subjectId || ""}_${options?.categoryId || ""}_${options?.search || ""}_${options?.limit || ""}_${options?.userId || "anon"}_${options?.includeAll || ""}`;
+  const cacheKey = `resources_${options?.subjectId || ""}_${options?.categoryId || ""}_${options?.search || ""}_${options?.limit || ""}_${options?.userId || "anon"}_${options?.includeAll || ""}_${options?.sort || "recent"}_${options?.resourceType || "all"}_${options?.folderId || ""}`;
   const cached = getFromCache<AcademicResource[]>(cacheKey);
   if (cached) return cached;
 
@@ -263,8 +338,16 @@ export async function getResources(options?: {
     let query = supabase
       .from("resources")
       .select("*, subject:subjects(*), category:resource_categories(*)")
-      .eq("publication_status", "published")
-      .order("created_at", { ascending: false });
+      .eq("publication_status", "published");
+
+    // Sorting at DB query level
+    if (options?.sort === "useful") {
+      query = query.order("usefulness_score", { ascending: false, nullsFirst: false }).order("created_at", { ascending: false });
+    } else if (options?.sort === "voted") {
+      query = query.order("upvotes_count", { ascending: false, nullsFirst: false }).order("created_at", { ascending: false });
+    } else {
+      query = query.order("created_at", { ascending: false });
+    }
 
     // Strict visibility and privacy isolation
     if (options?.includeAll) {
@@ -314,6 +397,18 @@ export async function getResources(options?: {
       }
     }
 
+    if (options?.resourceType && options.resourceType !== "all") {
+      if (options.resourceType === "document") {
+        query = query.or("resource_type.eq.document,resource_type.is.null");
+      } else {
+        query = query.eq("resource_type", options.resourceType);
+      }
+    }
+
+    if (options?.folderId) {
+      query = query.eq("chapter", options.folderId);
+    }
+
     if (options?.search) {
       query = query.or(
         `title.ilike.%${options.search}%,description.ilike.%${options.search}%`
@@ -329,6 +424,34 @@ export async function getResources(options?: {
       return [];
     }
 
+    // Batch enrich vote summaries without N+1 requests
+    const ids = data.map((r: any) => r.id);
+    if (ids.length > 0) {
+      try {
+        const voteSummaries = await getResourceVotes(ids, options?.userId);
+        data.forEach((r: any) => {
+          if (voteSummaries[r.id]) {
+            r.vote_summary = voteSummaries[r.id];
+            r.usefulness_score = voteSummaries[r.id].score;
+          }
+        });
+
+        if (options?.sort === "useful") {
+          data.sort(
+            (a: any, b: any) =>
+              (b.vote_summary?.score ?? b.usefulness_score ?? 0) -
+              (a.vote_summary?.score ?? a.usefulness_score ?? 0)
+          );
+        } else if (options?.sort === "voted") {
+          data.sort((a: any, b: any) => {
+            const sumA = (a.vote_summary?.upvotes || 0) + (a.vote_summary?.downvotes || 0);
+            const sumB = (b.vote_summary?.upvotes || 0) + (b.vote_summary?.downvotes || 0);
+            return sumB - sumA;
+          });
+        }
+      } catch {}
+    }
+
     setToCache(cacheKey, data, 20000);
     return data;
   } catch (err) {
@@ -337,7 +460,7 @@ export async function getResources(options?: {
   }
 }
 
-export async function getResourceById(id: string): Promise<AcademicResource | null> {
+export async function getResourceById(id: string, userId?: string): Promise<AcademicResource | null> {
   try {
     const supabase = await getDbClient();
     const { data, error } = await supabase
@@ -349,6 +472,15 @@ export async function getResourceById(id: string): Promise<AcademicResource | nu
     if (error || !data) {
       return null;
     }
+
+    // Enrich single resource with vote summary
+    try {
+      const voteMap = await getResourceVotes([data.id], userId);
+      if (voteMap[data.id]) {
+        data.vote_summary = voteMap[data.id];
+        data.usefulness_score = voteMap[data.id].score;
+      }
+    } catch {}
 
     return data;
   } catch {

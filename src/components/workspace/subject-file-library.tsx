@@ -58,6 +58,8 @@ import { getDescendantFolderIds } from "@/lib/utils/folder-tree";
 import { SubjectTreeView } from "@/components/workspace/subject-tree-view";
 import { DeleteConfirmModal } from "@/components/ui/delete-confirm-modal";
 import { cn } from "@/lib/utils";
+import { ResourceVoteControl } from "@/components/resources/resource-vote-control";
+import { ContributeTrigger } from "@/components/resources/contribute-trigger";
 
 interface SubjectFileLibraryProps {
   subject: Subject;
@@ -344,6 +346,17 @@ export function SubjectFileLibrary({
 
           {/* Action Buttons */}
           <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <ContributeTrigger
+              subjects={[subject]}
+              categories={categories}
+              folders={folders}
+              defaultSubjectId={subject.id}
+              defaultFolderId={currentFolderId}
+              label="Contribuer"
+              size="sm"
+              showSparkle={true}
+            />
+
             <button
               type="button"
               onClick={() => setIsCreateFolderModalOpen(true)}
@@ -356,9 +369,9 @@ export function SubjectFileLibrary({
             <button
               type="button"
               onClick={() => onOpenUploadModal(currentFolderId || undefined)}
-              className="bg-[#2855D9] hover:bg-[#1E40AF] text-white px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition-all cursor-pointer shadow-2xs"
+              className="bg-white hover:bg-[#F4F6FA] text-[#182235] border border-[#E4E8F0] px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition-all cursor-pointer shadow-2xs"
             >
-              <FilePlus className="w-3.5 h-3.5" />
+              <FilePlus className="w-3.5 h-3.5 text-[#2855D9]" />
               <span>Déposer Fichier</span>
             </button>
 
@@ -483,6 +496,16 @@ export function SubjectFileLibrary({
             </p>
           </div>
           <div className="pt-2 flex flex-wrap items-center justify-center gap-2">
+            <ContributeTrigger
+              subjects={[subject]}
+              categories={categories}
+              folders={folders}
+              defaultSubjectId={subject.id}
+              defaultFolderId={currentFolderId}
+              label="Contribuer une ressource"
+              showSparkle={true}
+              size="sm"
+            />
             <Button
               size="sm"
               variant="outline"
@@ -724,7 +747,16 @@ export function SubjectFileLibrary({
                         </div>
 
                         {/* Card Footer Actions */}
-                        <div className="mt-3 pt-2.5 border-t border-[#F1F4F9] flex items-center justify-between">
+                        <div className="mt-3 pt-2.5 border-t border-[#F1F4F9] flex items-center justify-between gap-1">
+                          <ResourceVoteControl
+                            resourceId={res.id}
+                            initialScore={res.vote_summary?.score ?? res.usefulness_score ?? 0}
+                            initialUpvotes={res.vote_summary?.upvotes ?? res.upvotes_count ?? 0}
+                            initialDownvotes={res.vote_summary?.downvotes ?? res.downvotes_count ?? 0}
+                            initialUserVote={res.vote_summary?.userVote ?? 0}
+                            size="sm"
+                          />
+
                           <button
                             type="button"
                             onClick={() =>
@@ -831,6 +863,15 @@ export function SubjectFileLibrary({
 
                       {/* Row Actions */}
                       <div className="flex items-center justify-between sm:justify-end space-x-2 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-[#F1F4F9]">
+                        <ResourceVoteControl
+                          resourceId={res.id}
+                          initialScore={res.vote_summary?.score ?? res.usefulness_score ?? 0}
+                          initialUpvotes={res.vote_summary?.upvotes ?? res.upvotes_count ?? 0}
+                          initialDownvotes={res.vote_summary?.downvotes ?? res.downvotes_count ?? 0}
+                          initialUserVote={res.vote_summary?.userVote ?? 0}
+                          size="sm"
+                        />
+
                         <button
                           type="button"
                           onClick={() =>

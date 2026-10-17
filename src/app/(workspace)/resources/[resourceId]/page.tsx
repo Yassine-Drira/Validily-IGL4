@@ -211,6 +211,7 @@ export default async function ResourceDetailPage({
                 title={resource.title}
                 initialBookmarked={resource.is_bookmarked}
                 initialStatus={resource.revision_status}
+                initialVoteSummary={resource.vote_summary}
                 downloadUrl={downloadEndpoint}
                 filename={resource.original_filename}
                 isExternal={isExternal}

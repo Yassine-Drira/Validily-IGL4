@@ -31,10 +31,13 @@ export async function createResource(data: {
   original_filename?: string;
   mime_type?: string;
   file_size_bytes?: number;
-  exam_session?: string;
+  academic_year?: string | null;
+  exam_session?: string | null;
   instructor?: string | null;
   chapter?: string | null;
   tags?: string[];
+  visibility?: "public" | "private" | "shared";
+  resource_type?: "document" | "quiz" | "link" | "exercise";
 }): Promise<{ success?: boolean; error?: string; resource?: AcademicResource }> {
   try {
     if (!isSupabaseConfigured()) {
@@ -62,6 +65,7 @@ export async function createResource(data: {
     const storagePath = data.storage_path || data.external_url || `links/${Date.now()}`;
     const filename = data.original_filename || (data.external_url ? "External Link" : "Resource Document");
     const mimeType = data.mime_type || (data.external_url ? "application/x-url" : "application/pdf");
+    const resourceType = data.resource_type || (data.external_url ? "link" : "document");
 
     const { data: resource, error } = await serviceSupabase
       .from("resources")
@@ -75,12 +79,14 @@ export async function createResource(data: {
         original_filename: filename,
         mime_type: mimeType,
         file_size_bytes: data.file_size_bytes || 0,
+        academic_year: data.academic_year || "2026-2027",
         exam_session: data.exam_session || null,
         instructor: data.instructor || null,
         chapter: data.chapter || null,
         tags: data.tags || [],
-        visibility: (data as any).visibility || "private",
+        visibility: data.visibility || "private",
         publication_status: "published",
+        resource_type: resourceType,
       })
       .select("*, subject:subjects(*), category:resource_categories(*)")
       .single();
@@ -97,6 +103,85 @@ export async function createResource(data: {
     return { success: true, resource };
   } catch (err: any) {
     return { error: err.message || "Failed to create resource." };
+  }
+}
+
+/**
+ * Create an interactive HTML quiz resource with sandboxed storage
+ */
+export async function createHtmlQuizResourceAction(data: {
+  subject_id: string;
+  category_id?: string;
+  title: string;
+  html_content: string;
+  folder_id?: string | null;
+  description?: string;
+  instructor?: string;
+  exam_session?: string;
+  tags?: string[];
+  visibility?: "public" | "private" | "shared";
+}): Promise<{ success?: boolean; error?: string; resource?: AcademicResource }> {
+  try {
+    if (!data.html_content?.trim() || !data.title?.trim() || !data.subject_id) {
+      return { error: "Contenu HTML, Titre et Matière sont requis." };
+    }
+
+    const requester = await getRequesterUser();
+    if (!requester) {
+      return { error: "Authentification requise pour publier un quiz interactif." };
+    }
+
+    let categoryId = data.category_id;
+    if (!categoryId) {
+      const serviceSupabase = getServiceSupabase();
+      if (serviceSupabase) {
+        const { data: firstCat } = await serviceSupabase
+          .from("resource_categories")
+          .select("id")
+          .limit(1)
+          .maybeSingle();
+        categoryId = firstCat?.id || "cat-courses";
+      }
+    }
+
+    const quizFilename = `${data.title.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-")}-quiz.html`;
+    const storagePath = `quizzes/html-${Date.now()}-${Math.random().toString(36).substring(2, 7)}.html`;
+
+    // Upload to Supabase Storage if configured
+    const serviceSupabase = getServiceSupabase();
+    if (isSupabaseConfigured() && serviceSupabase) {
+      try {
+        await serviceSupabase.storage
+          .from("academic-resources")
+          .upload(storagePath, Buffer.from(data.html_content, "utf-8"), {
+            contentType: "text/html",
+            upsert: true,
+          });
+      } catch (uploadErr) {
+        console.warn("Storage upload for HTML quiz failed, will use inline fallback:", uploadErr);
+      }
+    }
+
+    const mergedTags = Array.from(new Set(["quiz", "interactive_html", ...(data.tags || [])]));
+
+    return await createResource({
+      subject_id: data.subject_id,
+      category_id: categoryId || "cat-courses",
+      title: data.title.trim(),
+      description: data.description?.trim() || "Quiz interactif HTML autonome avec auto-évaluation.",
+      storage_path: storagePath,
+      original_filename: quizFilename,
+      mime_type: "text/html;quiz",
+      file_size_bytes: Buffer.byteLength(data.html_content, "utf-8"),
+      instructor: data.instructor || null,
+      exam_session: data.exam_session || null,
+      chapter: data.folder_id || null,
+      tags: mergedTags,
+      visibility: data.visibility || "public",
+      resource_type: "quiz",
+    });
+  } catch (err: any) {
+    return { error: err.message || "Échec de la création du quiz interactif." };
   }
 }
 
