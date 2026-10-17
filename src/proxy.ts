@@ -16,7 +16,8 @@ export async function proxy(request: NextRequest) {
   const isProtectedRoute =
     pathname.startsWith("/forest") ||
     pathname.startsWith("/my-space") ||
-    pathname.startsWith("/admin");
+    pathname.startsWith("/admin") ||
+    pathname.startsWith("/bookmarks");
 
   let authenticatedUser = null;
 
@@ -72,6 +73,10 @@ export async function proxy(request: NextRequest) {
   response.headers.set("X-Content-Type-Options", "nosniff");
   response.headers.set("X-Frame-Options", "SAMEORIGIN");
   response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  response.headers.set(
+    "Permissions-Policy",
+    "camera=(), microphone=(), geolocation=(), browsing-topics=()"
+  );
 
   return response;
 }

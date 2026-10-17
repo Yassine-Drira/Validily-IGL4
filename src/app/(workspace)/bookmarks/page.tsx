@@ -5,38 +5,26 @@ import { SavedItemsManager } from "@/components/bookmarks/saved-items-manager";
 import { AcademicResource } from "@/types/database";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 
+import { getRequesterUser } from "@/lib/auth/authorization";
+
 export const dynamic = "force-dynamic";
 
 export default async function BookmarksPage() {
-  const isGuest = false;
+  const requester = await getRequesterUser();
+  if (!requester && isSupabaseConfigured()) {
+    redirect("/login?next=/bookmarks");
+  }
+
   let bookmarkedResources: AcademicResource[] = [];
 
   try {
-    if (isSupabaseConfigured()) {
-      const supabase = await createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user?.id) {
-        redirect("/login?next=/bookmarks");
-      }
-
-      const bookmarks = await getBookmarks(user.id);
-      bookmarkedResources = bookmarks
-        .map((b) => b.resource)
-        .filter((r): r is AcademicResource => Boolean(r));
-    } else {
-      // In unconfigured / test environment, allow test execution
-      const bookmarks = await getBookmarks();
-      bookmarkedResources = bookmarks
-        .map((b) => b.resource)
-        .filter((r): r is AcademicResource => Boolean(r));
-    }
+    const bookmarks = requester?.id
+      ? await getBookmarks(requester.id)
+      : await getBookmarks();
+    bookmarkedResources = bookmarks
+      .map((b) => b.resource)
+      .filter((r): r is AcademicResource => Boolean(r));
   } catch (err: any) {
-    if (err?.digest?.startsWith("NEXT_REDIRECT")) {
-      throw err;
-    }
     console.error("BookmarksPage error:", err);
   }
 
@@ -45,7 +33,7 @@ export default async function BookmarksPage() {
       <Breadcrumbs items={[{ label: "Favoris & Sauvegardes" }]} />
       <SavedItemsManager
         initialResources={bookmarkedResources}
-        isGuest={isGuest}
+        isGuest={!requester}
       />
     </div>
   );
