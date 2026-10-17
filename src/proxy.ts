@@ -20,6 +20,7 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith("/bookmarks");
 
   let authenticatedUser = null;
+  let userRole: string | null = null;
 
   if (
     supabaseUrl &&
@@ -54,6 +55,15 @@ export async function proxy(request: NextRequest) {
     const { data } = await supabase.auth.getUser();
     authenticatedUser = data?.user || null;
 
+    if (authenticatedUser && pathname.startsWith("/admin")) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", authenticatedUser.id)
+        .maybeSingle();
+      userRole = profile?.role || "student";
+    }
+
     // Actively delete any orphaned auth chunks from earlier sessions to eliminate HTTP 431
     const allCookies = request.cookies.getAll();
     const orphans = findOrphanAuthCookies(allCookies);
@@ -64,6 +74,13 @@ export async function proxy(request: NextRequest) {
 
   // Mandatory Authentication: Protect features from unlogged visitors
   if (isProtectedRoute && !authenticatedUser) {
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("next", pathname);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  // Strict Admin Gate: Non-admin users are strictly blocked at the edge from /admin
+  if (pathname.startsWith("/admin") && userRole !== "admin") {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("next", pathname);
     return NextResponse.redirect(loginUrl);
