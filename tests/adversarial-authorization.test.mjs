@@ -392,3 +392,157 @@ test("SEC-09: Temporary Admin Role Delegation, Revocation, and Expiration Contra
   );
   assert.ok(authCode.includes("temporary_admin_expires_at"), "authorization.ts must check temporary grant expiration");
 });
+
+test("SEC-10: Global Forest Reset (SEC-CRIT-001) strictly denies students and temporary admins, allows permanent admin", async () => {
+  const { resetAllForestProgressAction } = await import("../src/lib/actions/forest-actions.ts");
+
+  // 1. Unauthenticated guest -> rejected
+  setTestUser(null);
+  const guestRes = await resetAllForestProgressAction();
+  assert.equal(guestRes.success, false, "Unauthenticated caller must be denied global reset");
+  assert.match(guestRes.error || "", /Authentification requise|Accès refusé/i);
+
+  // 2. Regular student -> rejected
+  setTestUser(USER_A);
+  const studentRes = await resetAllForestProgressAction();
+  assert.equal(studentRes.success, false, "Student caller must be denied global reset");
+  assert.match(studentRes.error || "", /Accès refusé|administrateur/i);
+
+  // 3. Temporary delegated admin -> rejected
+  setTestUser({
+    id: "temp-admin-id-1234",
+    email: "temp_admin@validily.tn",
+    role: "admin",
+    isTemporaryAdmin: true,
+  });
+  const tempAdminRes = await resetAllForestProgressAction();
+  assert.equal(tempAdminRes.success, false, "Temporary delegated admin must be denied global reset");
+  assert.match(tempAdminRes.error || "", /non autorisée|réservée à l'administrateur principal/i);
+
+  // 4. Permanent master admin -> permitted
+  setTestUser(USER_ADMIN);
+  const adminRes = await resetAllForestProgressAction();
+  assert.equal(adminRes.success, true, "Permanent master admin must be permitted to execute maintenance reset");
+  assert.match(adminRes.message || "", /réinitialisée/i);
+});
+
+test("SEC-11: Email broadcast summary (PRIV-HIGH-012) strictly enforces assertAdmin()", async () => {
+  // 1. Unauthenticated guest -> assertAdmin rejects
+  setTestUser(null);
+  const guestAuth = await assertAdmin();
+  assert.equal(guestAuth.authorized, false, "Guest must fail assertAdmin");
+
+  // 2. Student -> assertAdmin rejects
+  setTestUser(USER_A);
+  const studentAuth = await assertAdmin();
+  assert.equal(studentAuth.authorized, false, "Student must fail assertAdmin");
+
+  // 3. Admin -> assertAdmin permits
+  setTestUser(USER_ADMIN);
+  const adminAuth = await assertAdmin();
+  assert.equal(adminAuth.authorized, true, "Admin must pass assertAdmin");
+
+  // 4. Code contract verification in email-actions.ts
+  const emailCode = fs.readFileSync(path.resolve("src/lib/actions/email-actions.ts"), "utf8");
+  assert.ok(
+    emailCode.includes("export async function getBroadcastSettingsSummary"),
+    "email-actions must export getBroadcastSettingsSummary"
+  );
+
+  const getSummaryStart = emailCode.indexOf("export async function getBroadcastSettingsSummary");
+  const getSummaryEnd = emailCode.indexOf("export async function getReleaseEmailPreviewAction");
+  const summaryBody = emailCode.slice(getSummaryStart, getSummaryEnd);
+
+  assert.ok(
+    summaryBody.includes("await assertAdmin"),
+    "getBroadcastSettingsSummary must call assertAdmin()"
+  );
+  assert.ok(
+    summaryBody.includes("sampleRecipients: []"),
+    "Unauthorized callers must receive empty sampleRecipients"
+  );
+
+  setTestUser(undefined);
+});
+
+test("SEC-12: sendClassmateCheer (ABUSE-HIGH-011) enforces 60-second cooldown rate limit", async () => {
+  const { sendClassmateCheer, _resetCheerCooldowns } = await import("../src/lib/actions/forest-actions.ts");
+  if (_resetCheerCooldowns) await _resetCheerCooldowns();
+
+  // 1. Sender cheers recipient for the first time -> succeeds
+  setTestUser(USER_A);
+  const firstCheer = await sendClassmateCheer({
+    recipientId: USER_B.id,
+    recipientName: "Student B",
+    cheerType: "water",
+  });
+  assert.equal(firstCheer.success, true, "First cheer must succeed");
+
+  // 2. Sender attempts immediate duplicate cheer -> blocked by 60s cooldown
+  const spamCheer = await sendClassmateCheer({
+    recipientId: USER_B.id,
+    recipientName: "Student B",
+    cheerType: "clap",
+  });
+  assert.equal(spamCheer.success, false, "Immediate duplicate cheer must be throttled");
+  assert.match(spamCheer.error || "", /patienter \d+s/i, "Throttled cheer must return cooldown error message");
+
+  if (_resetCheerCooldowns) await _resetCheerCooldowns();
+  setTestUser(undefined);
+});
+
+test("SEC-13: createSignedUploadUrlAction strictly requires authentication and validates bounds", async () => {
+  // 1. Unauthenticated guest check via getRequesterUser
+  setTestUser(null);
+  const guestUser = await getRequesterUser();
+  assert.equal(guestUser, null, "Guest user must be null");
+
+  // 2. Student authorization check
+  setTestUser(USER_A);
+  const studentUser = await getRequesterUser();
+  assert.equal(studentUser?.id, USER_A.id, "Student user must match requester");
+
+  // 3. Inspect src/lib/actions/resource-actions.ts code contract
+  const resourceCode = fs.readFileSync(path.resolve("src/lib/actions/resource-actions.ts"), "utf8");
+  assert.ok(
+    resourceCode.includes("export async function createSignedUploadUrlAction"),
+    "resource-actions must export createSignedUploadUrlAction"
+  );
+
+  const actionStart = resourceCode.indexOf("export async function createSignedUploadUrlAction");
+  const actionEnd = resourceCode.indexOf("export async function createResource");
+  const actionBody = resourceCode.slice(actionStart, actionEnd);
+
+  // Authentication gate
+  assert.ok(
+    actionBody.includes("await getRequesterUser()") && actionBody.includes("Authentification requise"),
+    "createSignedUploadUrlAction must enforce getRequesterUser authentication gate"
+  );
+
+  // Size limit boundary
+  assert.ok(
+    actionBody.includes("MAX_SIZE_BYTES = 50 * 1024 * 1024"),
+    "createSignedUploadUrlAction must enforce 50MB boundary"
+  );
+
+  // Format whitelist
+  assert.ok(
+    actionBody.includes(".pdf") && actionBody.includes(".html") && actionBody.includes(".md"),
+    "createSignedUploadUrlAction must restrict mime/extension to authorized types"
+  );
+
+  // Storage path partitioning
+  assert.ok(
+    actionBody.includes("uniqueStoragePath = `${requester.id}/"),
+    "createSignedUploadUrlAction must isolate storage path by user ID"
+  );
+
+  // Rate limiting
+  assert.ok(
+    actionBody.includes("signedUploadRateMap") && actionBody.includes("maxPerWindow"),
+    "createSignedUploadUrlAction must enforce in-memory throttling per user"
+  );
+
+  setTestUser(undefined);
+});
+

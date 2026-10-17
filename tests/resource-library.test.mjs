@@ -146,3 +146,68 @@ test("Sidebar Navigation Integrity: No duplicate Examens tab", async () => {
   // Must preserve Bibliothèque pointing to /library
   assert.strictEqual(sidebarCode.includes('{ label: "Bibliothèque", href: "/library"'), true);
 });
+
+test("Upload Route Security: Magic byte verification and executable rejection contracts", async () => {
+  const fs = await import("fs");
+  const uploadCode = fs.readFileSync("src/app/api/upload/route.ts", "utf-8");
+
+  // 1. Magic byte header inspection
+  assert.ok(
+    uploadCode.includes("const headerBytes = new Uint8Array(fileBuffer.slice(0, 8))"),
+    "Upload route must extract initial file magic bytes"
+  );
+
+  // 2. Executable rejection (MZ / ELF)
+  assert.ok(
+    uploadCode.includes("headerBytes[0] === 0x4d && headerBytes[1] === 0x5a") &&
+      uploadCode.includes("headerBytes[0] === 0x7f && headerBytes[1] === 0x45"),
+    "Upload route must reject MZ and ELF executable binary signatures"
+  );
+
+  // 3. Authentic PDF signature verification
+  assert.ok(
+    uploadCode.includes("headerBytes[0] === 0x25") &&
+      uploadCode.includes("headerBytes[1] === 0x50") &&
+      uploadCode.includes("headerBytes[2] === 0x44") &&
+      uploadCode.includes("headerBytes[3] === 0x46"),
+    "Upload route must assert authentic %PDF magic bytes for PDF files"
+  );
+
+  // 4. Rate limiting contract
+  assert.ok(
+    uploadCode.includes("checkUploadRateLimit") && uploadCode.includes("status: 429"),
+    "Upload route must enforce upload rate limiting with HTTP 429"
+  );
+});
+
+test("Upload Route Compatibility: supports both camelCase and snake_case form fields", async () => {
+  const fs = await import("fs");
+  const uploadCode = fs.readFileSync("src/app/api/upload/route.ts", "utf-8");
+
+  assert.ok(
+    uploadCode.includes('formData.get("subjectId")') && uploadCode.includes('formData.get("subject_id")'),
+    "Upload route must handle both subjectId and subject_id"
+  );
+  assert.ok(
+    uploadCode.includes('formData.get("categoryId")') && uploadCode.includes('formData.get("category_id")'),
+    "Upload route must handle both categoryId and category_id"
+  );
+});
+
+test("Direct Storage Upload Action: createSignedUploadUrlAction contract", async () => {
+  const fs = await import("fs");
+  const resourceCode = fs.readFileSync("src/lib/actions/resource-actions.ts", "utf-8");
+
+  assert.ok(
+    resourceCode.includes("export async function createSignedUploadUrlAction"),
+    "resource-actions must export createSignedUploadUrlAction"
+  );
+  assert.ok(
+    resourceCode.includes("createSignedUploadUrl(uniqueStoragePath)"),
+    "createSignedUploadUrlAction must invoke Supabase Storage createSignedUploadUrl"
+  );
+  assert.ok(
+    resourceCode.includes("MAX_SIZE_BYTES = 50 * 1024 * 1024"),
+    "createSignedUploadUrlAction must enforce 50MB boundary"
+  );
+});

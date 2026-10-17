@@ -39,30 +39,44 @@ export function InteractiveHtmlRunner({
   const [isSubmittingScore, setIsSubmittingScore] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
 
   // Inject sandbox storage shim to prevent localStorage crash inside origin-null sandbox
   const safeHtml = React.useMemo(() => {
     return injectSandboxShim(htmlContent);
   }, [htmlContent]);
 
-  // Listen for message events from the embedded HTML
+  // Listen for message events exclusively from the sandboxed iframe
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
-      if (event.data && event.data.type === "VALIDILY_QUIZ_COMPLETED") {
-        const score = Number(event.data.score) || 0;
-        const total = Number(event.data.total) || 20;
+      // Strict origin isolation: ensure message originates strictly from our embedded sandboxed frame
+      if (!iframeRef.current || event.source !== iframeRef.current.contentWindow) {
+        return;
+      }
+
+      if (!event.data || typeof event.data !== "object") return;
+
+      if (event.data.type === "VALIDILY_QUIZ_COMPLETED") {
+        const rawScore = Number(event.data.score);
+        const rawTotal = Number(event.data.total);
+        const total = Number.isFinite(rawTotal) && rawTotal > 0 ? Math.round(rawTotal) : 20;
+        const score = Number.isFinite(rawScore) ? Math.min(Math.max(0, Math.round(rawScore)), total) : 0;
         setSelfScore(score);
         setTotalScore(total);
-        const percent = Math.round((score / (total || 1)) * 100);
-        const timeInfo = event.data.timeSpentSeconds
-          ? ` • Durée : ${Math.floor(event.data.timeSpentSeconds / 60)}m ${event.data.timeSpentSeconds % 60}s`
-          : "";
+        const percent = Math.round((score / total) * 100);
+        const rawTime = Number(event.data.timeSpentSeconds);
+        const timeInfo =
+          Number.isFinite(rawTime) && rawTime > 0
+            ? ` • Durée : ${Math.floor(rawTime / 60)}m ${Math.round(rawTime % 60)}s`
+            : "";
         setSubmitSuccess(
           `Score capturé depuis l'atelier : ${score} / ${total} (${percent}%)${timeInfo}`
         );
-      } else if (event.data && event.data.type === "VALIDILY_QUIZ_PROGRESS") {
-        const total = Number(event.data.total) || 20;
-        const scoreSoFar = Number(event.data.scoreSoFar) || 0;
+      } else if (event.data.type === "VALIDILY_QUIZ_PROGRESS") {
+        const rawTotal = Number(event.data.total);
+        const rawScore = Number(event.data.scoreSoFar);
+        const total = Number.isFinite(rawTotal) && rawTotal > 0 ? Math.round(rawTotal) : 20;
+        const scoreSoFar = Number.isFinite(rawScore) ? Math.min(Math.max(0, Math.round(rawScore)), total) : 0;
         setSelfScore(scoreSoFar);
         setTotalScore(total);
       }
@@ -182,10 +196,11 @@ export function InteractiveHtmlRunner({
       {/* Embedded Sandboxed Frame */}
       <div className="flex-1 w-full bg-black relative">
         <iframe
+          ref={iframeRef}
           key={iframeKey}
           srcDoc={safeHtml}
           title={title}
-          sandbox="allow-scripts allow-modals allow-popups allow-forms"
+          sandbox="allow-scripts allow-forms"
           className="w-full h-full border-0 absolute inset-0 bg-[#09090b]"
         />
       </div>

@@ -4,14 +4,35 @@ import { getServiceSupabase } from "@/lib/supabase/admin";
 import { getRequesterUser } from "@/lib/auth/authorization";
 import { invalidateRepositoryCache } from "@/lib/supabase/repository";
 
+const uploadRateLimitMap = new Map<string, { count: number; windowStart: number }>();
+
+function checkUploadRateLimit(userId: string): { allowed: boolean; remaining: number } {
+  const now = Date.now();
+  const windowMs = 60 * 1000;
+  const maxPerWindow = 15;
+
+  const record = uploadRateLimitMap.get(userId);
+  if (!record || now - record.windowStart > windowMs) {
+    uploadRateLimitMap.set(userId, { count: 1, windowStart: now });
+    return { allowed: true, remaining: maxPerWindow - 1 };
+  }
+
+  if (record.count >= maxPerWindow) {
+    return { allowed: false, remaining: 0 };
+  }
+
+  record.count++;
+  return { allowed: true, remaining: maxPerWindow - record.count };
+}
+
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
-    const subjectId = formData.get("subjectId") as string;
-    const categoryId = formData.get("categoryId") as string;
-    const title = formData.get("title") as string;
-    const instructor = formData.get("instructor") as string | null;
+    const subjectId = ((formData.get("subjectId") as string | null) || (formData.get("subject_id") as string | null))?.trim() || "";
+    const categoryId = ((formData.get("categoryId") as string | null) || (formData.get("category_id") as string | null))?.trim() || "";
+    const title = (formData.get("title") as string | null)?.trim() || "";
+    const instructor = (formData.get("instructor") as string | null)?.trim() || null;
     const visibilityParam = formData.get("visibility") as string | null;
     const submitShared = formData.get("submitShared") === "on";
 
@@ -98,6 +119,16 @@ export async function POST(req: NextRequest) {
     }
 
     const userId = requester.id;
+
+    // Rate limiting: max 15 uploads per minute per user
+    const rateCheck = checkUploadRateLimit(userId);
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { error: "Limite de téléversement atteinte (maximum 15 fichiers par minute). Veuillez patienter." },
+        { status: 429 }
+      );
+    }
+
     const serviceSupabase = getServiceSupabase();
 
     // 4. Generate secure unique storage path
@@ -105,6 +136,32 @@ export async function POST(req: NextRequest) {
     const uniqueStoragePath = `${userId}/${Date.now()}-${sanitizedFilename}`;
 
     const fileBuffer = await file.arrayBuffer();
+
+    // Magic byte signature validation
+    const headerBytes = new Uint8Array(fileBuffer.slice(0, 8));
+    const isWindowsExe = headerBytes[0] === 0x4d && headerBytes[1] === 0x5a; // MZ
+    const isElf = headerBytes[0] === 0x7f && headerBytes[1] === 0x45 && headerBytes[2] === 0x4c && headerBytes[3] === 0x46; // ELF
+    if (isWindowsExe || isElf) {
+      return NextResponse.json(
+        { error: "Téléversement rejeté : les fichiers exécutables ne sont pas autorisés." },
+        { status: 400 }
+      );
+    }
+
+    if (isPdf) {
+      const isRealPdf =
+        headerBytes[0] === 0x25 && // %
+        headerBytes[1] === 0x50 && // P
+        headerBytes[2] === 0x44 && // D
+        headerBytes[3] === 0x46;   // F
+      if (!isRealPdf) {
+        return NextResponse.json(
+          { error: "Signature de fichier invalide : le document ne correspond pas au format PDF authentique." },
+          { status: 400 }
+        );
+      }
+    }
+
     const mimeType = isHtml
       ? "text/html"
       : isMd

@@ -23,10 +23,14 @@ This project runs on free-tier subscriptions for both **Vercel** and **Supabase*
   * Test execution: `node --test tests/*.test.mjs`
   * Dev server: `npm run dev` (running locally on localhost:3000)
 
-### 2. Supabase Quota Safeguards
-* **Storage Limit**: 1 GB free bucket limit on `academic-resources`. Do not upload bulk or dummy test files to live storage. Use local mocks or small (<1MB) test fixtures.
-* **Database & Egress**: 500 MB database and 2 GB bandwidth. Avoid unindexed table scans or rapid automated query loops.
-* **Caching**: Always preserve the 30-second TTL in-memory cache in `src/lib/supabase/repository.ts` to avoid redundant PostgREST network calls.
+### 2. Supabase Quota Safeguards & Egress Preservation
+* **Bandwidth & Egress Hard Limit**: Supabase Free Tier has a **5 GB monthly egress limit** (currently tracked at ~0.96 GB / 19.2%).
+  * **Leverage In-Memory Repository Cache**: Always preserve and utilize `src/lib/supabase/repository.ts` to cache queries for subjects, categories, and resources in memory (avoiding redundant PostgREST network calls).
+  * **Never Fetch Bulk Storage Files in Testing**: Do not repeatedly download or stream large files (>10 MB) directly through Supabase during staging smoke tests. Test strictly with small fixtures (100 KB – 1 MB).
+  * **Cache-Control on Storage Downloads**: Public downloads must leverage browser and CDN caching (`Cache-Control: public, max-age=31536000, immutable`) to prevent returning users from re-fetching existing documents.
+  * **Local-First Execution**: Continue running all automated tests locally via `npm test` without connecting to live Supabase, preserving 100% of remaining egress bandwidth for real users.
+* **Storage Limit**: 1 GB free bucket limit on `academic-resources`. Do not upload bulk or dummy test files to live storage.
+* **Database Size**: 500 MB limit. Avoid unindexed table scans or high-frequency automated query loops.
 
 ### 3. Verification Protocol
 Before marking any task complete:

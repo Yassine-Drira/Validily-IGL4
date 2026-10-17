@@ -15,6 +15,17 @@ export interface BroadcastSummary {
 }
 
 export async function getBroadcastSettingsSummary(): Promise<BroadcastSummary> {
+  const authCheck = await assertAdmin();
+  if (!authCheck.authorized) {
+    return {
+      configuredSender: "",
+      isBroadcastEnabled: false,
+      hasSmtpPassword: false,
+      totalRegisteredUsers: 0,
+      sampleRecipients: [],
+    };
+  }
+
   const config = getSmtpConfig();
   let totalUsers = 0;
   let sampleRecipients: string[] = [];

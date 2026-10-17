@@ -44,6 +44,19 @@ function safeRevalidate(path: string) {
   }
 }
 
+function isTableMissingError(err: any): boolean {
+  if (!err) return false;
+  const msg = (err.message || "").toLowerCase();
+  return (
+    msg.includes("schema cache") ||
+    msg.includes("does not exist") ||
+    msg.includes("could not find the table") ||
+    err.code === "PGRST204" ||
+    err.code === "PGRST205" ||
+    err.code === "42P01"
+  );
+}
+
 // In-memory cache & fallback for fast navigation without redundant DB queries
 const inMemorySubjectFolders = new Map<string, { folders: SubjectFolder[]; expiry: number }>();
 
@@ -55,6 +68,27 @@ export async function getSubjectFolders(subjectId: string): Promise<SubjectFolde
     const cached = inMemorySubjectFolders.get(subjectId);
     if (cached && Date.now() < cached.expiry) {
       return cached.folders;
+    }
+
+    if (isSupabaseConfigured()) {
+      try {
+        const serviceSupabase = getServiceSupabase();
+        const { data, error } = await serviceSupabase
+          .from("subject_folders")
+          .select("*")
+          .eq("subject_id", subjectId)
+          .order("sort_order", { ascending: true });
+
+        if (!error && data && data.length > 0) {
+          inMemorySubjectFolders.set(subjectId, {
+            folders: data as SubjectFolder[],
+            expiry: Date.now() + 30000,
+          });
+          return data as SubjectFolder[];
+        }
+      } catch {
+        // Fall back to disk
+      }
     }
 
     const disk = readDiskFolders(subjectId);
@@ -98,6 +132,32 @@ async function saveSubjectFolders(
       expiry: Date.now() + 30000,
     });
     writeDiskFolders(subjectId, folders);
+
+    if (isSupabaseConfigured()) {
+      try {
+        const serviceSupabase = getServiceSupabase();
+        if (folders.length > 0) {
+          await serviceSupabase.from("subject_folders").upsert(
+            folders.map((f) => ({
+              id: f.id,
+              subject_id: f.subject_id,
+              name: f.name,
+              parent_id: f.parent_id || null,
+              color: f.color || "blue",
+              icon: f.icon || "folder",
+              description: f.description || null,
+              sort_order: f.sort_order || 0,
+              owner_id: f.owner_id || null,
+              created_at: f.created_at,
+              updated_at: new Date().toISOString(),
+            }))
+          );
+        }
+      } catch {
+        // Graceful fallback to disk/memory
+      }
+    }
+
     invalidateRepositoryCache();
     return { success: true };
   } catch (err: any) {
@@ -453,6 +513,14 @@ export async function deleteFolderAction(data: {
 
     if (!saveRes.success) {
       return { success: false, error: saveRes.error };
+    }
+
+    if (isSupabaseConfigured()) {
+      try {
+        await serviceSupabase.from("subject_folders").delete().in("id", foldersToDelete);
+      } catch {
+        // Fallback if table not present in DB
+      }
     }
 
     safeRevalidate("/subjects");

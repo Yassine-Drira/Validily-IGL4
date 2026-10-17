@@ -21,6 +21,97 @@ async function safeRevalidate(path: string) {
   }
 }
 
+const signedUploadRateMap = new Map<string, { count: number; windowStart: number }>();
+
+export async function createSignedUploadUrlAction(data: {
+  filename: string;
+  fileSizeBytes: number;
+  mimeType: string;
+}): Promise<{
+  success: boolean;
+  signedUrl?: string;
+  token?: string;
+  storagePath?: string;
+  error?: string;
+}> {
+  try {
+    const requester = await getRequesterUser();
+    if (!requester || !requester.id) {
+      return { success: false, error: "Authentification requise pour téléverser." };
+    }
+
+    // Rate limiting: 15 per minute per user
+    const now = Date.now();
+    const windowMs = 60 * 1000;
+    const maxPerWindow = 15;
+    const record = signedUploadRateMap.get(requester.id);
+    if (!record || now - record.windowStart > windowMs) {
+      signedUploadRateMap.set(requester.id, { count: 1, windowStart: now });
+    } else if (record.count >= maxPerWindow) {
+      return {
+        success: false,
+        error: "Limite de téléversement atteinte (maximum 15 fichiers par minute). Veuillez patienter.",
+      };
+    } else {
+      record.count++;
+    }
+
+    // Validation
+    const lowerName = data.filename.toLowerCase();
+    const isPdf = lowerName.endsWith(".pdf") || data.mimeType === "application/pdf";
+    const isHtml = lowerName.endsWith(".html") || data.mimeType === "text/html";
+    const isTxt = lowerName.endsWith(".txt") || data.mimeType === "text/plain";
+    const isMd = lowerName.endsWith(".md") || lowerName.endsWith(".markdown") || data.mimeType === "text/markdown";
+
+    if (!isPdf && !isHtml && !isTxt && !isMd) {
+      return {
+        success: false,
+        error: "Type de fichier non autorisé. Formats acceptés : PDF, Markdown, Texte brut et HTML.",
+      };
+    }
+
+    const MAX_SIZE_BYTES = 50 * 1024 * 1024;
+    if (data.fileSizeBytes > MAX_SIZE_BYTES) {
+      return {
+        success: false,
+        error: `La taille du fichier (${(data.fileSizeBytes / 1024 / 1024).toFixed(1)} Mo) dépasse la limite de 50 Mo.`,
+      };
+    }
+
+    const sanitizedFilename = data.filename.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const uniqueStoragePath = `${requester.id}/${Date.now()}-${sanitizedFilename}`;
+
+    if (!isSupabaseConfigured()) {
+      return {
+        success: true,
+        signedUrl: `mock://storage/upload/${uniqueStoragePath}`,
+        storagePath: uniqueStoragePath,
+      };
+    }
+
+    const serviceSupabase = getServiceSupabase();
+    const { data: uploadData, error: uploadErr } = await serviceSupabase.storage
+      .from("academic-resources")
+      .createSignedUploadUrl(uniqueStoragePath);
+
+    if (uploadErr || !uploadData) {
+      return {
+        success: false,
+        error: uploadErr?.message || "Impossible de générer l'URL de téléversement sécurisée.",
+      };
+    }
+
+    return {
+      success: true,
+      signedUrl: uploadData.signedUrl,
+      token: uploadData.token,
+      storagePath: uniqueStoragePath,
+    };
+  } catch (err: any) {
+    return { success: false, error: err?.message || "Erreur lors de la préparation du téléversement." };
+  }
+}
+
 export async function createResource(data: {
   subject_id: string;
   category_id: string;

@@ -22,9 +22,12 @@ CRITICAL: The project is hosted on FREE-TIER Vercel and Supabase accounts. To av
      - Production bundle & type checking: `npx next build`
      - Local dev server: `npm run dev` (running locally on http://localhost:3000)
 
-3. **SUPABASE RESOURCE EFFICIENCY**:
-   - Do not upload bulk or dummy test files to live Supabase Storage.
-   - Maintain the in-memory repository cache (`src/lib/supabase/repository.ts`) to avoid redundant API queries.
+3. **SUPABASE RESOURCE EFFICIENCY & EGRESS PRESERVATION**:
+   - Strictly preserve Supabase Free Tier **5 GB monthly egress** (monitored at ~0.96 GB / 19.2%).
+   - Do not upload or repeatedly download bulk/dummy test files (>10 MB) to live Supabase Storage.
+   - Maintain and utilize the in-memory repository cache (`src/lib/supabase/repository.ts`) to eliminate redundant PostgREST queries.
+   - Enforce browser/CDN Cache-Control on public storage downloads (`Cache-Control: public, max-age=31536000, immutable`).
+   - Run all automated regression tests locally via `npm test` without connecting to live Supabase.
    - Avoid executing high-frequency network polling or repetitive DB scans.
 
 4. **MANDATORY PRODUCTION RELEASE ANNOUNCEMENT GATE**:

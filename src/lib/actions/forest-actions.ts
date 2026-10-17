@@ -1584,9 +1584,13 @@ export async function resetAllForestProgressAction(): Promise<{
 }> {
   try {
     const authMod = await getAuthModule();
-    const requester = await authMod?.getRequesterUser();
-    if (!requester || !requester.id) {
-      return { success: false, message: "", error: "Non authentifié." };
+    const adminCheck = await authMod?.assertPermanentAdmin();
+    if (!adminCheck || !adminCheck.authorized) {
+      return {
+        success: false,
+        message: "",
+        error: adminCheck?.error || "Accès refusé. Action réservée à l'administrateur principal.",
+      };
     }
 
     // 1. Clear in-memory maps
@@ -1621,6 +1625,12 @@ export async function resetAllForestProgressAction(): Promise<{
   }
 }
 
+const cheerCooldownMap = new Map<string, number>();
+
+export async function _resetCheerCooldowns(): Promise<void> {
+  cheerCooldownMap.clear();
+}
+
 /**
  * 6. Send an encouraging cheer to a classmate's forest
  */
@@ -1643,6 +1653,36 @@ export async function sendClassmateCheer(input: {
 
     if (requester.id === input.recipientId) {
       return { success: false, message: "", error: "Vous ne pouvez pas vous encourager vous-même." };
+    }
+
+    // Rate limiting: 60-second cooldown per sender-recipient pair
+    const cooldownKey = `${requester.id}_${input.recipientId}`;
+    const lastCheerTime = cheerCooldownMap.get(cooldownKey) || 0;
+    const now = Date.now();
+    if (now - lastCheerTime < 60_000) {
+      const remainingSec = Math.ceil((60_000 - (now - lastCheerTime)) / 1000);
+      return {
+        success: false,
+        message: "",
+        error: `Veuillez patienter ${remainingSec}s avant d'encourager à nouveau ce camarade.`,
+      };
+    }
+
+    // Optimistic cooldown reservation to prevent race conditions during concurrent in-flight requests
+    cheerCooldownMap.set(cooldownKey, now);
+
+    try {
+      const { acquireDistributedLock } = await import("@/lib/kv/redis");
+      const lock = await acquireDistributedLock(`cheer:${cooldownKey}`, 60);
+      if (!lock.acquired) {
+        return {
+          success: false,
+          message: "",
+          error: `Veuillez patienter ${lock.remainingSeconds || 60}s avant d'encourager à nouveau ce camarade.`,
+        };
+      }
+    } catch {
+      // Fallback already enforced by cheerCooldownMap
     }
 
     const cheerLabels: Record<string, string> = {
@@ -1674,6 +1714,27 @@ export async function sendClassmateCheer(input: {
       const serviceSupabase = await getAdminClient();
       if (serviceSupabase) {
         try {
+          const { data: recentCheer } = await serviceSupabase
+            .from("forest_cheers")
+            .select("created_at")
+            .eq("sender_id", requester.id)
+            .eq("recipient_id", input.recipientId)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (recentCheer?.created_at) {
+            const elapsedSec = (now - new Date(recentCheer.created_at).getTime()) / 1000;
+            if (elapsedSec < 60) {
+              const remainingSec = Math.ceil(60 - elapsedSec);
+              return {
+                success: false,
+                message: "",
+                error: `Veuillez patienter ${remainingSec}s avant d'encourager à nouveau ce camarade.`,
+              };
+            }
+          }
+
           await serviceSupabase.from("forest_cheers").insert({
             sender_id: requester.id,
             recipient_id: input.recipientId,
@@ -1706,6 +1767,8 @@ export async function sendClassmateCheer(input: {
     } catch {
       // Graceful error isolation
     }
+
+    cheerCooldownMap.set(cooldownKey, now);
 
     return {
       success: true,

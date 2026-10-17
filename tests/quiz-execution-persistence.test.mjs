@@ -145,3 +145,82 @@ test("Guest vs Authenticated Handling in submitQuizAttempt", () => {
     "submitQuizAttempt must safely return isGuest: true when user is unauthenticated"
   );
 });
+
+test("SEC-QUIZ-01: Server-Authoritative Scoring and Anti-Replay Integrity Contracts", () => {
+  const actionsFile = fs.readFileSync(
+    path.join(process.cwd(), "src", "lib", "actions", "quiz-actions.ts"),
+    "utf-8"
+  );
+
+  // 1. Authoritative question and option retrieval
+  assert.ok(
+    actionsFile.includes("authoritativeQuestions") &&
+      actionsFile.includes("options:quiz_options(id, is_correct)"),
+    "submitQuizAttempt must query authoritative questions and correct options from database"
+  );
+
+  // 2. Server-side answer correctness recalculation
+  assert.ok(
+    actionsFile.includes("isActuallyCorrect = Boolean(matchedOpt && matchedOpt.is_correct)"),
+    "submitQuizAttempt must authoritatively compute isActuallyCorrect from database options"
+  );
+
+  // 3. Final score computed from validated answers rather than trusting client
+  assert.ok(
+    actionsFile.includes("finalScore = correctAnswersCount"),
+    "submitQuizAttempt must assign calculated correct answers to finalScore"
+  );
+
+  // 4. Persistence of calculated scores into database
+  assert.ok(
+    actionsFile.includes("score: finalScore") && actionsFile.includes("total_questions: finalTotal"),
+    "submitQuizAttempt must persist authoritative score and total into quiz_attempts"
+  );
+
+  // 5. Anti-replay throttle
+  assert.ok(
+    actionsFile.includes("recentAttempt") && actionsFile.includes("Tentative déjà enregistrée"),
+    "submitQuizAttempt must prevent rapid duplicate replay submissions"
+  );
+});
+
+test("SEC-QUIZ-02: Interactive HTML Sandboxed Runner Security Contracts", () => {
+  const runnerFile = fs.readFileSync(
+    path.join(process.cwd(), "src", "components", "quizzes", "interactive-html-runner.tsx"),
+    "utf-8"
+  );
+
+  // 1. Sandboxed iframe without dangerous popup / modal permissions
+  assert.ok(
+    runnerFile.includes('sandbox="allow-scripts allow-forms"'),
+    "InteractiveHtmlRunner must restrict sandbox to allow-scripts allow-forms"
+  );
+  assert.ok(
+    !runnerFile.includes("allow-modals"),
+    "InteractiveHtmlRunner must not allow modals in sandbox"
+  );
+  assert.ok(
+    !runnerFile.includes("allow-popups"),
+    "InteractiveHtmlRunner must not allow popups in sandbox"
+  );
+
+  // 2. Strict event.source validation on cross-window postMessage
+  assert.ok(
+    runnerFile.includes("event.source !== iframeRef.current.contentWindow"),
+    "InteractiveHtmlRunner must reject messages not originating from the specific sandboxed iframe"
+  );
+});
+
+test("SEC-QUIZ-03: Optimistic in-flight concurrency lock in submitQuizAttempt", () => {
+  const actionsFile = fs.readFileSync(
+    path.join(process.cwd(), "src", "lib", "actions", "quiz-actions.ts"),
+    "utf-8"
+  );
+
+  assert.ok(
+    actionsFile.includes("quizAttemptInFlightMap") &&
+      actionsFile.includes("Tentative déjà en cours de traitement"),
+    "submitQuizAttempt must maintain in-flight lock to reject simultaneous burst submissions"
+  );
+});
+

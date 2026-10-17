@@ -216,6 +216,8 @@ export async function deleteQuiz(quizId: string): Promise<{ success?: boolean; e
   }
 }
 
+const quizAttemptInFlightMap = new Map<string, number>();
+
 export async function submitQuizAttempt(data: {
   quiz_id: string;
   score: number;
@@ -232,8 +234,13 @@ export async function submitQuizAttempt(data: {
   isDemo?: boolean;
   error?: string;
   message?: string;
+  authoritativeScore?: number;
 }> {
   try {
+    if (!data || !data.quiz_id) {
+      return { error: "Identifiant du quiz manquant." };
+    }
+
     if (!isSupabaseConfigured()) {
       return { success: true, isDemo: true };
     }
@@ -253,15 +260,110 @@ export async function submitQuizAttempt(data: {
       };
     }
 
+    // In-flight concurrent lock: prevent simultaneous duplicate burst submissions
+    const inFlightKey = `${user.id}_${data.quiz_id}`;
+    const lastAttemptTime = quizAttemptInFlightMap.get(inFlightKey) || 0;
+    const now = Date.now();
+    if (now - lastAttemptTime < 2000) {
+      return { success: true, message: "Tentative déjà en cours de traitement." };
+    }
+    quizAttemptInFlightMap.set(inFlightKey, now);
+
+    try {
+      const { acquireDistributedLock } = await import("@/lib/kv/redis");
+      const lock = await acquireDistributedLock(`quiz-burst:${inFlightKey}`, 2);
+      if (!lock.acquired) {
+        return { success: true, message: "Tentative déjà en cours de traitement." };
+      }
+    } catch {
+      // Fallback already enforced by quizAttemptInFlightMap
+    }
+
     const serviceSupabase = getServiceSupabase();
+
+    // Anti-replay / duplicate attempt throttle: check if completed < 2 seconds ago
+    const { data: recentAttempt } = await serviceSupabase
+      .from("quiz_attempts")
+      .select("id, completed_at")
+      .eq("quiz_id", data.quiz_id)
+      .eq("user_id", user.id)
+      .order("completed_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (recentAttempt?.completed_at) {
+      const elapsedMs = Date.now() - new Date(recentAttempt.completed_at).getTime();
+      if (elapsedMs < 2000) {
+        return { success: true, attemptId: recentAttempt.id, message: "Tentative déjà enregistrée." };
+      }
+    }
+
+    // Authoritative Server-Side Scoring & Integrity
+    const { data: authoritativeQuestions } = await serviceSupabase
+      .from("quiz_questions")
+      .select("id, question_type, options:quiz_options(id, is_correct)")
+      .eq("quiz_id", data.quiz_id);
+
+    let finalScore = 0;
+    let finalTotal = Math.max(1, Number(data.total_questions) || 1);
+    const answersToInsert: Array<{
+      attempt_id?: string;
+      question_id: string;
+      selected_option_id: string;
+      is_correct: boolean;
+    }> = [];
+
+    const isInteractiveDrill =
+      authoritativeQuestions?.some((q: any) => q.question_type === "interactive_html") || false;
+
+    if (isInteractiveDrill) {
+      // Interactive HTML drill: questions are encapsulated inside sandboxed HTML/JS.
+      // Enforce bounds: integer, 0 <= score <= total_questions
+      finalTotal = Math.max(1, Math.round(Number(data.total_questions) || 20));
+      finalScore = Math.min(Math.max(0, Math.round(Number(data.score) || 0)), finalTotal);
+    } else if (authoritativeQuestions && authoritativeQuestions.length > 0) {
+      // Standard QCM: Authoritative server-side scoring using database definitions
+      finalTotal = authoritativeQuestions.length;
+      const questionMap = new Map<string, any>(
+        authoritativeQuestions.map((q: any) => [q.id, q])
+      );
+
+      let correctAnswersCount = 0;
+      if (Array.isArray(data.answers)) {
+        for (const ans of data.answers) {
+          const authQuestion = questionMap.get(ans.question_id);
+          if (!authQuestion) continue;
+
+          const matchedOpt = authQuestion.options?.find(
+            (o: any) => o.id === ans.selected_option_id
+          );
+          const isActuallyCorrect = Boolean(matchedOpt && matchedOpt.is_correct);
+
+          if (isActuallyCorrect) {
+            correctAnswersCount++;
+          }
+
+          answersToInsert.push({
+            question_id: ans.question_id,
+            selected_option_id: ans.selected_option_id,
+            is_correct: isActuallyCorrect,
+          });
+        }
+      }
+      finalScore = correctAnswersCount;
+    } else {
+      // Fallback for standalone/mock quizzes without stored questions
+      finalTotal = Math.max(1, Math.round(Number(data.total_questions) || 1));
+      finalScore = Math.min(Math.max(0, Math.round(Number(data.score) || 0)), finalTotal);
+    }
 
     const { data: attempt, error: attemptError } = await serviceSupabase
       .from("quiz_attempts")
       .insert({
         quiz_id: data.quiz_id,
         user_id: user.id,
-        score: data.score,
-        total_questions: data.total_questions,
+        score: finalScore,
+        total_questions: finalTotal,
         completed_at: new Date().toISOString(),
       })
       .select()
@@ -272,8 +374,8 @@ export async function submitQuizAttempt(data: {
       return { error: attemptError?.message || "Erreur lors de l'enregistrement de la tentative." };
     }
 
-    if (data.answers && data.answers.length > 0) {
-      const answersToInsert = data.answers.map((ans) => ({
+    if (answersToInsert.length > 0) {
+      const records = answersToInsert.map((ans) => ({
         attempt_id: attempt.id,
         question_id: ans.question_id,
         selected_option_id: ans.selected_option_id,
@@ -282,7 +384,7 @@ export async function submitQuizAttempt(data: {
 
       const { error: ansError } = await serviceSupabase
         .from("quiz_attempt_answers")
-        .insert(answersToInsert);
+        .insert(records);
 
       if (ansError) {
         console.error("Error recording attempt answers:", ansError);
@@ -292,7 +394,7 @@ export async function submitQuizAttempt(data: {
     safeRevalidate("/quizzes");
     safeRevalidate(`/quizzes/${data.quiz_id}`);
     safeRevalidate("/subjects");
-    return { success: true, attemptId: attempt.id };
+    return { success: true, attemptId: attempt.id, authoritativeScore: finalScore };
   } catch (err: any) {
     console.error("submitQuizAttempt error:", err);
     return { error: err.message || "Erreur lors de la soumission de la tentative." };
