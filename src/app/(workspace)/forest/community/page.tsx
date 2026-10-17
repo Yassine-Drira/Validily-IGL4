@@ -343,12 +343,31 @@ export default function CommunityForestPage() {
 
         <div className="flex items-center space-x-2 text-xs text-[#68748A] self-end sm:self-auto font-mono">
           <Users className="w-4 h-4 text-emerald-600" />
-          <span>{filteredMembers.length} camarades visibles</span>
+          <span>{isLoading ? "Chargement des bosquets..." : `${filteredMembers.length} camarades visibles`}</span>
         </div>
       </div>
 
       {/* Members Forest Grid */}
-      {filteredMembers.length === 0 ? (
+      {isLoading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div
+              key={i}
+              className="bg-white border border-[#E4E8F0] rounded-3xl p-5 shadow-2xs space-y-4 animate-pulse"
+            >
+              <div className="flex items-center space-x-3">
+                <div className="w-11 h-11 rounded-2xl bg-gray-100" />
+                <div className="space-y-1.5 flex-1">
+                  <div className="h-4 bg-gray-100 rounded w-28" />
+                  <div className="h-3 bg-gray-100 rounded w-20" />
+                </div>
+              </div>
+              <div className="h-14 bg-gray-50 rounded-2xl border border-gray-100" />
+              <div className="h-7 bg-gray-50 rounded-xl" />
+            </div>
+          ))}
+        </div>
+      ) : filteredMembers.length === 0 ? (
         !isAuthenticated ? (
           <div className="text-center py-16 bg-white rounded-3xl border border-[#E4E8F0] p-8 space-y-4 shadow-2xs">
             <Lock className="w-10 h-10 text-[#2855D9] mx-auto opacity-75" />
