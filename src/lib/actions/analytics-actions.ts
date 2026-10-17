@@ -192,6 +192,27 @@ export async function getUserStudyGoals(userId?: string): Promise<UserStudyGoals
     const inMem = localUserGoals.get(effectiveUserId);
     if (inMem) return inMem;
 
+    // 1. Try Supabase database
+    try {
+      const serviceSupabase = await getAdminClient();
+      if (serviceSupabase) {
+        const { data, error } = await serviceSupabase
+          .from("user_study_goals")
+          .select("daily_focus_minutes, weekly_quizzes, target_score")
+          .eq("user_id", effectiveUserId)
+          .maybeSingle();
+        if (!error && data?.daily_focus_minutes) {
+          const goals: UserStudyGoals = {
+            dailyFocusMinutes: data.daily_focus_minutes,
+            weeklyQuizzes: data.weekly_quizzes,
+            targetScore: data.target_score,
+          };
+          localUserGoals.set(effectiveUserId, goals);
+          return goals;
+        }
+      }
+    } catch {}
+
     const disk = readDiskAnalyticsJson(`goals_${effectiveUserId}.json`);
     if (disk?.dailyFocusMinutes) {
       localUserGoals.set(effectiveUserId, disk);
@@ -246,6 +267,21 @@ export async function saveUserStudyGoals(
 
     localUserGoals.set(effectiveUserId, updated);
     writeDiskAnalyticsJson(`goals_${effectiveUserId}.json`, updated);
+
+    // Save to Supabase database
+    try {
+      const serviceSupabase = await getAdminClient();
+      if (serviceSupabase) {
+        await serviceSupabase.from("user_study_goals").upsert({
+          user_id: effectiveUserId,
+          daily_focus_minutes: updated.dailyFocusMinutes,
+          weekly_quizzes: updated.weeklyQuizzes,
+          target_score: updated.targetScore,
+          updated_at: updated.updated_at,
+        });
+      }
+    } catch {}
+
     return { success: true, goals: updated };
   } catch (err: any) {
     return {
@@ -323,6 +359,23 @@ export async function recordUserDailyFocus(input: {
     localDailyFocusRecords.set(effectiveUserId, userHistory);
     writeDiskAnalyticsJson(`daily_focus_${effectiveUserId}.json`, userHistory);
 
+    // Persist to Supabase database
+    try {
+      const serviceSupabase = await getAdminClient();
+      if (serviceSupabase) {
+        await serviceSupabase.from("user_daily_focus").upsert(
+          {
+            user_id: effectiveUserId,
+            focus_date: todayStr,
+            total_seconds: nextSeconds,
+            completed_pomodoros: nextPomodoros,
+            updated_at: updatedRecord.updatedAt,
+          },
+          { onConflict: "user_id,focus_date" }
+        );
+      }
+    } catch {}
+
     return {
       success: true,
       record: {
@@ -351,13 +404,38 @@ export async function getUserDailyFocusHistory(
     const inMem = localDailyFocusRecords.get(effectiveUserId);
     const result: Record<string, { totalSeconds: number; completedPomodoros: number; totalMinutes: number }> = {};
 
+    // 1. Try Supabase database first
+    try {
+      const serviceSupabase = await getAdminClient();
+      if (serviceSupabase) {
+        const { data, error } = await serviceSupabase
+          .from("user_daily_focus")
+          .select("focus_date, total_seconds, completed_pomodoros")
+          .eq("user_id", effectiveUserId);
+        if (!error && Array.isArray(data) && data.length > 0) {
+          for (const row of data) {
+            const d = row.focus_date;
+            const s = row.total_seconds || 0;
+            const p = row.completed_pomodoros || 0;
+            result[d] = {
+              totalSeconds: s,
+              completedPomodoros: p,
+              totalMinutes: Math.floor(s / 60),
+            };
+          }
+        }
+      }
+    } catch {}
+
     if (inMem) {
       for (const [date, rec] of Object.entries(inMem)) {
-        result[date] = {
-          totalSeconds: rec.totalSeconds,
-          completedPomodoros: rec.completedPomodoros,
-          totalMinutes: Math.floor(rec.totalSeconds / 60),
-        };
+        if (!result[date] || rec.totalSeconds > result[date].totalSeconds) {
+          result[date] = {
+            totalSeconds: rec.totalSeconds,
+            completedPomodoros: rec.completedPomodoros,
+            totalMinutes: Math.floor(rec.totalSeconds / 60),
+          };
+        }
       }
     }
 

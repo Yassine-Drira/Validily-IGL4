@@ -114,3 +114,45 @@ export async function releaseDistributedLock(key: string): Promise<void> {
     }
   }
 }
+
+/**
+ * Get persistent JSON document from distributed KV store
+ */
+export async function getDistributedJson<T = any>(key: string): Promise<T | null> {
+  const creds = getKvCredentials();
+  if (creds) {
+    try {
+      const res = await fetch(`${creds.url}/get/${encodeURIComponent(key)}`, {
+        headers: { Authorization: `Bearer ${creds.token}` },
+        cache: "no-store",
+      });
+      if (res.ok) {
+        const data = (await res.json()) as UpstashResponse<string | null>;
+        if (data.result) {
+          return JSON.parse(data.result) as T;
+        }
+      }
+    } catch {}
+  }
+  return null;
+}
+
+/**
+ * Set persistent JSON document in distributed KV store
+ */
+export async function setDistributedJson(key: string, value: any, ttlSeconds?: number): Promise<void> {
+  const creds = getKvCredentials();
+  if (creds) {
+    try {
+      const serialized = JSON.stringify(value);
+      const url = ttlSeconds
+        ? `${creds.url}/set/${encodeURIComponent(key)}/${encodeURIComponent(serialized)}?ex=${ttlSeconds}`
+        : `${creds.url}/set/${encodeURIComponent(key)}/${encodeURIComponent(serialized)}`;
+      await fetch(url, {
+        headers: { Authorization: `Bearer ${creds.token}` },
+        cache: "no-store",
+      });
+    } catch {}
+  }
+}
+

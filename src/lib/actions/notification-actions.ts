@@ -166,6 +166,20 @@ export async function getUserAnnouncementState(
     state = { read: new Set<string>(), dismissed: new Set<string>() };
     userAnnouncementState.set(userId, state);
 
+    // 1. Try Upstash Redis distributed store
+    try {
+      const { getDistributedJson } = await import("@/lib/kv/redis");
+      const kvData = await getDistributedJson<{ readIds: string[]; dismissedIds: string[] }>(`announcements:${userId}`);
+      if (kvData) {
+        if (Array.isArray(kvData.readIds)) {
+          kvData.readIds.forEach((id: string) => state?.read.add(id));
+        }
+        if (Array.isArray(kvData.dismissedIds)) {
+          kvData.dismissedIds.forEach((id: string) => state?.dismissed.add(id));
+        }
+      }
+    } catch {}
+
     const diskData = readDiskNotificationJson(`announcements_${userId}.json`);
     if (diskData) {
       if (Array.isArray(diskData.readIds)) {
@@ -184,10 +198,18 @@ export async function saveUserAnnouncementState(
   state: { read: Set<string>; dismissed: Set<string> }
 ): Promise<void> {
   userAnnouncementState.set(userId, state);
-  writeDiskNotificationJson(`announcements_${userId}.json`, {
+  const payload = {
     readIds: Array.from(state.read),
     dismissedIds: Array.from(state.dismissed),
-  });
+  };
+
+  // 1. Persist to Upstash Redis
+  try {
+    const { setDistributedJson } = await import("@/lib/kv/redis");
+    await setDistributedJson(`announcements:${userId}`, payload);
+  } catch {}
+
+  writeDiskNotificationJson(`announcements_${userId}.json`, payload);
 }
 
 export async function resetUserAnnouncementState(userId?: string): Promise<void> {

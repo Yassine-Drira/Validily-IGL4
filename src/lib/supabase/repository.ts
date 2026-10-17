@@ -679,6 +679,27 @@ export async function getSubjectFolders(subjectId: string): Promise<import("@/ty
   if (cached) return cached;
 
   try {
+    // 1. Query Supabase subject_folders database table
+    try {
+      const { isSupabaseConfigured } = await import("./server");
+      if (isSupabaseConfigured()) {
+        const { getServiceSupabase } = await import("./admin");
+        const serviceSupabase = getServiceSupabase();
+        if (serviceSupabase) {
+          const { data, error } = await serviceSupabase
+            .from("subject_folders")
+            .select("*")
+            .eq("subject_id", subjectId)
+            .order("sort_order", { ascending: true });
+
+          if (!error && data && data.length > 0) {
+            setToCache(cacheKey, data as any, 30000);
+            return data as any;
+          }
+        }
+      }
+    } catch {}
+
     const fs = await import("fs");
     const path = await import("path");
     const cacheDir = path.join(process.cwd(), ".validily-cache");
