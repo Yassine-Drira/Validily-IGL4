@@ -105,9 +105,9 @@ export async function resetCustomEmailTemplateAction(): Promise<{
 }> {
   const adminCheck = await assertAdmin();
   const defaultTemplate = generateReleaseEmailHtml({
-    releaseVersion: "v1.1",
+    releaseVersion: "v1.2",
     releaseDate: "Octobre 2026",
-    siteUrl: process.env.NEXT_PUBLIC_SITE_URL || "https://validily.vercel.app",
+    siteUrl: process.env.NEXT_PUBLIC_SITE_URL || "https://validily-igl-4.vercel.app",
   });
 
   if (!adminCheck.authorized) {
@@ -121,7 +121,7 @@ export async function resetCustomEmailTemplateAction(): Promise<{
   return { success: true, defaultTemplate };
 }
 
-export async function getReleaseEmailPreviewAction(version: string = "v1.1") {
+export async function getReleaseEmailPreviewAction(version: string = "v1.2") {
   // Check if admin has saved a custom HTML template in distributed Redis
   try {
     const custom = await getDistributedJson<CustomEmailTemplate>("global:custom_email_broadcast_template");
@@ -138,7 +138,7 @@ export async function getReleaseEmailPreviewAction(version: string = "v1.1") {
   const standard = generateReleaseEmailHtml({
     releaseVersion: version,
     releaseDate: "Octobre 2026",
-    siteUrl: process.env.NEXT_PUBLIC_SITE_URL || "https://validily.vercel.app",
+    siteUrl: process.env.NEXT_PUBLIC_SITE_URL || "https://validily-igl-4.vercel.app",
   });
 
   return {
@@ -216,8 +216,9 @@ export async function executeReleaseEmailBroadcastAction(
         text = saved.text || html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
       } else {
         const generated = generateReleaseEmailHtml({
-          releaseVersion: params.targetVersion || "v1.1",
+          releaseVersion: params.targetVersion || "v1.2",
           releaseDate: "Octobre 2026",
+          siteUrl: process.env.NEXT_PUBLIC_SITE_URL || "https://validily-igl-4.vercel.app",
         });
         subject = params.customSubject?.trim() || generated.subject;
         html = generated.html;

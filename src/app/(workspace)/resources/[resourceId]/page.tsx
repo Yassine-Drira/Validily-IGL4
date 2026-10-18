@@ -6,6 +6,7 @@ import { CategoryBadge } from "@/components/academic/category-badge";
 import { formatBytes, formatDate } from "@/lib/utils";
 import { PdfViewer } from "@/components/pdf/pdf-viewer";
 import { ExternalLinkViewer } from "@/components/resources/external-link-viewer";
+import { InteractiveHtmlRunner } from "@/components/quizzes/interactive-html-runner";
 import { ResourceActionsBar } from "@/components/resources/resource-actions-bar";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { getCachedSignedUrl } from "@/lib/supabase/storage-cache";
@@ -226,7 +227,7 @@ export default async function ResourceDetailPage({
 
       {/* In-App Reader Interface */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Main Viewer Frame: External Link Portal vs PDF Reader */}
+        {/* Main Viewer Frame: External Link Portal vs Interactive HTML vs PDF Reader */}
         <div className="lg:col-span-3">
           {resource.mime_type?.includes("url") ||
           resource.mime_type?.includes("google-apps") ||
@@ -234,6 +235,16 @@ export default async function ResourceDetailPage({
           resource.tags?.includes("gdrive") ||
           resource.storage_path?.startsWith("http") ? (
             <ExternalLinkViewer resource={resource} />
+          ) : resource.mime_type?.includes("html") ||
+            resource.original_filename?.toLowerCase().endsWith(".html") ||
+            resource.resource_type === "quiz" ? (
+            <div className="bg-white rounded-xl border border-[#E4E8F0] overflow-hidden min-h-[600px] shadow-xs">
+              <InteractiveHtmlRunner
+                title={resource.title}
+                subjectName={resource.subject?.name}
+                srcUrl={viewUrl}
+              />
+            </div>
           ) : (
             <PdfViewer
               url={viewUrl}

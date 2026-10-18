@@ -410,3 +410,107 @@ export interface SystemNotification {
   created_at: string;
 }
 
+// -----------------------------------------------------------------------------
+// Academic Planner & Task Management Types
+// -----------------------------------------------------------------------------
+
+export type AcademicTaskPriority = "low" | "medium" | "high" | "urgent";
+
+export type AcademicTaskCategory =
+  | "td_tp"
+  | "project"
+  | "exam"
+  | "revision"
+  | "reading"
+  | "other";
+
+export type AcademicRecurrencePattern =
+  | "daily"
+  | "weekly"
+  | "biweekly"
+  | "monthly";
+
+export interface AcademicSubtask {
+  id: string;
+  title: string;
+  done: boolean;
+  order: number;
+}
+
+export interface AcademicTask {
+  id: string;
+  user_id: string;
+  subject_id: string | null;
+  title: string;
+  description: string | null;
+  category: AcademicTaskCategory;
+  priority: AcademicTaskPriority;
+  due_date: string; // YYYY-MM-DD
+  due_time: string | null; // HH:MM
+  estimated_minutes: number;
+  actual_minutes: number;
+  is_completed: boolean;
+  completed_at: string | null;
+  subtasks: AcademicSubtask[];
+  is_recurring?: boolean;
+  recurrence_pattern?: AcademicRecurrencePattern | null;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+  subject?: Subject;
+}
+
+export interface CalendarTimeblock {
+  id: string;
+  user_id: string;
+  task_id: string | null;
+  subject_id: string | null;
+  title: string;
+  block_date: string; // YYYY-MM-DD
+  start_time: string; // HH:MM or HH:MM:SS
+  end_time: string; // HH:MM or HH:MM:SS
+  duration_minutes: number;
+  is_completed: boolean;
+  completed_at: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  subject?: Subject;
+  task?: AcademicTask;
+}
+
+export type AcademicGoalPeriod = "daily" | "weekly" | "monthly" | "custom";
+export type AcademicGoalMetric =
+  | "study_minutes"
+  | "tasks_completed"
+  | "study_sessions"
+  | "exercises"
+  | "chapters"
+  | "custom";
+export type AcademicGoalStatus = "active" | "completed" | "paused" | "archived";
+
+export interface AcademicGoal {
+  id: string;
+  user_id: string;
+  title: string;
+  description?: string | null;
+  period_type: AcademicGoalPeriod;
+  period_key: string; // e.g. "2026-10-18", "2026-W42", "2026-10", "custom"
+  metric_type: AcademicGoalMetric;
+  target_value: number;
+  unit?: string;
+  subject_id?: string | null;
+  manual_progress?: number;
+  status?: AcademicGoalStatus;
+  deadline?: string | null;
+  created_at: string;
+  updated_at: string;
+  subject?: Subject;
+}
+
+export interface AcademicGoalWithProgress extends AcademicGoal {
+  current_progress: number;
+  is_completed: boolean;
+  percentage: number;
+  is_automated: boolean;
+}

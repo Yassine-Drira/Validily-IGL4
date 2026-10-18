@@ -17,6 +17,7 @@ import {
   X,
   ArrowRight,
   Trees,
+  CalendarCheck2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -27,6 +28,7 @@ import { useSidebar } from "./workspace-shell";
 
 const navItems = [
   { label: "Accueil", href: "/", icon: LayoutDashboard },
+  { label: "Planning & Tâches", href: "/planner", icon: CalendarCheck2 },
   { label: "Semestres", href: "/semesters", icon: Calendar },
   { label: "Matières", href: "/subjects", icon: BookOpen },
   { label: "Bibliothèque", href: "/library", icon: FolderArchive },

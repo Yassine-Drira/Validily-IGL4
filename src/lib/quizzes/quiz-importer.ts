@@ -108,29 +108,46 @@ export const SANDBOX_STORAGE_SHIM = `
     };
   };
 
+  // Safely shim localStorage
   try {
-    var test = window.localStorage;
-    test.getItem('__test');
+    var testLS = window.localStorage;
+    if (!testLS || typeof testLS.getItem !== 'function') throw new Error('invalid');
+    testLS.getItem('__validily_probe');
   } catch(e) {
     try {
-      Object.defineProperty(window, 'localStorage', {
-        value: createShim(),
-        writable: true,
-        configurable: true
-      });
-      Object.defineProperty(window, 'sessionStorage', {
-        value: createShim(),
-        writable: true,
-        configurable: true
-      });
-    } catch(err) {
       window.localStorage = createShim();
+    } catch(err1) {
+      try {
+        Object.defineProperty(window, 'localStorage', {
+          value: createShim(),
+          writable: true,
+          configurable: true
+        });
+      } catch(err2) {}
+    }
+  }
+
+  // Safely shim sessionStorage
+  try {
+    var testSS = window.sessionStorage;
+    if (!testSS || typeof testSS.getItem !== 'function') throw new Error('invalid');
+    testSS.getItem('__validily_probe');
+  } catch(e) {
+    try {
       window.sessionStorage = createShim();
+    } catch(err1) {
+      try {
+        Object.defineProperty(window, 'sessionStorage', {
+          value: createShim(),
+          writable: true,
+          configurable: true
+        });
+      } catch(err2) {}
     }
   }
 
   // Provide a bridge helper for completion events with rich telemetry
-  window.reportValidilyScore = function(score, total, extra) {
+  var reportScore = function(score, total, extra) {
     if (window.parent && window.parent !== window) {
       var payload = {
         type: 'VALIDILY_QUIZ_COMPLETED',
@@ -148,6 +165,9 @@ export const SANDBOX_STORAGE_SHIM = `
       window.parent.postMessage(payload, '*');
     }
   };
+
+  window.reportValidilyScore = reportScore;
+  window.reportEduFocusScore = reportScore;
 })();
 </script>
 `;

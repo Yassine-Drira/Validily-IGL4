@@ -97,6 +97,25 @@ export interface GlobalAnnouncement {
 // Active published global announcements registry
 const ACTIVE_GLOBAL_ANNOUNCEMENTS: GlobalAnnouncement[] = [
   {
+    id: "announcement-v1-2-planner-release",
+    type: "announcement",
+    release_version: "v1.2",
+    title: "VALIDILY-IGL4 v1.2 — Votre Planning & To-Do Académique est Disponible",
+    content: `Bienvenue dans la version 1.2 de VALIDILY-IGL4 ! Cette mise à jour introduit un tout nouveau sous-système de productivité et d'organisation académique taillé sur mesure pour la promotion IGL4.
+
+Nouveautés majeures :
+- 📋 To-Do Académique & Sous-tâches : Créez vos devoirs, suivez vos sous-tâches, cochez vos accomplissements avec une interface instantanée (< 1ms) et synchronisation durable sur base de données.
+- 📅 Calendrier Interactif 08:00–00:00 : Planifiez vos blocs d'étude, déplacez vos séances par glisser-déposer ou presets rapides, prévenez les conflits d'horaires et visualisez l'indicateur d'heure actuelle.
+- 🎯 Objectifs Personnels & Télémétrie : Fixez vos cibles d'étude (minutes réelles de concentration ou devoirs terminés), mesurées de façon authoritative via votre historique Focus sans double-comptage.
+- ⚡ Raccourci Google NotebookLM : Accédez en un clic à l'analyseur IA de cours officiel en toute sécurité.
+- 🌲 Intégration Bosquet & Focus : Déclenchez vos sessions Pomodoro directement depuis vos créneaux et faites grandir votre Bosquet.
+
+Rendez-vous sur votre nouvel espace Planning & Tâches pour booster votre semestre ! 🚀`,
+    link: "/planner",
+    created_at: "2026-10-18T12:00:00.000Z",
+    is_active: true,
+  },
+  {
     id: "announcement-v1-1-release",
     type: "announcement",
     release_version: "v1.1",

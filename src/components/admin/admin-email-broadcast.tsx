@@ -60,7 +60,7 @@ export function AdminEmailBroadcastView() {
       try {
         const [sum, preview] = await Promise.all([
           getBroadcastSettingsSummary(),
-          getReleaseEmailPreviewAction("v1.1"),
+          getReleaseEmailPreviewAction("v1.2"),
         ]);
         setSummary(sum);
         if (preview) {
@@ -153,7 +153,7 @@ export function AdminEmailBroadcastView() {
         setPlainText(res.defaultTemplate.text);
         setIsCustom(false);
         setImportedFileName(null);
-        setSaveReport("Modèle réinitialisé au gabarit officiel Validily v1.1.");
+        setSaveReport("Modèle réinitialisé au gabarit officiel Validily v1.2.");
         setTimeout(() => setSaveReport(null), 5000);
       }
     } catch (err: any) {

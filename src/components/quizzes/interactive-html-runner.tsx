@@ -20,16 +20,18 @@ import { injectSandboxShim } from "@/lib/quizzes/quiz-importer";
 export interface InteractiveHtmlRunnerProps {
   quizId?: string;
   title: string;
-  subjectName: string;
-  htmlContent: string;
+  subjectName?: string;
+  htmlContent?: string;
+  srcUrl?: string;
   onClose?: () => void;
 }
 
 export function InteractiveHtmlRunner({
   quizId,
   title,
-  subjectName,
-  htmlContent,
+  subjectName = "Atelier Interactif",
+  htmlContent = "",
+  srcUrl,
   onClose,
 }: InteractiveHtmlRunnerProps) {
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -38,13 +40,50 @@ export function InteractiveHtmlRunner({
   const [totalScore, setTotalScore] = useState<number>(20);
   const [isSubmittingScore, setIsSubmittingScore] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
+  const [fetchedHtml, setFetchedHtml] = useState<string>(htmlContent);
+  const [isLoadingContent, setIsLoadingContent] = useState<boolean>(!htmlContent && Boolean(srcUrl));
   const containerRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
+  // Fetch HTML content if srcUrl is provided without inline content
+  useEffect(() => {
+    if (htmlContent) {
+      setFetchedHtml(htmlContent);
+      setIsLoadingContent(false);
+      return;
+    }
+
+    if (srcUrl) {
+      let isCancelled = false;
+      setIsLoadingContent(true);
+      fetch(srcUrl)
+        .then((res) => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return res.text();
+        })
+        .then((text) => {
+          if (!isCancelled) {
+            setFetchedHtml(text);
+            setIsLoadingContent(false);
+          }
+        })
+        .catch((err) => {
+          if (!isCancelled) {
+            console.error("Failed to load quiz from srcUrl:", err);
+            setIsLoadingContent(false);
+          }
+        });
+
+      return () => {
+        isCancelled = true;
+      };
+    }
+  }, [htmlContent, srcUrl]);
+
   // Inject sandbox storage shim to prevent localStorage crash inside origin-null sandbox
   const safeHtml = React.useMemo(() => {
-    return injectSandboxShim(htmlContent);
-  }, [htmlContent]);
+    return fetchedHtml ? injectSandboxShim(fetchedHtml) : "";
+  }, [fetchedHtml]);
 
   // Listen for message events exclusively from the sandboxed iframe
   useEffect(() => {
@@ -56,7 +95,12 @@ export function InteractiveHtmlRunner({
 
       if (!event.data || typeof event.data !== "object") return;
 
-      if (event.data.type === "VALIDILY_QUIZ_COMPLETED") {
+      const msgType = event.data.type;
+      if (
+        msgType === "VALIDILY_QUIZ_COMPLETED" ||
+        msgType === "EDUFOCUS_QUIZ_COMPLETED" ||
+        msgType === "QUIZ_COMPLETED"
+      ) {
         const rawScore = Number(event.data.score);
         const rawTotal = Number(event.data.total);
         const total = Number.isFinite(rawTotal) && rawTotal > 0 ? Math.round(rawTotal) : 20;
@@ -72,7 +116,11 @@ export function InteractiveHtmlRunner({
         setSubmitSuccess(
           `Score capturé depuis l'atelier : ${score} / ${total} (${percent}%)${timeInfo}`
         );
-      } else if (event.data.type === "VALIDILY_QUIZ_PROGRESS") {
+      } else if (
+        msgType === "VALIDILY_QUIZ_PROGRESS" ||
+        msgType === "EDUFOCUS_QUIZ_PROGRESS" ||
+        msgType === "QUIZ_PROGRESS"
+      ) {
         const rawTotal = Number(event.data.total);
         const rawScore = Number(event.data.scoreSoFar);
         const total = Number.isFinite(rawTotal) && rawTotal > 0 ? Math.round(rawTotal) : 20;
@@ -142,31 +190,36 @@ export function InteractiveHtmlRunner({
     <div
       ref={containerRef}
       className={`flex flex-col bg-[#0F172A] text-white rounded-2xl overflow-hidden border border-[#1E293B] shadow-2xl transition-all ${
-        isFullscreen ? "fixed inset-0 z-50 rounded-none w-screen h-screen" : "w-full h-[88vh] max-w-6xl mx-auto"
+        isFullscreen
+          ? "fixed inset-0 z-50 rounded-none w-screen h-screen"
+          : "w-full h-[86dvh] min-h-[500px] max-w-6xl mx-auto"
       }`}
     >
       {/* Top Academic Navigation Bar */}
-      <div className="bg-[#1E293B]/90 backdrop-blur-md px-4 py-3 border-b border-[#334155] flex flex-wrap items-center justify-between gap-3 shrink-0">
-        <div className="flex items-center space-x-3 min-w-0">
-          <span className="bg-[#2855D9] text-white text-[11px] font-semibold px-2.5 py-0.5 rounded-full uppercase tracking-wider shrink-0 shadow-2xs">
+      <div className="bg-[#1E293B]/95 backdrop-blur-md px-3.5 sm:px-4 py-2.5 sm:py-3 border-b border-[#334155] flex flex-wrap items-center justify-between gap-2.5 shrink-0">
+        <div className="flex items-center space-x-2.5 min-w-0 max-w-[75%] sm:max-w-[80%]">
+          <span className="bg-[#2855D9] text-white text-[10px] sm:text-[11px] font-semibold px-2 sm:px-2.5 py-0.5 rounded-full uppercase tracking-wider shrink-0 shadow-2xs">
             {subjectName}
           </span>
           <div className="truncate">
-            <h2 className="text-sm font-bold text-white truncate leading-tight">{title}</h2>
-            <div className="flex items-center space-x-2 text-[11px] text-[#94A3B8]">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+            <h2 className="text-xs sm:text-sm font-bold text-white truncate leading-tight" title={title}>
+              {title}
+            </h2>
+            <div className="hidden xs:flex items-center space-x-1.5 text-[10px] sm:text-[11px] text-[#94A3B8]">
+              <ShieldCheck className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-400 shrink-0" />
               <span>Atelier HTML Interactif Sécurisé</span>
             </div>
           </div>
         </div>
 
         {/* Action Controls */}
-        <div className="flex items-center space-x-2 shrink-0">
+        <div className="flex items-center space-x-1.5 sm:space-x-2 shrink-0">
           <button
             type="button"
             onClick={handleReload}
             className="p-1.5 rounded-lg bg-[#334155]/60 hover:bg-[#334155] text-[#94A3B8] hover:text-white transition-colors cursor-pointer"
             title="Recharger l'atelier"
+            aria-label="Recharger l'atelier"
           >
             <RotateCcw className="w-4 h-4" />
           </button>
@@ -176,6 +229,7 @@ export function InteractiveHtmlRunner({
             onClick={handleToggleFullscreen}
             className="p-1.5 rounded-lg bg-[#334155]/60 hover:bg-[#334155] text-[#94A3B8] hover:text-white transition-colors cursor-pointer"
             title={isFullscreen ? "Quitter le plein écran" : "Plein écran"}
+            aria-label={isFullscreen ? "Quitter le plein écran" : "Plein écran"}
           >
             {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
           </button>
@@ -186,6 +240,7 @@ export function InteractiveHtmlRunner({
               onClick={onClose}
               className="p-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 hover:text-white transition-colors cursor-pointer ml-1"
               title="Fermer l'atelier"
+              aria-label="Fermer l'atelier"
             >
               <X className="w-4 h-4" />
             </button>
@@ -194,32 +249,39 @@ export function InteractiveHtmlRunner({
       </div>
 
       {/* Embedded Sandboxed Frame */}
-      <div className="flex-1 w-full bg-black relative">
-        <iframe
-          ref={iframeRef}
-          key={iframeKey}
-          srcDoc={safeHtml}
-          title={title}
-          sandbox="allow-scripts allow-forms"
-          className="w-full h-full border-0 absolute inset-0 bg-[#09090b]"
-        />
+      <div className="flex-1 w-full bg-black relative min-h-[300px]">
+        {isLoadingContent ? (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#09090b] text-[#94A3B8] space-y-3">
+            <Loader2 className="w-8 h-8 animate-spin text-[#2855D9]" />
+            <p className="text-xs">Chargement de l&apos;atelier interactif...</p>
+          </div>
+        ) : (
+          <iframe
+            ref={iframeRef}
+            key={iframeKey}
+            srcDoc={safeHtml}
+            title={title}
+            sandbox="allow-scripts allow-forms"
+            className="w-full h-full border-0 absolute inset-0 bg-[#09090b]"
+          />
+        )}
       </div>
 
       {/* Bottom Evaluation Bar */}
-      <div className="bg-[#1E293B] px-4 py-2.5 border-t border-[#334155] flex flex-wrap items-center justify-between gap-3 text-xs shrink-0">
-        <div className="flex items-center space-x-2 text-[#94A3B8]">
+      <div className="bg-[#1E293B] px-3.5 sm:px-4 py-2 sm:py-2.5 border-t border-[#334155] flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs shrink-0">
+        <div className="flex items-center space-x-2 text-[#94A3B8] min-w-0">
           <Award className="w-4 h-4 text-amber-400 shrink-0" />
-          <span className="font-medium text-slate-200">Enregistrer votre progression d&apos;évaluation :</span>
+          <span className="font-medium text-slate-200 truncate">Progression d&apos;évaluation :</span>
           {submitSuccess && (
-            <span className="text-emerald-400 font-semibold flex items-center space-x-1">
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>{submitSuccess}</span>
+            <span className="text-emerald-400 font-semibold flex items-center space-x-1 truncate">
+              <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+              <span className="truncate">{submitSuccess}</span>
             </span>
           )}
         </div>
 
-        <div className="flex items-center space-x-2">
-          <div className="flex items-center bg-[#0F172A] border border-[#334155] rounded-lg px-2.5 py-1 text-xs">
+        <div className="flex items-center justify-between sm:justify-end space-x-2">
+          <div className="flex items-center bg-[#0F172A] border border-[#334155] rounded-lg px-2 py-1 text-xs shrink-0">
             <span className="text-[#94A3B8] mr-1.5">Note :</span>
             <input
               type="number"
@@ -227,7 +289,8 @@ export function InteractiveHtmlRunner({
               max={totalScore}
               value={selfScore}
               onChange={(e) => setSelfScore(Math.max(0, parseInt(e.target.value) || 0))}
-              className="w-12 bg-transparent text-white font-mono text-center font-bold focus:outline-hidden"
+              className="w-10 sm:w-12 bg-transparent text-white font-mono text-center font-bold focus:outline-hidden"
+              aria-label="Score obtenu"
             />
             <span className="text-[#94A3B8] mx-1">/</span>
             <input
@@ -235,7 +298,8 @@ export function InteractiveHtmlRunner({
               min={1}
               value={totalScore}
               onChange={(e) => setTotalScore(Math.max(1, parseInt(e.target.value) || 20))}
-              className="w-12 bg-transparent text-[#94A3B8] font-mono text-center focus:outline-hidden"
+              className="w-10 sm:w-12 bg-transparent text-[#94A3B8] font-mono text-center focus:outline-hidden"
+              aria-label="Total de questions"
             />
           </div>
 
@@ -244,14 +308,14 @@ export function InteractiveHtmlRunner({
             variant="primary"
             onClick={handleRecordScore}
             disabled={isSubmittingScore}
-            className="bg-[#2855D9] hover:bg-[#1E40AF] text-white"
+            className="bg-[#2855D9] hover:bg-[#1E40AF] text-white shrink-0 text-xs px-3 sm:px-4"
           >
             {isSubmittingScore ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
             ) : (
               <Send className="w-3.5 h-3.5 mr-1" />
             )}
-            <span>Enregistrer mon score</span>
+            <span>Enregistrer</span>
           </Button>
         </div>
       </div>

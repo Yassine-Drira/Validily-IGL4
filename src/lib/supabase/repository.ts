@@ -748,7 +748,7 @@ export async function getQuizzes(subjectId?: string): Promise<Quiz[]> {
     const supabase = await getDbClient();
     let query = supabase
       .from("quizzes")
-      .select("*, subject:subjects(*), questions:quiz_questions(count)")
+      .select("*, subject:subjects(*), questions:quiz_questions(id, question_type)")
       .eq("publication_status", "published")
       .order("created_at", { ascending: false });
 
@@ -761,10 +761,15 @@ export async function getQuizzes(subjectId?: string): Promise<Quiz[]> {
       return [];
     }
 
-    return data.map((item: any) => ({
-      ...item,
-      question_count: item.questions?.[0]?.count ?? 0,
-    }));
+    return data.map((item: any) => {
+      const questionsList = Array.isArray(item.questions) ? item.questions : [];
+      const isHtml = questionsList.some((q: any) => q.question_type === "interactive_html");
+      return {
+        ...item,
+        isHtmlDrill: isHtml,
+        question_count: isHtml ? "Atelier" : questionsList.length,
+      };
+    });
   } catch (err) {
     console.error("Failed to query quizzes from database:", err);
     return [];

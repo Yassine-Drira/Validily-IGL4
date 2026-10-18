@@ -23,34 +23,57 @@
 
   <style>
     /* ==========================================================================
-       1. VARIABLES ET DESIGN SYSTEM VALIDILY DARK NAVY ACADEMIC
+       1. VARIABLES ET DESIGN SYSTEM VALIDILY LIGHT ACADEMIC
        ========================================================================== */
     :root {
-      --bg: #0b1120;
-      --panel: #111a2e;
-      --card: #182238;
-      --card-hover: #1e2c47;
-      --border: rgba(255, 255, 255, 0.08);
-      --border-accent: rgba(40, 85, 217, 0.35);
-      --accent: #2855D9;
-      --accent-hover: #1e40af;
-      --accent-light: #4776F2;
-      --accent-glow: rgba(40, 85, 217, 0.25);
-      --ok: #10b981;
-      --ok-bg: rgba(16, 185, 129, 0.12);
-      --ok-border: rgba(16, 185, 129, 0.3);
-      --warn: #f59e0b;
-      --warn-bg: rgba(245, 158, 11, 0.12);
-      --warn-border: rgba(245, 158, 11, 0.3);
-      --err: #ef4444;
-      --err-bg: rgba(239, 68, 68, 0.12);
-      --err-border: rgba(239, 68, 68, 0.3);
-      --txt: #f8fafc;
-      --txt-muted: #94a3b8;
-      --txt-dim: #64748b;
+      /* Fond & Surface - Charte Validily Clean Light Academic */
+      --bg: #F4F6FA;                /* Fond principal ardoise douce et reposante */
+      --surface: #FFFFFF;           /* Cartes et conteneurs blancs purs */
+      --surface-warm: #FAFAF7;      /* Zones de lecture chaude / callouts */
+      --surface-accent: #EDF2FF;    /* Conteneurs bleutés légers */
+      --panel: #FFFFFF;             /* En-tête et barres de navigation */
+      --panel-border: #E4E8F0;      /* Ligne de démarcation subtile */
+
+      /* Typographie & Lisibilité Supérieure */
+      --ink: #111A2E;               /* Titres majeurs encre marine profonde */
+      --txt: #182235;               /* Texte courant et options de questions */
+      --txt-muted: #68748A;         /* Explications, sous-titres et métadonnées */
+      --txt-dim: #94A3B8;           /* Éléments secondaires et badges inactifs */
+
+      /* Palette de Marque Signature Validily */
+      --accent: #2855D9;            /* Bleu Cobalt Validily */
+      --accent-hover: #1E40AF;      /* Bleu Cobalt profond au survol */
+      --accent-light: #4776F2;      /* Dégradés et accents vifs */
+      --accent-tint: #EDF2FF;       /* Fond de badge et surbrillance */
+      --accent-glow: rgba(40, 85, 217, 0.16);
+
+      /* États Pédagogiques Clairs */
+      --ok: #059669;                /* Émeraude - Réponse correcte / Maîtrisé */
+      --ok-bg: #ECFDF5;
+      --ok-border: #A7F3D0;
+      --warn: #D97706;              /* Ambre - Piège d'examen classique / Attention */
+      --warn-bg: #FFFBEB;
+      --warn-border: #FDE68A;
+      --err: #DC2626;               /* Rubis - Erreur / Fausse proposition */
+      --err-bg: #FEF2F2;
+      --err-border: #FECACA;
+      --violet: #7C3AED;            /* Violet - Concepts théoriques */
+      --violet-bg: #F5F3FF;
+      --violet-border: #DDD6FE;
+
+      --border: #E4E8F0;
+      --border-accent: rgba(40, 85, 217, 0.25);
+
+      /* Rayons & Ombres Modernes */
       --radius-sm: 8px;
-      --radius-md: 14px;
-      --radius-lg: 20px;
+      --radius-md: 12px;
+      --radius-lg: 18px;
+      --radius-xl: 24px;
+      --shadow-sm: 0 1px 2px 0 rgba(16, 24, 40, 0.05);
+      --shadow-card: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+      --shadow-elevated: 0 20px 25px -5px rgba(0, 0, 0, 0.06), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
+
+      /* Typographie */
       --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
     }
@@ -71,13 +94,13 @@
       overflow-x: hidden;
     }
 
-    a { color: var(--accent-light); text-decoration: none; }
+    a { color: var(--accent); text-decoration: none; }
     button { font-family: inherit; cursor: pointer; border: none; outline: none; }
 
     /* Surlignage de recherche */
     mark.hl {
-      background: rgba(245, 158, 11, 0.35);
-      color: #fef08a;
+      background: #FEF08A;
+      color: #854D0E;
       padding: 0 4px;
       border-radius: 4px;
       font-weight: 600;
@@ -90,10 +113,12 @@
       position: sticky;
       top: 0;
       z-index: 50;
-      background: rgba(17, 26, 46, 0.92);
+      background: rgba(255, 255, 255, 0.94);
       backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
       border-bottom: 1px solid var(--border);
       padding: 12px 20px;
+      box-shadow: var(--shadow-sm);
     }
 
     .top-header-inner {
@@ -116,20 +141,20 @@
       width: 36px;
       height: 36px;
       border-radius: var(--radius-sm);
-      background: linear-gradient(135deg, var(--accent), #1e3a8a);
+      background: linear-gradient(135deg, var(--accent), #1E40AF);
       display: flex;
       align-items: center;
       justify-content: center;
       font-weight: 800;
       font-size: 16px;
       color: #fff;
-      box-shadow: 0 0 15px var(--accent-glow);
+      box-shadow: 0 4px 12px var(--accent-glow);
     }
 
     .brand-title {
       font-size: 14px;
       font-weight: 700;
-      color: #fff;
+      color: var(--ink);
       display: flex;
       align-items: center;
       gap: 8px;
@@ -138,9 +163,9 @@
     .badge-promo {
       font-size: 10px;
       font-family: var(--font-mono);
-      background: rgba(40, 85, 217, 0.2);
-      color: var(--accent-light);
-      border: 1px solid var(--border-accent);
+      background: var(--surface-accent);
+      color: var(--accent);
+      border: 1px solid rgba(40, 85, 217, 0.25);
       padding: 2px 8px;
       border-radius: 999px;
       font-weight: 600;
@@ -158,20 +183,21 @@
       display: flex;
       align-items: center;
       gap: 8px;
-      background: rgba(255, 255, 255, 0.04);
+      background: var(--surface);
       border: 1px solid var(--border);
       padding: 6px 12px;
       border-radius: var(--radius-md);
       font-family: var(--font-mono);
       font-size: 13px;
-      color: var(--txt);
+      color: var(--ink);
       cursor: pointer;
+      box-shadow: var(--shadow-sm);
       transition: all 0.2s;
     }
 
     .timer-widget:hover {
-      background: rgba(255, 255, 255, 0.08);
-      border-color: var(--border-accent);
+      background: var(--surface-accent);
+      border-color: var(--accent);
     }
 
     .timer-dot {
@@ -179,7 +205,7 @@
       height: 8px;
       border-radius: 50%;
       background: var(--ok);
-      box-shadow: 0 0 8px var(--ok);
+      box-shadow: 0 0 6px var(--ok);
       animation: pulseDot 2s infinite;
     }
 
@@ -193,16 +219,17 @@
       display: flex;
       align-items: center;
       gap: 8px;
-      background: rgba(255, 255, 255, 0.04);
+      background: var(--surface);
       border: 1px solid var(--border);
       padding: 6px 12px;
       border-radius: var(--radius-md);
       font-size: 12px;
+      box-shadow: var(--shadow-sm);
     }
 
     .audio-btn {
       background: transparent;
-      color: var(--txt);
+      color: var(--ink);
       font-size: 14px;
       display: flex;
       align-items: center;
@@ -210,7 +237,7 @@
       transition: transform 0.1s;
     }
 
-    .audio-btn:hover { transform: scale(1.1); color: var(--accent-light); }
+    .audio-btn:hover { transform: scale(1.15); color: var(--accent); }
 
     .audio-waves {
       display: flex;
@@ -222,7 +249,7 @@
     .audio-bar {
       width: 2px;
       height: 100%;
-      background: var(--accent-light);
+      background: var(--accent);
       border-radius: 2px;
       animation: waveAnim 1s ease-in-out infinite alternate;
     }
@@ -241,7 +268,7 @@
     }
 
     .search-input {
-      background: rgba(0, 0, 0, 0.35);
+      background: var(--surface);
       border: 1px solid var(--border);
       color: var(--txt);
       font-size: 12px;
@@ -249,13 +276,14 @@
       border-radius: var(--radius-md);
       width: 170px;
       transition: all 0.2s;
+      box-shadow: var(--shadow-sm);
     }
 
     .search-input:focus {
       outline: none;
       width: 220px;
       border-color: var(--accent);
-      box-shadow: 0 0 10px var(--accent-glow);
+      box-shadow: 0 0 0 3px rgba(40, 85, 217, 0.12);
     }
 
     .search-icon {
@@ -275,15 +303,17 @@
       gap: 8px;
       padding: 5px 12px;
       border-radius: var(--radius-md);
-      background: rgba(40, 85, 217, 0.1);
-      border: 1px solid var(--border-accent);
+      background: var(--surface-accent);
+      border: 1px solid rgba(40, 85, 217, 0.25);
       font-size: 12px;
       font-weight: 600;
+      color: var(--accent);
     }
 
     .readiness-val {
       font-family: var(--font-mono);
-      color: var(--accent-light);
+      font-weight: 700;
+      color: var(--accent);
     }
 
     /* ==========================================================================
@@ -298,12 +328,13 @@
     .nav-tabs {
       display: flex;
       gap: 6px;
-      background: var(--panel);
+      background: var(--surface);
       padding: 6px;
       border-radius: var(--radius-lg);
       border: 1px solid var(--border);
       overflow-x: auto;
       scrollbar-width: none;
+      box-shadow: var(--shadow-sm);
     }
 
     .nav-tabs::-webkit-scrollbar { display: none; }
@@ -326,22 +357,28 @@
     }
 
     .tab-btn:hover {
-      color: var(--txt);
-      background: rgba(255, 255, 255, 0.04);
+      color: var(--ink);
+      background: var(--bg);
     }
 
     .tab-btn.active {
       background: var(--accent);
       color: #fff;
-      box-shadow: 0 4px 15px var(--accent-glow);
+      box-shadow: 0 4px 14px rgba(40, 85, 217, 0.25);
     }
 
     .tab-badge {
       font-family: var(--font-mono);
       font-size: 10px;
-      padding: 2px 6px;
+      padding: 2px 7px;
       border-radius: 999px;
-      background: rgba(255, 255, 255, 0.15);
+      background: rgba(0, 0, 0, 0.08);
+      color: var(--txt);
+    }
+
+    .tab-btn.active .tab-badge {
+      background: rgba(255, 255, 255, 0.25);
+      color: #fff;
     }
 
     /* ==========================================================================
@@ -371,22 +408,23 @@
        5. ONGLET ① : QCM INTERACTIF (20 QUESTIONS)
        ========================================================================== */
     .qcm-dashboard {
-      background: var(--panel);
+      background: var(--surface);
       border: 1px solid var(--border);
       border-radius: var(--radius-lg);
-      padding: 20px;
+      padding: 20px 24px;
       margin-bottom: 24px;
       display: flex;
       flex-wrap: wrap;
       align-items: center;
       justify-content: space-between;
       gap: 16px;
+      box-shadow: var(--shadow-card);
     }
 
     .stats-grid {
       display: flex;
       flex-wrap: wrap;
-      gap: 20px;
+      gap: 24px;
     }
 
     .stat-item {
@@ -399,30 +437,31 @@
       text-transform: uppercase;
       letter-spacing: 0.5px;
       color: var(--txt-muted);
+      font-weight: 600;
     }
 
     .stat-value {
       font-size: 22px;
       font-weight: 800;
       font-family: var(--font-mono);
-      color: var(--txt);
+      color: var(--ink);
     }
 
     .stat-value.ok { color: var(--ok); }
     .stat-value.err { color: var(--err); }
-    .stat-value.accent { color: var(--accent-light); }
+    .stat-value.accent { color: var(--accent); }
 
     .btn-sync-validily {
-      background: linear-gradient(135deg, var(--accent), #1d4ed8);
+      background: linear-gradient(135deg, var(--accent), #1E40AF);
       color: #fff;
-      padding: 10px 18px;
+      padding: 11px 20px;
       border-radius: var(--radius-md);
       font-size: 13px;
       font-weight: 700;
       display: flex;
       align-items: center;
       gap: 8px;
-      box-shadow: 0 4px 15px var(--accent-glow);
+      box-shadow: 0 4px 14px rgba(40, 85, 217, 0.25);
       transition: all 0.2s;
     }
 
@@ -433,11 +472,12 @@
 
     /* Grille de navigation des 20 questions */
     .palette-box {
-      background: var(--card);
+      background: var(--surface);
       border: 1px solid var(--border);
       border-radius: var(--radius-md);
-      padding: 14px 18px;
+      padding: 16px 20px;
       margin-bottom: 24px;
+      box-shadow: var(--shadow-sm);
     }
 
     .palette-header {
@@ -447,54 +487,52 @@
       margin-bottom: 12px;
       font-size: 12px;
       color: var(--txt-muted);
+      font-weight: 600;
     }
 
     .palette-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(36px, 1fr));
+      display: flex;
+      flex-wrap: wrap;
       gap: 8px;
     }
 
-    .palette-btn {
-      height: 36px;
-      border-radius: var(--radius-sm);
-      background: rgba(255, 255, 255, 0.05);
-      color: var(--txt-muted);
+    .palette-item {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--txt);
       font-family: var(--font-mono);
       font-size: 12px;
       font-weight: 700;
+      cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
-      border: 1px solid var(--border);
       transition: all 0.15s;
       position: relative;
     }
 
-    .palette-btn:hover {
-      border-color: var(--accent-light);
-      color: var(--txt);
-    }
-
-    .palette-btn.current {
+    .palette-item:hover {
       border-color: var(--accent);
-      color: #fff;
-      box-shadow: 0 0 10px var(--accent-glow);
+      background: var(--surface-accent);
+      transform: translateY(-1px);
     }
 
-    .palette-btn.correct {
+    .palette-item.ok {
       background: var(--ok-bg);
       border-color: var(--ok-border);
       color: var(--ok);
     }
 
-    .palette-btn.wrong {
+    .palette-item.err {
       background: var(--err-bg);
       border-color: var(--err-border);
       color: var(--err);
     }
 
-    .palette-btn.bookmarked::after {
+    .palette-item.bookmarked::after {
       content: '🔖';
       position: absolute;
       top: -4px;
@@ -511,34 +549,37 @@
     }
 
     .filter-btn {
-      padding: 6px 12px;
+      padding: 7px 14px;
       border-radius: var(--radius-sm);
-      background: rgba(255, 255, 255, 0.05);
+      background: var(--surface);
       border: 1px solid var(--border);
       color: var(--txt-muted);
       font-size: 12px;
       font-weight: 600;
       transition: all 0.15s;
+      box-shadow: var(--shadow-sm);
     }
 
     .filter-btn.active, .filter-btn:hover {
-      background: rgba(40, 85, 217, 0.15);
+      background: var(--surface-accent);
       border-color: var(--accent);
-      color: var(--txt);
+      color: var(--accent);
     }
 
     /* Carte de Question */
     .question-card {
-      background: var(--card);
+      background: var(--surface);
       border: 1px solid var(--border);
       border-radius: var(--radius-lg);
-      padding: 24px;
+      padding: 26px;
       margin-bottom: 20px;
+      box-shadow: var(--shadow-card);
       transition: all 0.2s;
     }
 
     .question-card:hover {
-      border-color: rgba(255, 255, 255, 0.15);
+      border-color: rgba(40, 85, 217, 0.3);
+      box-shadow: var(--shadow-elevated);
     }
 
     .q-top-row {
@@ -559,27 +600,29 @@
       font-family: var(--font-mono);
       font-weight: 700;
       font-size: 11px;
-      background: rgba(255, 255, 255, 0.08);
-      padding: 3px 8px;
+      background: var(--surface-accent);
+      color: var(--accent);
+      padding: 4px 10px;
       border-radius: var(--radius-sm);
     }
 
     .q-chapter-tag {
       font-size: 11px;
       color: var(--txt-muted);
+      font-weight: 500;
     }
 
     .q-diff-badge {
       font-size: 10px;
       font-weight: 700;
       text-transform: uppercase;
-      padding: 2px 7px;
+      padding: 3px 8px;
       border-radius: 999px;
     }
 
-    .q-diff-badge.facile { background: rgba(16, 185, 129, 0.15); color: var(--ok); }
-    .q-diff-badge.moyen { background: rgba(245, 158, 11, 0.15); color: var(--warn); }
-    .q-diff-badge.difficile { background: rgba(239, 68, 68, 0.15); color: var(--err); }
+    .q-diff-badge.facile { background: var(--ok-bg); color: var(--ok); border: 1px solid var(--ok-border); }
+    .q-diff-badge.moyen { background: var(--warn-bg); color: var(--warn); border: 1px solid var(--warn-border); }
+    .q-diff-badge.difficile { background: var(--err-bg); color: var(--err); border: 1px solid var(--err-border); }
 
     .btn-bookmark {
       background: transparent;
@@ -592,9 +635,9 @@
     .btn-bookmark.active { color: var(--warn); transform: scale(1.15); }
 
     .q-text {
-      font-size: 15px;
-      font-weight: 600;
-      color: var(--txt);
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--ink);
       margin-bottom: 18px;
       line-height: 1.5;
     }
@@ -610,170 +653,175 @@
     .option-btn {
       width: 100%;
       text-align: left;
-      padding: 12px 16px;
+      padding: 13px 18px;
       border-radius: var(--radius-md);
-      background: rgba(255, 255, 255, 0.03);
+      background: var(--surface);
       border: 1px solid var(--border);
       color: var(--txt);
-      font-size: 13px;
+      font-size: 14px;
       display: flex;
       align-items: flex-start;
       gap: 12px;
       transition: all 0.15s;
       cursor: pointer;
+      box-shadow: var(--shadow-sm);
     }
 
     .option-btn:hover:not(:disabled) {
-      background: var(--card-hover);
-      border-color: var(--border-accent);
-      transform: translateX(3px);
+      background: var(--surface-accent);
+      border-color: var(--accent);
+      transform: translateX(4px);
     }
 
     .opt-letter {
       font-family: var(--font-mono);
       font-weight: 700;
-      color: var(--accent-light);
-      background: rgba(40, 85, 217, 0.15);
-      width: 24px;
-      height: 24px;
+      color: var(--accent);
+      background: var(--surface-accent);
+      border: 1px solid rgba(40, 85, 217, 0.2);
+      width: 26px;
+      height: 26px;
       border-radius: 6px;
       display: flex;
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
-      font-size: 11px;
+      font-size: 12px;
     }
 
     .option-btn.correct {
       background: var(--ok-bg) !important;
       border-color: var(--ok) !important;
-      color: #fff;
+      color: #065F46 !important;
+      font-weight: 600;
     }
 
     .option-btn.correct .opt-letter {
-      background: var(--ok);
-      color: #fff;
+      background: var(--ok) !important;
+      color: #fff !important;
+      border-color: var(--ok) !important;
     }
 
     .option-btn.wrong {
       background: var(--err-bg) !important;
       border-color: var(--err) !important;
-      color: #fff;
+      color: #991B1B !important;
     }
 
     .option-btn.wrong .opt-letter {
-      background: var(--err);
-      color: #fff;
+      background: var(--err) !important;
+      color: #fff !important;
+      border-color: var(--err) !important;
     }
 
-    /* Boîtes Pédagogiques */
+    /* Boîtes de feedback pédagogique */
     .feedback-box {
-      margin-top: 14px;
       border-radius: var(--radius-md);
-      padding: 14px 16px;
+      padding: 14px 18px;
       font-size: 13px;
-      line-height: 1.5;
+      line-height: 1.6;
+      margin-top: 10px;
       display: none;
-      animation: fadeIn 0.2s ease-out;
     }
 
-    .feedback-box.show { display: block; }
+    .feedback-box.show { display: block; animation: fadeIn 0.25s ease-out; }
 
     .feedback-why {
-      background: rgba(40, 85, 217, 0.1);
-      border: 1px solid var(--border-accent);
-      color: #dbeafe;
-      margin-bottom: 10px;
+      background: var(--surface-accent);
+      border: 1px solid rgba(40, 85, 217, 0.25);
+      border-left: 4px solid var(--accent);
+      color: #1E3A8A;
     }
-
-    .feedback-why strong { color: var(--accent-light); }
 
     .feedback-trap {
       background: var(--warn-bg);
       border: 1px solid var(--warn-border);
-      color: #fef3c7;
+      border-left: 4px solid var(--warn);
+      color: #78350F;
     }
 
-    .feedback-trap strong { color: var(--warn); }
-
     /* ==========================================================================
-       6. ONGLET ② : EXERCICES PRATIQUES & SCRATCHPAD
+       6. ONGLET ② : EXERCICES PRATIQUES & CODE
        ========================================================================== */
     .exercise-card {
-      background: var(--panel);
+      background: var(--surface);
       border: 1px solid var(--border);
       border-radius: var(--radius-lg);
-      padding: 24px;
+      padding: 26px;
       margin-bottom: 24px;
+      box-shadow: var(--shadow-card);
     }
 
     .ex-header {
       display: flex;
       justify-content: space-between;
-      align-items: flex-start;
-      margin-bottom: 16px;
+      align-items: center;
+      margin-bottom: 14px;
     }
 
     .ex-title {
-      font-size: 16px;
-      font-weight: 700;
-      color: #fff;
-      display: flex;
-      align-items: center;
-      gap: 10px;
+      font-size: 17px;
+      font-weight: 800;
+      color: var(--ink);
     }
 
-    .ex-tag {
-      font-size: 10px;
+    .ex-badge {
+      font-size: 11px;
+      font-weight: 700;
       font-family: var(--font-mono);
-      background: rgba(16, 185, 129, 0.15);
-      color: var(--ok);
-      padding: 3px 8px;
-      border-radius: 999px;
+      background: var(--surface-accent);
+      color: var(--accent);
+      padding: 3px 10px;
+      border-radius: var(--radius-sm);
     }
 
     .ex-desc {
-      font-size: 13px;
-      color: var(--txt-muted);
-      margin-bottom: 16px;
+      font-size: 14px;
       line-height: 1.6;
+      color: var(--txt);
+      margin-bottom: 16px;
+    }
+
+    .scratchpad-wrap {
+      margin-bottom: 16px;
     }
 
     .scratchpad-label {
       font-size: 12px;
-      font-weight: 600;
-      color: var(--txt-dim);
+      font-weight: 700;
+      color: var(--ink);
       margin-bottom: 6px;
       display: flex;
       align-items: center;
-      justify-content: space-between;
+      gap: 6px;
     }
 
     .scratchpad-textarea {
       width: 100%;
       height: 120px;
-      background: rgba(0, 0, 0, 0.4);
+      background: var(--surface-warm);
       border: 1px solid var(--border);
       border-radius: var(--radius-md);
-      color: #f8fafc;
+      color: var(--txt);
       font-family: var(--font-mono);
-      font-size: 12px;
-      padding: 12px;
+      font-size: 13px;
+      padding: 12px 14px;
       resize: vertical;
       margin-bottom: 14px;
-      transition: border-color 0.2s;
+      transition: all 0.2s;
     }
 
     .scratchpad-textarea:focus {
       outline: none;
       border-color: var(--accent);
-      box-shadow: 0 0 10px var(--accent-glow);
+      background: #fff;
+      box-shadow: 0 0 0 3px rgba(40, 85, 217, 0.12);
     }
 
     .ex-accordion-btn {
-      background: rgba(255, 255, 255, 0.04);
+      background: var(--surface);
       border: 1px solid var(--border);
-      color: var(--txt-muted);
+      color: var(--ink);
       padding: 8px 14px;
       border-radius: var(--radius-md);
       font-size: 12px;
@@ -784,15 +832,17 @@
       margin-right: 8px;
       margin-bottom: 10px;
       transition: all 0.2s;
+      box-shadow: var(--shadow-sm);
     }
 
     .ex-accordion-btn:hover {
-      background: rgba(255, 255, 255, 0.08);
-      color: var(--txt);
+      background: var(--surface-accent);
+      border-color: var(--accent);
+      color: var(--accent);
     }
 
     .ex-accordion-body {
-      background: rgba(0, 0, 0, 0.25);
+      background: var(--surface-warm);
       border: 1px solid var(--border);
       border-radius: var(--radius-md);
       padding: 16px;
@@ -800,6 +850,7 @@
       line-height: 1.6;
       margin-top: 10px;
       display: none;
+      color: var(--txt);
     }
 
     .ex-accordion-body.open { display: block; animation: fadeIn 0.2s ease-out; }
@@ -818,20 +869,20 @@
     .ex-mastered-toggle input { cursor: pointer; accent-color: var(--ok); }
 
     /* ==========================================================================
-       7. ONGLET ③ : FLASHCARDS LEITNER 3D
+       7. ONGLET ③ : FLASHCARDS LEITNER 3D COLORFUL GLASSMORPHISM
        ========================================================================== */
     .flashcards-container {
       max-width: 680px;
       margin: 0 auto;
-      perspective: 1200px;
+      perspective: 1400px;
     }
 
     .flashcard-wrapper {
       position: relative;
       width: 100%;
-      height: 340px;
+      height: 380px;
       cursor: pointer;
-      margin-bottom: 20px;
+      margin-bottom: 24px;
     }
 
     .flashcard-inner {
@@ -839,131 +890,196 @@
       height: 100%;
       position: relative;
       transform-style: preserve-3d;
-      transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-      border-radius: var(--radius-lg);
+      transition: transform 0.65s cubic-bezier(0.34, 1.56, 0.64, 1);
+      border-radius: var(--radius-xl);
     }
 
     .flashcard-inner.flipped {
       transform: rotateY(180deg);
     }
 
+    /* Châssis Glassmorphism Givré */
     .flashcard-face {
       position: absolute;
+      inset: 0;
       width: 100%;
       height: 100%;
       backface-visibility: hidden;
-      border-radius: var(--radius-lg);
-      border: 1px solid var(--border);
-      padding: 32px 28px;
+      border-radius: var(--radius-xl);
+      background: rgba(255, 255, 255, 0.90);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.95);
+      box-shadow: 0 20px 40px -12px rgba(40, 85, 217, 0.12), 0 0 0 1px var(--border);
       display: flex;
       flex-direction: column;
-      justify-content: space-between;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
-    }
-
-    .flashcard-front {
-      background: linear-gradient(145deg, #182238, #111a2e);
+      overflow: hidden;
     }
 
     .flashcard-back {
-      background: linear-gradient(145deg, #111a2e, #0e1526);
       transform: rotateY(180deg);
-      border-color: var(--border-accent);
     }
 
-    .fc-badge-row {
+    /* Bannières Supérieures Dégradées & Thèmes Chromatiques */
+    .flashcard-header {
+      padding: 14px 22px;
       display: flex;
-      justify-content: space-between;
       align-items: center;
+      justify-content: space-between;
+      backdrop-filter: blur(8px);
+      border-bottom: 2px solid transparent;
+      transition: all 0.3s ease;
+    }
+
+    /* Thème A : Cobalt & Indigo Aurora */
+    .fc-theme-cobalt .flashcard-header {
+      background: linear-gradient(135deg, rgba(40, 85, 217, 0.12) 0%, rgba(99, 102, 241, 0.15) 100%);
+      border-bottom-color: #2855D9;
+    }
+    /* Thème B : Émeraude & Cyan Néon */
+    .fc-theme-emerald .flashcard-header {
+      background: linear-gradient(135deg, rgba(5, 150, 105, 0.12) 0%, rgba(6, 182, 212, 0.15) 100%);
+      border-bottom-color: #059669;
+    }
+    /* Thème C : Violet & Rose Crépuscule */
+    .fc-theme-violet .flashcard-header {
+      background: linear-gradient(135deg, rgba(124, 58, 237, 0.12) 0%, rgba(244, 63, 94, 0.15) 100%);
+      border-bottom-color: #7C3AED;
+    }
+    /* Thème D : Ambre Solaire & Or */
+    .fc-theme-amber .flashcard-header {
+      background: linear-gradient(135deg, rgba(217, 119, 6, 0.12) 0%, rgba(245, 158, 11, 0.15) 100%);
+      border-bottom-color: #D97706;
+    }
+
+    .fc-topic-badge {
       font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 4px 12px;
+      border-radius: 9999px;
+      background: rgba(255, 255, 255, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.95);
+      color: var(--ink);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    }
+
+    .fc-face-tag {
       font-family: var(--font-mono);
-      color: var(--txt-dim);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      color: var(--txt-muted);
     }
 
     .fc-center-content {
+      flex: 1;
+      padding: 24px 30px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
       text-align: center;
-      margin: auto 0;
     }
 
     .fc-question {
-      font-size: 19px;
-      font-weight: 700;
-      color: #fff;
-      line-height: 1.4;
+      font-size: 20px;
+      font-weight: 800;
+      color: var(--ink);
+      line-height: 1.45;
+      letter-spacing: -0.2px;
     }
 
     .fc-answer {
       font-size: 15px;
-      color: #e2e8f0;
-      line-height: 1.6;
+      line-height: 1.65;
+      color: var(--txt);
       text-align: left;
     }
 
-    .fc-hint {
+    .fc-hint-bar {
+      padding: 10px 20px;
+      background: rgba(244, 246, 250, 0.85);
+      border-top: 1px solid var(--border);
       font-size: 11px;
-      color: var(--txt-dim);
+      color: var(--txt-muted);
       text-align: center;
     }
 
+    /* Boutons de Notation Leitner Glassmorphism */
     .fc-controls {
       display: flex;
-      justify-content: center;
-      align-items: center;
       gap: 12px;
-      margin-bottom: 24px;
+      justify-content: center;
+      margin-bottom: 20px;
     }
 
     .btn-fc-rate {
       flex: 1;
-      padding: 10px 14px;
+      padding: 12px 18px;
       border-radius: var(--radius-md);
       font-size: 13px;
       font-weight: 700;
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 6px;
-      transition: all 0.15s;
+      gap: 8px;
+      transition: all 0.2s ease;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      box-shadow: var(--shadow-sm);
     }
 
     .btn-fc-rate.box1 {
-      background: var(--err-bg);
-      border: 1px solid var(--err-border);
-      color: var(--err);
+      background: rgba(254, 242, 242, 0.90);
+      border: 1px solid #FECACA;
+      color: #DC2626;
+    }
+    .btn-fc-rate.box1:hover {
+      background: #FEE2E2;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 14px rgba(220, 38, 38, 0.2);
     }
 
     .btn-fc-rate.box2 {
-      background: var(--warn-bg);
-      border: 1px solid var(--warn-border);
-      color: var(--warn);
+      background: rgba(255, 251, 235, 0.90);
+      border: 1px solid #FDE68A;
+      color: #D97706;
+    }
+    .btn-fc-rate.box2:hover {
+      background: #FEF3C7;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 14px rgba(217, 119, 6, 0.2);
     }
 
     .btn-fc-rate.box3 {
-      background: var(--ok-bg);
-      border: 1px solid var(--ok-border);
-      color: var(--ok);
+      background: rgba(236, 253, 245, 0.90);
+      border: 1px solid #A7F3D0;
+      color: #059669;
     }
-
-    .btn-fc-rate:hover {
+    .btn-fc-rate.box3:hover {
+      background: #D1FAE5;
       transform: translateY(-2px);
-      filter: brightness(1.2);
+      box-shadow: 0 4px 14px rgba(5, 150, 105, 0.2);
     }
 
     /* ==========================================================================
        8. ONGLET ④ : CHEAT SHEET & MÉMOS VISUELS
        ========================================================================== */
     .cheat-section {
-      background: var(--panel);
+      background: var(--surface);
       border: 1px solid var(--border);
       border-radius: var(--radius-lg);
       padding: 24px;
       margin-bottom: 24px;
+      box-shadow: var(--shadow-card);
     }
 
     .cheat-title {
       font-size: 16px;
       font-weight: 800;
-      color: #fff;
+      color: var(--ink);
       margin-bottom: 14px;
       display: flex;
       align-items: center;
@@ -979,35 +1095,43 @@
 
     .cheat-table th, .cheat-table td {
       border: 1px solid var(--border);
-      padding: 10px 14px;
+      padding: 11px 16px;
       text-align: left;
     }
 
     .cheat-table th {
-      background: rgba(255, 255, 255, 0.04);
-      color: var(--txt-muted);
+      background: #F8FAFC;
+      color: var(--ink);
       font-family: var(--font-mono);
       font-size: 11px;
       text-transform: uppercase;
+      font-weight: 700;
+    }
+
+    .cheat-table td {
+      background: var(--surface);
+      color: var(--txt);
+      line-height: 1.55;
     }
 
     .cheat-table tr:hover td {
-      background: rgba(255, 255, 255, 0.02);
+      background: var(--surface-warm);
     }
 
     .code-snippet-box {
-      background: #060a12;
-      border: 1px solid var(--border);
+      background: #0F172A;
+      border: 1px solid #1E293B;
       border-radius: var(--radius-md);
       padding: 14px 16px;
       position: relative;
       margin-bottom: 12px;
+      box-shadow: var(--shadow-sm);
     }
 
     .code-snippet-box pre {
       font-family: var(--font-mono);
       font-size: 12px;
-      color: #38bdf8;
+      color: #38BDF8;
       overflow-x: auto;
     }
 
@@ -1015,11 +1139,11 @@
       position: absolute;
       top: 10px;
       right: 10px;
-      background: rgba(255, 255, 255, 0.08);
-      border: 1px solid var(--border);
-      color: var(--txt-muted);
+      background: rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #E2E8F0;
       font-size: 11px;
-      padding: 4px 8px;
+      padding: 4px 10px;
       border-radius: 6px;
       transition: all 0.2s;
     }
@@ -1033,13 +1157,14 @@
        9. ONGLET ⑤ : PIÈGES D'EXAMEN & ANTI-PATTERNS
        ========================================================================== */
     .trap-card {
-      background: var(--panel);
+      background: var(--surface);
       border: 1px solid var(--border);
       border-radius: var(--radius-lg);
       padding: 24px;
       margin-bottom: 20px;
       position: relative;
       overflow: hidden;
+      box-shadow: var(--shadow-card);
     }
 
     .trap-card::before {
@@ -1061,11 +1186,16 @@
       margin-bottom: 14px;
     }
 
+    .trap-header strong {
+      color: var(--ink) !important;
+      font-size: 15px;
+    }
+
     .trap-badge {
       font-size: 11px;
       font-family: var(--font-mono);
       font-weight: 700;
-      padding: 2px 8px;
+      padding: 3px 9px;
       border-radius: 999px;
       background: var(--warn-bg);
       color: var(--warn);
@@ -1095,6 +1225,8 @@
       border-radius: var(--radius-md);
       padding: 14px;
       font-size: 13px;
+      color: #991B1B;
+      line-height: 1.55;
     }
 
     .trap-box-right {
@@ -1103,15 +1235,18 @@
       border-radius: var(--radius-md);
       padding: 14px;
       font-size: 13px;
+      color: #065F46;
+      line-height: 1.55;
     }
 
     .trap-rule {
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid var(--border);
+      background: #FFFBEB;
+      border: 1px solid #FDE68A;
       border-radius: var(--radius-md);
-      padding: 12px 14px;
+      padding: 12px 16px;
       font-size: 13px;
-      color: #fde68a;
+      color: #92400E;
+      line-height: 1.5;
     }
 
     /* ==========================================================================
@@ -1121,14 +1256,14 @@
       position: fixed;
       bottom: 24px;
       right: 24px;
-      background: var(--panel);
-      color: #fff;
-      border: 1px solid var(--border-accent);
+      background: var(--surface);
+      color: var(--ink);
+      border: 1px solid var(--accent);
       padding: 12px 20px;
       border-radius: var(--radius-md);
       font-size: 13px;
       font-weight: 600;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      box-shadow: var(--shadow-elevated);
       z-index: 100;
       opacity: 0;
       transform: translateY(20px);
@@ -1499,29 +1634,29 @@
         </div>
 
         <div class="flashcard-wrapper" id="flashcardWrapper">
-          <div class="flashcard-inner" id="flashcardInner">
+          <div class="flashcard-inner fc-theme-cobalt" id="flashcardInner">
             <!-- Recto -->
             <div class="flashcard-face flashcard-front">
-              <div class="fc-badge-row">
-                <span id="fcTopicTag">Urbanisation des SI</span>
-                <span>RECTO</span>
+              <div class="flashcard-header">
+                <span class="fc-topic-badge" id="fcTopicTag">Urbanisation des SI</span>
+                <span class="fc-face-tag">RECTO</span>
               </div>
               <div class="fc-center-content">
                 <div class="fc-question" id="fcFrontText">Chargement de la question...</div>
               </div>
-              <div class="fc-hint">Cliquez ou appuyez sur [Espace] pour retourner la carte</div>
+              <div class="fc-hint-bar">✦ Cliquez ou appuyez sur [Espace] pour retourner la carte</div>
             </div>
 
             <!-- Verso -->
             <div class="flashcard-face flashcard-back">
-              <div class="fc-badge-row">
-                <span style="color: var(--ok);">RÉPONSE D'EXAMEN</span>
-                <span>VERSO</span>
+              <div class="flashcard-header">
+                <span class="fc-topic-badge" style="color: var(--ok); background: #ECFDF5; border-color: #A7F3D0;">RÉPONSE D'EXAMEN</span>
+                <span class="fc-face-tag">VERSO</span>
               </div>
               <div class="fc-center-content">
                 <div class="fc-answer" id="fcBackText">Chargement de la réponse...</div>
               </div>
-              <div class="fc-hint">Évaluez votre degré d'acquisition ci-dessous</div>
+              <div class="fc-hint-bar">Évaluez votre degré d'acquisition avec [1], [2] ou [3]</div>
             </div>
           </div>
         </div>
@@ -2599,6 +2734,21 @@ Au Centre : Exigences    : Gestion transversale permanente des besoins tout au l
       const inner = document.getElementById('flashcardInner');
       inner.classList.remove('flipped');
       isFcCardFlipped = false;
+
+      // Dynamic Chromatic Top Glassmorphism Themes
+      inner.classList.remove('fc-theme-cobalt', 'fc-theme-emerald', 'fc-theme-violet', 'fc-theme-amber');
+      const themes = ['fc-theme-cobalt', 'fc-theme-emerald', 'fc-theme-violet', 'fc-theme-amber'];
+      const themeClass = themes[currentFcIndex % themes.length];
+      inner.classList.add(themeClass);
+
+      const savedRating = safeStorage.getItem('validily_sid_fc_' + currentFcIndex);
+      const hint = document.querySelector('.flashcard-front .fc-hint-bar');
+      if (savedRating && hint) {
+        const ratingLabels = { '1': '❌ À revoir', '2': '∼ Moyen', '3': '✅ Maîtrisé' };
+        hint.innerHTML = '✦ Statut actuel : <strong>' + (ratingLabels[savedRating] || '') + '</strong> • Cliquez pour retourner';
+      } else if (hint) {
+        hint.innerHTML = '✦ Cliquez ou appuyez sur [Espace] pour retourner la carte';
+      }
     }
 
     function flipFlashcard() {

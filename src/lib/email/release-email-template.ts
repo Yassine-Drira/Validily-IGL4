@@ -24,12 +24,12 @@ export function generateReleaseEmailHtml(options: ReleaseEmailOptions = {}): {
   html: string;
   text: string;
 } {
-  const version = options.releaseVersion || "v1.1";
+  const version = options.releaseVersion || "v1.2";
   const dateStr = options.releaseDate || "Octobre 2026";
-  const baseUrl = options.siteUrl || process.env.NEXT_PUBLIC_SITE_URL || "https://validily.vercel.app";
+  const baseUrl = options.siteUrl || process.env.NEXT_PUBLIC_SITE_URL || "https://validily-igl-4.vercel.app";
   const recipientGreeting = options.recipientName ? `Bonjour ${options.recipientName},` : "Bonjour,";
 
-  const pillars = options.customPillars || [
+  const defaultPillarsV1_1 = [
     {
       title: "Partage & Arborescence de Ressources",
       badge: "ORGANISATION",
@@ -43,16 +43,16 @@ export function generateReleaseEmailHtml(options: ReleaseEmailOptions = {}): {
       badge: "MULTIMÉDIA",
       description:
         "Intégration de quiz interactifs HTML en bac à sable sécurisé, visionneuse PDF haute performance et fiches de synthèse.",
-      badgeColor: "#a78bfa",
-      borderColor: "#7c3aed",
+      badgeColor: "#34d399",
+      borderColor: "#059669",
     },
     {
       title: "Système de Vote Communautaire",
       badge: "ENTRAIDE",
       description:
         "Mise en valeur collaborative des meilleures fiches de révision de la promotion IGL4 grâce à un barème de vote par les pairs.",
-      badgeColor: "#fbbf24",
-      borderColor: "#d97706",
+      badgeColor: "#a78bfa",
+      borderColor: "#7c3aed",
     },
     {
       title: "Focus Hub & Audio Persistant",
@@ -80,7 +80,65 @@ export function generateReleaseEmailHtml(options: ReleaseEmailOptions = {}): {
     },
   ];
 
-  const subject = `Validily IGL4 — Mise à jour officielle (${version})`;
+  const defaultPillarsV1_2 = [
+    {
+      title: "Planning & Calendrier Interactif (08h00 - Minuit)",
+      badge: "EMPLOI DU TEMPS",
+      description:
+        "Créneaux d'étude personnalisés de 08:00 à minuit, blocs multi-heures continus, détection de conflits et indicateur temps-réel.",
+      badgeColor: "#38bdf8",
+      borderColor: "#0284c7",
+    },
+    {
+      title: "To-Do Académique Réactif & Sous-Tâches",
+      badge: "ORGANISATION",
+      description:
+        "Gestion complète de vos devoirs et TDs, sous-tâches ordonnées, bascule d'état optimiste instantanée (< 1ms) et sauvegarde Supabase.",
+      badgeColor: "#34d399",
+      borderColor: "#059669",
+    },
+    {
+      title: "Objectifs Personnels & Télémétrie Bosquet",
+      badge: "MOTIVATION",
+      description:
+        "Cibles d'étude quotidiennes et hebdos mesurées à partir des minutes réelles de concentration du Bosquet, sans double-comptage.",
+      badgeColor: "#a78bfa",
+      borderColor: "#7c3aed",
+    },
+    {
+      title: "Raccourci Google NotebookLM Intégré",
+      badge: "ANALYSE IA",
+      description:
+        "Accès direct en un clic à l'outil officiel Google NotebookLM pour interroger vos cours et générer des guides d'étude assistés.",
+      badgeColor: "#fbbf24",
+      borderColor: "#d97706",
+    },
+    {
+      title: "Focus Hub & Bosquet de Promotion",
+      badge: "IMMERSION",
+      description:
+        "Lancement instantané de vos sessions Pomodoro depuis vos créneaux avec continuité audio et plantation d'arbres certifiés.",
+      badgeColor: "#4ade80",
+      borderColor: "#16a34a",
+    },
+    {
+      title: "Persistance Cloud Supabase & Zéro Quota",
+      badge: "HAUTE FIABILITÉ",
+      description:
+        "Sécurité Row-Level Security stricte par étudiant, isolation hermétique des données et exécution locale préservant les quotas cloud.",
+      badgeColor: "#22d3ee",
+      borderColor: "#0891b2",
+    },
+  ];
+
+  const pillars =
+    options.customPillars ||
+    (version === "v1.1" ? defaultPillarsV1_1 : defaultPillarsV1_2);
+
+  const subject =
+    version === "v1.1"
+      ? `Validily IGL4 — Mise à jour officielle (${version})`
+      : `Validily IGL4 — Votre Planning & To-Do Académique est Arrivé (${version})`;
 
   const text = `${recipientGreeting}
 
@@ -89,7 +147,8 @@ Une nouvelle version de VALIDILY-IGL4 (${version}) est disponible pour l'ensembl
 Nouveautés majeures :
 ${pillars.map((p) => `- [${p.badge}] ${p.title} : ${p.description}`).join("\n")}
 
-Accédez à votre espace de travail : ${baseUrl}/my-space
+Accéder au Planning Académique : ${baseUrl}/planner
+Accéder à l'Espace Étudiant & Ressources : ${baseUrl}/my-space
 
 --
 Promotion IGL4 — Plateforme Académique & Révision Collaborative
@@ -154,9 +213,11 @@ Contact : validely.app@gmail.com
               <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
                 <tr>
                   <td align="left" valign="middle">
-                    <span style="font-size: 20px; font-weight: 800; letter-spacing: -0.5px; color: #ffffff; text-transform: uppercase;">
-                      VALIDILY<span style="color: #34d399; margin-left: 2px;">•</span><span style="font-size: 14px; font-weight: 600; color: #a7f3d0; margin-left: 4px;">IGL4</span>
-                    </span>
+                    <a href="${baseUrl}/" target="_blank" style="text-decoration: none; display: inline-block;">
+                      <span style="font-size: 20px; font-weight: 800; letter-spacing: -0.5px; color: #ffffff; text-transform: uppercase;">
+                        VALIDILY<span style="color: #34d399; margin-left: 2px;">•</span><span style="font-size: 14px; font-weight: 600; color: #a7f3d0; margin-left: 4px;">IGL4</span>
+                      </span>
+                    </a>
                     <div style="font-size: 11px; font-weight: 500; color: #d1fae5; margin-top: 3px; letter-spacing: 0.3px;">
                       UNIVERSITÉ • PLATEFORME ACADÉMIQUE DE RÉVISION
                     </div>
@@ -235,18 +296,21 @@ Contact : validely.app@gmail.com
               </table>
 
               <!-- Call To Action Button -->
-              <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-top: 24px;">
+              <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-top: 28px;">
                 <tr>
                   <td align="center">
                     <table role="presentation" border="0" cellpadding="0" cellspacing="0">
                       <tr>
-                        <td align="center" style="border-radius: 8px; background: linear-gradient(135deg, #059669 0%, #10b981 100%); box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.2);">
-                          <a href="${baseUrl}/my-space" target="_blank" style="display: inline-block; padding: 14px 28px; font-size: 14px; font-weight: 700; color: #ffffff; text-decoration: none; border-radius: 8px; letter-spacing: 0.2px;">
-                            Accéder à Validily IGL4 &rarr;
+                        <td align="center" style="border-radius: 8px; background: linear-gradient(135deg, #059669 0%, #10b981 100%); box-shadow: 0 4px 14px -1px rgba(16, 185, 129, 0.4);">
+                          <a href="${baseUrl}/planner" target="_blank" style="display: inline-block; padding: 14px 32px; font-size: 14px; font-weight: 700; color: #ffffff; text-decoration: none; border-radius: 8px; letter-spacing: 0.2px;">
+                            Ouvrir le Planning & To-Do Académique &rarr;
                           </a>
                         </td>
                       </tr>
                     </table>
+                    <div style="margin-top: 14px; font-size: 12px; color: #94a3b8;">
+                      Ou accédez à votre <a href="${baseUrl}/my-space" target="_blank" style="color: #34d399; font-weight: 600; text-decoration: underline;">Espace Étudiant & Ressources Partagées</a>
+                    </div>
                   </td>
                 </tr>
               </table>

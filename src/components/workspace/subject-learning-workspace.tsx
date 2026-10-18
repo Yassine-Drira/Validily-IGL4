@@ -1191,12 +1191,22 @@ ${resources.map((r) => `<li><strong>${r.title}</strong> (${r.mime_type}) - ${r.s
             </div>
 
             <div className="flex-1 bg-stone-900 overflow-hidden">
-              <PdfViewer
-                url={`/api/download/${viewingResource.id}`}
-                filename={viewingResource.original_filename}
-                title={viewingResource.title}
-                downloadUrl={`/api/download/${viewingResource.id}`}
-              />
+              {viewingResource.mime_type?.includes("html") ||
+              viewingResource.original_filename?.toLowerCase().endsWith(".html") ? (
+                <InteractiveHtmlRunner
+                  title={viewingResource.title}
+                  subjectName={subject.name}
+                  srcUrl={`/api/download/${viewingResource.id}`}
+                  onClose={() => setViewingResource(null)}
+                />
+              ) : (
+                <PdfViewer
+                  url={`/api/download/${viewingResource.id}`}
+                  filename={viewingResource.original_filename}
+                  title={viewingResource.title}
+                  downloadUrl={`/api/download/${viewingResource.id}`}
+                />
+              )}
             </div>
           </div>
         </div>

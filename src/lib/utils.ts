@@ -26,3 +26,25 @@ export function formatDate(dateString: string): string {
     return dateString;
   }
 }
+
+/**
+ * Returns a date formatted as YYYY-MM-DD in the local timezone,
+ * preventing UTC midnight date shifts for students in UTC+1 or other timezones.
+ */
+export function getLocalTodayDateString(date: Date = new Date()): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Validates and normalizes UUID subject IDs for PostgreSQL foreign-key compatibility.
+ */
+export function cleanDbSubjectId(id?: string | null): string | null {
+  if (!id || typeof id !== "string") return null;
+  const trimmed = id.trim();
+  return UUID_REGEX.test(trimmed) ? trimmed : null;
+}

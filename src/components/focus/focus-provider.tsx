@@ -1115,3 +1115,5 @@ export function useFocusTimer(): FocusContextType {
   const context = useContext(FocusContext);
   return context || FALLBACK_FOCUS_CONTEXT;
 }
+
+export const useFocus = useFocusTimer;
