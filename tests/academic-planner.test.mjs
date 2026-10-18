@@ -1166,4 +1166,93 @@ test("PLANNER-DATA-02: Subject ID sanitization safely handles malformed non-UUID
   assert.equal(blockRes.data.subject_id, null);
 });
 
+test("PLANNER-SEC-06: Strict Multi-Tenant Isolation - Comprehensive privacy audit across all planner entities", async () => {
+  // 1. Alice creates task, timeblock, and goal
+  setTestUser(USER_ALICE);
+  const aliceTask = await createAcademicTaskAction({
+    title: "Alice Private Revision",
+    category: "revision",
+    priority: "high",
+    due_date: "2026-10-25",
+  });
+  assert.ok(aliceTask.success && aliceTask.data);
+
+  const aliceBlock = await createCalendarTimeblockAction({
+    title: "Alice Focus Block",
+    block_date: "2026-10-25",
+    start_time: "10:00",
+    end_time: "12:00",
+    task_id: aliceTask.data.id,
+  });
+  assert.ok(aliceBlock.success && aliceBlock.data);
+
+  const aliceGoal = await setAcademicGoalAction({
+    title: "Alice Confidential Target",
+    period_type: "daily",
+    period_key: "2026-10-25",
+    metric_type: "study_minutes",
+    target_value: 120,
+  });
+  assert.ok(aliceGoal.success && aliceGoal.data);
+
+  // 2. Switch to Bob: verify Bob cannot read or enumerate any of Alice's entities
+  setTestUser(USER_BOB);
+
+  // Bob gets tasks: must be empty
+  const bobTasks = await getAcademicTasksAction();
+  assert.equal(bobTasks.success, true);
+  assert.equal(bobTasks.data.length, 0);
+
+  // Bob gets timeblocks: must be empty
+  const bobBlocks = await getCalendarTimeblocksAction("2026-10-20", "2026-10-30");
+  assert.equal(bobBlocks.success, true);
+  assert.equal(bobBlocks.data.length, 0);
+
+  // Bob gets goals: must be empty
+  const bobGoals = await getAcademicGoalsAction({ period_type: "daily", period_key: "2026-10-25" });
+  assert.equal(bobGoals.success, true);
+  assert.equal(bobGoals.data.length, 0);
+
+  // Bob attempts mutations on Alice's task
+  const bobUpdateTask = await updateAcademicTaskAction(aliceTask.data.id, { title: "Hacked" });
+  assert.equal(bobUpdateTask.success, false);
+  const bobDeleteTask = await deleteAcademicTaskAction(aliceTask.data.id);
+  assert.equal(bobDeleteTask.success, false);
+
+  // Bob attempts mutations on Alice's block
+  const bobUpdateBlock = await updateCalendarTimeblockAction(aliceBlock.data.id, { title: "Hacked" });
+  assert.equal(bobUpdateBlock.success, false);
+  const bobDeleteBlock = await deleteCalendarTimeblockAction(aliceBlock.data.id);
+  assert.equal(bobDeleteBlock.success, false);
+
+  // Bob attempts mutations on Alice's goal
+  const bobOverwriteGoal = await setAcademicGoalAction({
+    id: aliceGoal.data.id,
+    title: "Hacked Goal",
+    period_type: "daily",
+    period_key: "2026-10-25",
+    metric_type: "study_minutes",
+    target_value: 1,
+  });
+  assert.equal(bobOverwriteGoal.success, false);
+  const bobProgressGoal = await updateAcademicGoalProgressAction(aliceGoal.data.id, 999);
+  assert.equal(bobProgressGoal.success, false);
+  const bobDeleteGoal = await deleteAcademicGoalAction(aliceGoal.data.id);
+  assert.equal(bobDeleteGoal.success, false);
+
+  // 3. Switch back to Alice: verify all data remains 100% intact
+  setTestUser(USER_ALICE);
+  const checkTasks = await getAcademicTasksAction();
+  assert.equal(checkTasks.data.length, 1);
+  assert.equal(checkTasks.data[0].title, "Alice Private Revision");
+
+  const checkBlocks = await getCalendarTimeblocksAction("2026-10-20", "2026-10-30");
+  assert.equal(checkBlocks.data.length, 1);
+  assert.equal(checkBlocks.data[0].title, "Alice Focus Block");
+
+  const checkGoals = await getAcademicGoalsAction({ period_type: "daily", period_key: "2026-10-25" });
+  assert.equal(checkGoals.data.length, 1);
+  assert.equal(checkGoals.data[0].title, "Alice Confidential Target");
+});
+
 

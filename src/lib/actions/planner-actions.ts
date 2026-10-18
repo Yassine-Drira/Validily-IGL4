@@ -814,7 +814,7 @@ export async function getCalendarTimeblocksAction(
       if (adminClient) {
         const { data, error } = await adminClient
           .from("calendar_timeblocks")
-          .select("*, subject:subjects(id, name, slug, icon), task:academic_tasks(id, title, is_completed)")
+          .select("*, subject:subjects(id, name, slug, icon), task:academic_tasks(id, title, is_completed, user_id)")
           .eq("user_id", requester.id)
           .gte("block_date", startDate)
           .lte("block_date", endDate)
@@ -822,10 +822,17 @@ export async function getCalendarTimeblocksAction(
           .order("start_time", { ascending: true });
 
         if (!error && Array.isArray(data)) {
-          for (const item of data) {
+          const sanitized = data.map((item: any) => {
+            // Strictly enforce that linked task belongs to the requester
+            if (item.task && item.task.user_id && item.task.user_id !== requester.id) {
+              return { ...item, task: null, task_id: null };
+            }
+            return item;
+          });
+          for (const item of sanitized) {
             localTimeblocks.set(item.id, item as CalendarTimeblock);
           }
-          return { success: true, data: data as CalendarTimeblock[] };
+          return { success: true, data: sanitized as CalendarTimeblock[] };
         }
       }
     } catch {
@@ -840,6 +847,15 @@ export async function getCalendarTimeblocksAction(
         b.block_date >= startDate &&
         b.block_date <= endDate
     )
+    .map((b) => {
+      if (b.task_id) {
+        const linkedTask = localTasks.get(b.task_id);
+        if (!linkedTask || linkedTask.user_id !== requester.id) {
+          return { ...b, task: undefined, task_id: null };
+        }
+      }
+      return b;
+    })
     .sort((a, b) => {
       if (a.block_date !== b.block_date) return a.block_date.localeCompare(b.block_date);
       return a.start_time.localeCompare(b.start_time);
@@ -1416,10 +1432,42 @@ export async function setAcademicGoalAction(
     try {
       const adminClient = await getAdminClient();
       if (adminClient) {
-        const { data, error } = await adminClient
-          .from("academic_goals")
-          .upsert(
-            {
+        if (input.id) {
+          // Strictly update existing goal belonging to this user
+          const { data, error } = await adminClient
+            .from("academic_goals")
+            .update({
+              title: goalPayload.title,
+              description: goalPayload.description,
+              period_type: goalPayload.period_type,
+              period_key: goalPayload.period_key,
+              metric_type: goalPayload.metric_type,
+              target_value: goalPayload.target_value,
+              unit: goalPayload.unit,
+              subject_id: cleanDbSubjectId(goalPayload.subject_id),
+              manual_progress: goalPayload.manual_progress,
+              status: goalPayload.status,
+              deadline: goalPayload.deadline,
+              updated_at: nowIso,
+            })
+            .eq("id", input.id)
+            .eq("user_id", requester.id)
+            .select("*")
+            .single();
+
+          if (!error && data) {
+            localGoals.set(data.id, data as AcademicGoal);
+            await safeRevalidate("/planner");
+            return { success: true, data: data as AcademicGoal };
+          } else if (error && !isTableMissingError(error)) {
+            console.error("setAcademicGoalAction update error:", error);
+            return { success: false, error: "Erreur d'enregistrement de l'objectif: " + (error.message || "") };
+          }
+        } else {
+          // Insert new goal with fresh ID assigned strictly to requester
+          const { data, error } = await adminClient
+            .from("academic_goals")
+            .insert({
               id: goalPayload.id,
               user_id: requester.id,
               title: goalPayload.title,
@@ -1434,19 +1482,18 @@ export async function setAcademicGoalAction(
               status: goalPayload.status,
               deadline: goalPayload.deadline,
               updated_at: nowIso,
-            },
-            { onConflict: "id" }
-          )
-          .select("*")
-          .single();
+            })
+            .select("*")
+            .single();
 
-        if (!error && data) {
-          localGoals.set(data.id, data as AcademicGoal);
-          await safeRevalidate("/planner");
-          return { success: true, data: data as AcademicGoal };
-        } else if (error && !isTableMissingError(error)) {
-          console.error("setAcademicGoalAction DB error:", error);
-          return { success: false, error: "Erreur d'enregistrement de l'objectif: " + (error.message || "") };
+          if (!error && data) {
+            localGoals.set(data.id, data as AcademicGoal);
+            await safeRevalidate("/planner");
+            return { success: true, data: data as AcademicGoal };
+          } else if (error && !isTableMissingError(error)) {
+            console.error("setAcademicGoalAction insert error:", error);
+            return { success: false, error: "Erreur d'enregistrement de l'objectif: " + (error.message || "") };
+          }
         }
       }
     } catch {
