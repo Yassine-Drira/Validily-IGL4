@@ -264,6 +264,7 @@ export interface UpdateTaskInput {
   estimated_minutes?: number;
   actual_minutes?: number;
   is_completed?: boolean;
+  completed_at?: string | null;
   subtasks?: AcademicSubtask[];
   sort_order?: number;
 }
@@ -306,7 +307,7 @@ export async function createAcademicTaskAction(input: CreateTaskInput): Promise<
   const subtasks: AcademicSubtask[] = sanitizeSubtasks(input.subtasks);
 
   const nowIso = new Date().toISOString();
-  const taskId = `task-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const taskId = crypto.randomUUID();
 
   const newTask: AcademicTask = {
     id: taskId,
@@ -586,7 +587,10 @@ export async function toggleAcademicTaskAction(
   data?: AcademicTask;
   error?: string;
 }> {
-  return updateAcademicTaskAction(taskId, { is_completed: isCompleted });
+  return updateAcademicTaskAction(taskId, {
+    is_completed: isCompleted,
+    completed_at: isCompleted ? new Date().toISOString() : null,
+  });
 }
 
 /**
@@ -725,7 +729,7 @@ export async function createCalendarTimeblockAction(
     }
   }
 
-  const blockId = `block-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const blockId = crypto.randomUUID();
   const nowIso = new Date().toISOString();
 
   const newBlock: CalendarTimeblock = {
@@ -889,6 +893,10 @@ export async function updateCalendarTimeblockAction(
   }
   if (input.duration_minutes !== undefined) {
     updates.duration_minutes = Math.max(5, Math.min(1440, Number(input.duration_minutes) || 30));
+  } else if (updates.start_time && updates.end_time) {
+    const s = parseTimeInMinutes(updates.start_time);
+    const e = parseTimeInMinutes(updates.end_time, true);
+    updates.duration_minutes = e > s ? e - s : 60;
   }
   if (input.subject_id !== undefined) updates.subject_id = cleanSubjectId(input.subject_id);
   if (input.notes !== undefined) updates.notes = input.notes?.trim() || null;
@@ -1312,7 +1320,47 @@ export async function setAcademicGoalAction(
   const manualProgress = Math.max(0, Math.min(100000, Number(input.manual_progress) || 0));
   const status: AcademicGoalStatus = input.status || "active";
 
-  const goalId = input.id || `goal-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const isValidUuid = input.id ? UUID_REGEX.test(input.id) : false;
+  let resolvedGoalId: string | null = isValidUuid ? input.id! : null;
+
+  // Deduplication: If creating without ID, reuse existing goal with same period & title
+  if (!resolvedGoalId && await isDbConfigured()) {
+    try {
+      const adminClient = await getAdminClient();
+      if (adminClient) {
+        const { data: existingSame } = await adminClient
+          .from("academic_goals")
+          .select("id")
+          .eq("user_id", requester.id)
+          .eq("period_type", input.period_type)
+          .eq("period_key", periodKey)
+          .eq("title", title)
+          .maybeSingle();
+
+        if (existingSame?.id) {
+          resolvedGoalId = existingSame.id;
+        }
+      }
+    } catch {
+      // Graceful fallback
+    }
+  }
+
+  if (!resolvedGoalId) {
+    for (const [id, g] of localGoals.entries()) {
+      if (
+        g.user_id === requester.id &&
+        g.period_type === input.period_type &&
+        g.period_key === periodKey &&
+        g.title.trim().toLowerCase() === title.trim().toLowerCase()
+      ) {
+        resolvedGoalId = id;
+        break;
+      }
+    }
+  }
+
+  const goalId = resolvedGoalId || crypto.randomUUID();
   const nowIso = new Date().toISOString();
 
   // Security: If updating an existing goal (input.id provided), enforce ownership check!
@@ -1320,7 +1368,7 @@ export async function setAcademicGoalAction(
     if (await isDbConfigured()) {
       try {
         const adminClient = await getAdminClient();
-        if (adminClient) {
+        if (adminClient && isValidUuid) {
           const { data: existingGoal, error: fetchErr } = await adminClient
             .from("academic_goals")
             .select("id, user_id")
@@ -1397,7 +1445,8 @@ export async function setAcademicGoalAction(
           await safeRevalidate("/planner");
           return { success: true, data: data as AcademicGoal };
         } else if (error && !isTableMissingError(error)) {
-          return { success: false, error: "Erreur d'enregistrement de l'objectif" };
+          console.error("setAcademicGoalAction DB error:", error);
+          return { success: false, error: "Erreur d'enregistrement de l'objectif: " + (error.message || "") };
         }
       }
     } catch {
@@ -1590,24 +1639,18 @@ export async function getAcademicGoalsAction(params?: {
       if (adminClient) {
         const { data: dbTasks } = await adminClient
           .from("academic_tasks")
-          .select("*")
+          .select("id, is_completed, subject_id, due_date")
           .eq("user_id", requester.id);
         if (Array.isArray(dbTasks)) {
           userTasks = dbTasks as AcademicTask[];
-          for (const t of userTasks) {
-            localTasks.set(t.id, t);
-          }
         }
 
         const { data: dbBlocks } = await adminClient
           .from("calendar_timeblocks")
-          .select("*")
+          .select("id, is_completed, subject_id, block_date")
           .eq("user_id", requester.id);
         if (Array.isArray(dbBlocks)) {
           userBlocks = dbBlocks as CalendarTimeblock[];
-          for (const b of userBlocks) {
-            localTimeblocks.set(b.id, b);
-          }
         }
       }
     } catch {
@@ -1627,16 +1670,9 @@ export async function getAcademicGoalsAction(params?: {
     let progress = 0;
     let isAutomated = false;
 
+    // Detectable missions only: time spent (focus telemetry) and focused periods (completed blocks)
     if (g.metric_type === "study_minutes") {
       progress = verifiedFocusMinutes;
-      isAutomated = true;
-    } else if (g.metric_type === "tasks_completed") {
-      progress = userTasks.filter((t) => {
-        if (!t.is_completed) return false;
-        if (g.subject_id && t.subject_id !== g.subject_id) return false;
-        if (g.period_type === "daily" && t.due_date !== g.period_key) return false;
-        return true;
-      }).length;
       isAutomated = true;
     } else if (g.metric_type === "study_sessions") {
       progress = userBlocks.filter((b) => {
@@ -1646,9 +1682,24 @@ export async function getAcademicGoalsAction(params?: {
         return true;
       }).length;
       isAutomated = true;
+    } else if (g.metric_type === "tasks_completed") {
+      // If student manually modified progress (e.g. from 0 to 2), respect their manual tracking!
+      if (typeof g.manual_progress === "number" && g.manual_progress > 0) {
+        progress = g.manual_progress;
+        isAutomated = false;
+      } else {
+        // Fallback to auto-detected completed tasks
+        progress = userTasks.filter((t) => {
+          if (!t.is_completed) return false;
+          if (g.subject_id && t.subject_id !== g.subject_id) return false;
+          if (g.period_type === "daily" && t.due_date !== g.period_key) return false;
+          return true;
+        }).length;
+        isAutomated = true;
+      }
     } else {
-      // Manual progress for exercises, chapters, or custom personal goals
-      progress = g.manual_progress || 0;
+      // Manual tracking for devoirs, exercises, chapters, or custom academic objectives
+      progress = g.manual_progress ?? 0;
       isAutomated = false;
     }
 

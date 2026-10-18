@@ -172,6 +172,34 @@ export function FocusProvider({
     },
     [uid]
   );
+  // Save daily stats helper (strictly scoped to active user & persisted to DB)
+  const persistDailyStats = useCallback(
+    (pomodoros: number, seconds: number, syncToDb = true) => {
+      if (!user?.id) return;
+      try {
+        const today = new Date().toISOString().split("T")[0];
+        localStorage.setItem(
+          `validily_focus_${user.id}_${today}`,
+          JSON.stringify({
+            completedPomodoros: pomodoros,
+            totalFocusSeconds: seconds,
+            totalFocusMinutes: Math.floor(seconds / 60),
+          })
+        );
+        if (syncToDb) {
+          recordUserDailyFocus({
+            dateStr: today,
+            totalSeconds: seconds,
+            completedPomodoros: pomodoros,
+            userId: user.id,
+          }).catch(() => {});
+        }
+      } catch {
+        // LocalStorage fallback
+      }
+    },
+    [user]
+  );
 
   // Load daily stats, tree preferences & persistent audio preferences on mount or when user changes
   useEffect(() => {
@@ -369,36 +397,7 @@ export function FocusProvider({
     } catch {
       // LocalStorage fallback
     }
-  }, [user, uid, persistActiveTimerState, persistAudioPreference]);
-
-  // Save daily stats helper (strictly scoped to active user & persisted to DB)
-  const persistDailyStats = useCallback(
-    (pomodoros: number, seconds: number, syncToDb = true) => {
-      if (!user?.id) return;
-      try {
-        const today = new Date().toISOString().split("T")[0];
-        localStorage.setItem(
-          `validily_focus_${user.id}_${today}`,
-          JSON.stringify({
-            completedPomodoros: pomodoros,
-            totalFocusSeconds: seconds,
-            totalFocusMinutes: Math.floor(seconds / 60),
-          })
-        );
-        if (syncToDb) {
-          recordUserDailyFocus({
-            dateStr: today,
-            totalSeconds: seconds,
-            completedPomodoros: pomodoros,
-            userId: user.id,
-          }).catch(() => {});
-        }
-      } catch {
-        // LocalStorage fallback
-      }
-    },
-    [user]
-  );
+  }, [user, uid, persistActiveTimerState, persistAudioPreference, persistDailyStats]);
 
   // Dismiss celebration banner
   const dismissCelebration = useCallback(() => {

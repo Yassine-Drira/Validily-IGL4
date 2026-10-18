@@ -16,6 +16,8 @@ import {
   Sparkles,
   AlertTriangle,
   Copy,
+  Check,
+  Move,
 } from "lucide-react";
 import type {
   CalendarTimeblock,
@@ -33,6 +35,12 @@ import { FocusTriggerButton } from "./focus-trigger-button";
 import { TimeblockEventCard } from "./timeblock-event-card";
 import { TaskSelector } from "./task-selector";
 import { getLocalTodayDateString } from "@/lib/utils";
+import {
+  PLANNER_COLOR_OPTIONS,
+  PlannerColorKey,
+  parseNotesAndColor,
+  formatNotesWithColor,
+} from "@/lib/planner/planner-theme";
 
 interface AcademicCalendarViewProps {
   timeblocks: CalendarTimeblock[];
@@ -122,8 +130,24 @@ export function AcademicCalendarView({
   const [formSubjectId, setFormSubjectId] = useState("");
   const [formTaskId, setFormTaskId] = useState<string | null>(null);
   const [formNotes, setFormNotes] = useState("");
+  const [formColor, setFormColor] = useState<PlannerColorKey>("cobalt");
   const [formConflictWarning, setFormConflictWarning] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  // Local optimistic state for timeblocks (instant drag-and-drop & zero-latency updates)
+  const [localBlocks, setLocalBlocks] = useState<CalendarTimeblock[]>(timeblocks);
+
+  useEffect(() => {
+    setLocalBlocks(timeblocks);
+  }, [timeblocks]);
+
+  // Drag-and-Drop movement state
+  const [movingBlockId, setMovingBlockId] = useState<string | null>(null);
+  const [dropPreview, setDropPreview] = useState<{
+    dateStr: string;
+    startMin: number;
+    duration: number;
+  } | null>(null);
 
   // Drag-to-select state for continuous multi-hour scheduling
   const [dragState, setDragState] = useState<{
@@ -191,6 +215,7 @@ export function AcademicCalendarView({
     setFormSubjectId("");
     setFormTaskId(null);
     setFormNotes("");
+    setFormColor("cobalt");
     setFormConflictWarning(null);
     setIsModalOpen(true);
   };
@@ -204,7 +229,11 @@ export function AcademicCalendarView({
     setFormEnd(block.end_time.slice(0, 5));
     setFormSubjectId(block.subject_id || "");
     setFormTaskId(block.task_id || null);
-    setFormNotes(block.notes || "");
+
+    const { colorKey, displayNotes } = parseNotesAndColor(block.notes);
+    setFormNotes(displayNotes || "");
+    setFormColor(colorKey || "cobalt");
+
     setFormConflictWarning(null);
     setIsModalOpen(true);
   };
@@ -224,41 +253,60 @@ export function AcademicCalendarView({
   // Save Block
   const handleSaveBlock = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formTitle.trim()) return;
+    const cleanTitle = formTitle.trim();
+    if (!cleanTitle) return;
 
     setSaving(true);
+    const sMins = parseTimeToMinutes(formStart);
+    const eMins = parseTimeToMinutes(formEnd, true);
+    const duration = eMins > sMins ? eMins - sMins : 60;
+    const encodedNotes = formatNotesWithColor(formNotes.trim(), formColor);
 
     if (editingBlock) {
-      await updateCalendarTimeblockAction(editingBlock.id, {
-        title: formTitle,
+      const res = await updateCalendarTimeblockAction(editingBlock.id, {
+        title: cleanTitle,
         block_date: formDate,
         start_time: formStart,
         end_time: formEnd,
+        duration_minutes: duration,
         subject_id: formSubjectId || null,
         task_id: formTaskId || null,
-        notes: formNotes,
+        notes: encodedNotes,
       });
+
+      setSaving(false);
+      if (!res.success) {
+        alert(res.error || "Erreur de modification du créneau");
+        return;
+      }
     } else {
-      await createCalendarTimeblockAction({
-        title: formTitle,
+      const res = await createCalendarTimeblockAction({
+        title: cleanTitle,
         block_date: formDate,
         start_time: formStart,
         end_time: formEnd,
+        duration_minutes: duration,
         subject_id: formSubjectId || null,
         task_id: formTaskId || null,
-        notes: formNotes,
+        notes: encodedNotes,
       });
+
+      setSaving(false);
+      if (!res.success) {
+        alert(res.error || "Erreur de création du créneau");
+        return;
+      }
     }
 
-    setSaving(false);
     setIsModalOpen(false);
     onRefresh();
   };
 
-  // Delete Block
+  // Delete Block with instant optimistic removal
   const handleDeleteBlock = async (blockId: string) => {
-    await deleteCalendarTimeblockAction(blockId);
+    setLocalBlocks((prev) => prev.filter((b) => b.id !== blockId));
     setIsModalOpen(false);
+    await deleteCalendarTimeblockAction(blockId);
     onRefresh();
   };
 
@@ -280,10 +328,14 @@ export function AcademicCalendarView({
     onRefresh();
   };
 
-  // Toggle complete
+  // Toggle complete with instant optimistic response (< 1ms)
   const handleToggleComplete = async (block: CalendarTimeblock) => {
+    const nextStatus = !block.is_completed;
+    setLocalBlocks((prev) =>
+      prev.map((b) => (b.id === block.id ? { ...b, is_completed: nextStatus } : b))
+    );
     await updateCalendarTimeblockAction(block.id, {
-      is_completed: !block.is_completed,
+      is_completed: nextStatus,
     });
     onRefresh();
   };
@@ -330,6 +382,108 @@ export function AcademicCalendarView({
     const rawMin = START_HOUR * 60 + Math.floor((offsetY / SLOT_HEIGHT) * 60);
     const snapped = Math.max(dragState.startMin + 30, Math.min(1440, Math.ceil(rawMin / 30) * 30));
     setDragState((prev) => (prev ? { ...prev, currentMin: snapped } : null));
+  };
+
+  // Drag-and-Drop movement handlers (HTML5 DnD for moving blocks across grid)
+  const handleEventDragStart = (e: React.DragEvent, block: CalendarTimeblock) => {
+    e.dataTransfer.setData("text/plain", block.id);
+    e.dataTransfer.effectAllowed = "move";
+    setMovingBlockId(block.id);
+  };
+
+  const handleEventDragEnd = () => {
+    setMovingBlockId(null);
+    setDropPreview(null);
+  };
+
+  const handleColumnDragOver = (e: React.DragEvent<HTMLDivElement>, dateStr: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (!movingBlockId) return;
+
+    const block = localBlocks.find((b) => b.id === movingBlockId);
+    if (!block) return;
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const offsetY = e.clientY - rect.top;
+    const rawMin = START_HOUR * 60 + Math.floor((offsetY / SLOT_HEIGHT) * 60);
+    const duration = block.duration_minutes || 60;
+    const maxStart = END_HOUR * 60 - duration;
+    // Snap to 30 min intervals
+    const snappedStart = Math.max(START_HOUR * 60, Math.min(maxStart, Math.floor(rawMin / 30) * 30));
+
+    if (
+      !dropPreview ||
+      dropPreview.dateStr !== dateStr ||
+      dropPreview.startMin !== snappedStart
+    ) {
+      setDropPreview({
+        dateStr,
+        startMin: snappedStart,
+        duration,
+      });
+    }
+  };
+
+  const handleColumnDrop = async (e: React.DragEvent<HTMLDivElement>, dateStr: string) => {
+    e.preventDefault();
+    const blockId = e.dataTransfer.getData("text/plain") || movingBlockId;
+    if (!blockId || !dropPreview) {
+      setMovingBlockId(null);
+      setDropPreview(null);
+      return;
+    }
+
+    const block = localBlocks.find((b) => b.id === blockId);
+    if (!block) {
+      setMovingBlockId(null);
+      setDropPreview(null);
+      return;
+    }
+
+    const newStart = minutesToTimeString(dropPreview.startMin);
+    const newEnd = minutesToTimeString(dropPreview.startMin + dropPreview.duration);
+
+    if (block.block_date === dateStr && block.start_time.slice(0, 5) === newStart) {
+      setMovingBlockId(null);
+      setDropPreview(null);
+      return;
+    }
+
+    const previousBlocks = [...localBlocks];
+
+    // 1. Instant optimistic update (< 1ms UI response)
+    setLocalBlocks((prev) =>
+      prev.map((b) =>
+        b.id === blockId
+          ? {
+              ...b,
+              block_date: dateStr,
+              start_time: newStart,
+              end_time: newEnd,
+              duration_minutes: dropPreview.duration,
+            }
+          : b
+      )
+    );
+
+    setMovingBlockId(null);
+    setDropPreview(null);
+
+    // 2. Persist in background
+    const res = await updateCalendarTimeblockAction(blockId, {
+      block_date: dateStr,
+      start_time: newStart,
+      end_time: newEnd,
+      duration_minutes: block.duration_minutes,
+    });
+
+    if (!res.success) {
+      setLocalBlocks(previousBlocks);
+      alert(res.error || "Impossible de déplacer le créneau");
+    } else {
+      onRefresh();
+    }
   };
 
   const handlePointerUpColumn = () => {
@@ -485,17 +639,29 @@ export function AcademicCalendarView({
         </div>
       )}
 
-      {/* 3. Grid Views (Day, 3-Days, Week) with Continuous Multi-Hour Timeline */}
+      {/* 3. Grid Views (Day, 3-Days, Week) with Continuous Multi-Hour Timeline & Glassmorphism Pro */}
       {viewMode !== "agenda" && (
-        <div className="bg-white border border-[#E4E8F0] rounded-xl overflow-hidden shadow-xs">
-          {/* Header Row: Days columns */}
-          <div
-            className="grid border-b border-[#E4E8F0] bg-[#F4F6FA] sticky top-0 z-10"
-            style={{
-              gridTemplateColumns: `56px repeat(${displayedDates.length}, minmax(0, 1fr))`,
-            }}
-          >
-            <div className="p-2.5 text-[11px] font-semibold text-[#68748A] text-center border-r border-[#E4E8F0]">
+        <div className="relative bg-white/90 backdrop-blur-xl border border-white/80 rounded-2xl overflow-hidden shadow-[0_12px_40px_rgba(40,85,217,0.06),inset_0_1px_1px_rgba(255,255,255,0.95)] before:absolute before:inset-0 before:bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(40,85,217,0.04),rgba(255,255,255,0))] before:pointer-events-none">
+          <div className="overflow-x-auto [scrollbar-width:thin]">
+            <div
+              className="min-w-full"
+              style={{
+                minWidth:
+                  viewMode === "week"
+                    ? "780px"
+                    : viewMode === "3days"
+                    ? "480px"
+                    : "100%",
+              }}
+            >
+              {/* Header Row: Days columns */}
+              <div
+                className="grid border-b border-[#E4E8F0]/80 bg-white/70 backdrop-blur-md sticky top-0 z-20 shadow-2xs"
+                style={{
+                  gridTemplateColumns: `56px repeat(${displayedDates.length}, minmax(0, 1fr))`,
+                }}
+              >
+            <div className="p-2.5 text-[11px] font-semibold text-[#68748A] text-center border-r border-[#E4E8F0]/80">
               Heure
             </div>
             {displayedDates.map((dateObj) => {
@@ -552,7 +718,7 @@ export function AcademicCalendarView({
               {/* Day Columns */}
               {displayedDates.map((dateObj) => {
                 const dateStr = getLocalTodayDateString(dateObj);
-                const dayBlocks = timeblocks.filter((b) => b.block_date === dateStr);
+                const dayBlocks = localBlocks.filter((b) => b.block_date === dateStr);
                 const isTodayCol = dateStr === todayStr;
                 const now = new Date();
                 const currentMinuteOfDay = now.getHours() * 60 + now.getMinutes();
@@ -565,7 +731,9 @@ export function AcademicCalendarView({
                     onPointerDown={(e) => handlePointerDownColumn(e, dateStr)}
                     onPointerMove={isDraggingThisCol ? handlePointerMoveColumn : undefined}
                     onPointerUp={isDraggingThisCol ? handlePointerUpColumn : undefined}
-                    className="border-r last:border-r-0 border-[#E4E8F0] relative hover:bg-[#F4F6FA]/20 cursor-crosshair transition-colors"
+                    onDragOver={(e) => handleColumnDragOver(e, dateStr)}
+                    onDrop={(e) => handleColumnDrop(e, dateStr)}
+                    className="border-r last:border-r-0 border-[#E4E8F0]/70 relative hover:bg-blue-50/15 cursor-crosshair transition-colors"
                     style={{ height: `${HOURS.length * SLOT_HEIGHT}px` }}
                   >
                     {/* Background hour grid guide lines */}
@@ -573,11 +741,11 @@ export function AcademicCalendarView({
                       <div
                         key={hour}
                         style={{ height: `${SLOT_HEIGHT}px` }}
-                        className="border-b border-[#E4E8F0]/70 pointer-events-none"
+                        className="border-b border-[#E4E8F0]/60 pointer-events-none"
                       />
                     ))}
 
-                    {/* Current Time Indicator Line (authoritative local time) */}
+                    {/* Current Time Indicator Line (authoritative local time with luminous glow) */}
                     {isTodayCol && currentMinuteOfDay >= START_HOUR * 60 && currentMinuteOfDay <= END_HOUR * 60 && (
                       <div
                         className="absolute left-0 right-0 z-30 pointer-events-none flex items-center"
@@ -585,24 +753,43 @@ export function AcademicCalendarView({
                           top: `${((currentMinuteOfDay - START_HOUR * 60) / 60) * SLOT_HEIGHT}px`,
                         }}
                       >
-                        <div className="w-2.5 h-2.5 rounded-full bg-[#EF4444] -ml-1.25 shadow-xs" />
-                        <div className="h-[2px] bg-[#EF4444] flex-1 shadow-xs" />
+                        <div className="w-2.5 h-2.5 rounded-full bg-[#EF4444] -ml-1.25 shadow-[0_0_8px_#EF4444] animate-pulse" />
+                        <div className="h-[2px] bg-gradient-to-r from-[#EF4444] via-[#EF4444]/80 to-transparent flex-1 shadow-[0_0_4px_rgba(239,68,68,0.5)]" />
                       </div>
                     )}
 
-                    {/* Drag selection visual highlight overlay */}
+                    {/* Drag selection visual highlight overlay with Glassmorphism */}
                     {isDraggingThisCol && (
                       <div
-                        className="absolute left-1 right-1 rounded-lg bg-[#2855D9]/20 border-2 border-dashed border-[#2855D9] z-20 pointer-events-none flex items-center justify-center text-xs font-semibold text-[#2855D9] shadow-xs"
+                        className="absolute left-1 right-1 rounded-xl bg-blue-500/20 backdrop-blur-xs border-2 border-dashed border-[#2855D9] z-20 pointer-events-none flex items-center justify-center text-xs font-bold text-[#2855D9] shadow-md animate-in fade-in-50"
                         style={{
                           top: `${((Math.min(dragState.startMin, dragState.currentMin) - START_HOUR * 60) / 60) * SLOT_HEIGHT}px`,
                           height: `${(Math.max(30, Math.abs(dragState.currentMin - dragState.startMin)) / 60) * SLOT_HEIGHT}px`,
                         }}
                       >
-                        <span>
+                        <span className="bg-white/90 backdrop-blur-md px-2.5 py-1 rounded-lg border border-[#2855D9]/30 shadow-xs">
                           {minutesToTimeString(Math.min(dragState.startMin, dragState.currentMin))} -{" "}
                           {minutesToTimeString(Math.max(dragState.startMin + 30, dragState.currentMin))}
                         </span>
+                      </div>
+                    )}
+
+                    {/* Drop Movement Preview Indicator (Glassmorphism Pro Target Indicator) */}
+                    {dropPreview && dropPreview.dateStr === dateStr && (
+                      <div
+                        className="absolute left-1 right-1 rounded-2xl bg-gradient-to-br from-blue-500/25 via-indigo-500/15 to-transparent border-2 border-dashed border-[#2855D9] backdrop-blur-md z-30 pointer-events-none flex flex-col items-center justify-center text-xs font-bold text-[#2855D9] shadow-xl animate-in fade-in-50 duration-100"
+                        style={{
+                          top: `${((dropPreview.startMin - START_HOUR * 60) / 60) * SLOT_HEIGHT}px`,
+                          height: `${Math.max(32, (dropPreview.duration / 60) * SLOT_HEIGHT - 3)}px`,
+                        }}
+                      >
+                        <div className="bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-xl border border-[#2855D9]/30 shadow-md flex items-center gap-2 text-xs font-bold text-[#2855D9]">
+                          <span className="w-2 h-2 rounded-full bg-[#2855D9] animate-ping" />
+                          <span>
+                            {minutesToTimeString(dropPreview.startMin)} -{" "}
+                            {minutesToTimeString(dropPreview.startMin + dropPreview.duration)}
+                          </span>
+                        </div>
                       </div>
                     )}
 
@@ -636,6 +823,9 @@ export function AcademicCalendarView({
                             onToggleComplete={handleToggleComplete}
                             onDelete={handleDeleteBlock}
                             onDuplicate={handleDuplicateBlock}
+                            onDragStart={handleEventDragStart}
+                            onDragEnd={handleEventDragEnd}
+                            isDragging={movingBlockId === block.id}
                             isCompact={duration < 45}
                           />
                         </div>
@@ -647,7 +837,9 @@ export function AcademicCalendarView({
             </div>
           </div>
         </div>
-      )}
+      </div>
+    </div>
+  )}
 
       {/* 4. Event Create / Edit Dialog with TaskSelector & Interval Adjustment */}
       {isModalOpen && (
@@ -811,6 +1003,37 @@ export function AcademicCalendarView({
                   <span>{formConflictWarning}</span>
                 </div>
               )}
+
+              {/* Color Tag Picker (Glassmorphism Pro Color Themes) */}
+              <div>
+                <label className="block text-[11px] font-semibold text-[#111A2E] mb-1.5 flex items-center justify-between">
+                  <span>Couleur & Thème visuel</span>
+                  <span className="text-[10px] text-[#2855D9] font-medium bg-[#EDF2FF] px-2 py-0.5 rounded-full">
+                    {PLANNER_COLOR_OPTIONS.find((c) => c.key === formColor)?.label || "Cobalt"}
+                  </span>
+                </label>
+                <div className="flex items-center justify-between gap-1.5 bg-[#F4F6FA] p-2 rounded-xl border border-[#E4E8F0]">
+                  {PLANNER_COLOR_OPTIONS.map((opt) => {
+                    const isSelected = formColor === opt.key;
+                    return (
+                      <button
+                        key={opt.key}
+                        type="button"
+                        onClick={() => setFormColor(opt.key)}
+                        className={`w-7 h-7 rounded-full transition-all duration-150 flex items-center justify-center relative ${
+                          isSelected
+                            ? "scale-110 ring-2 ring-offset-2 ring-[#2855D9] shadow-sm"
+                            : "opacity-75 hover:opacity-100 hover:scale-105"
+                        }`}
+                        style={{ backgroundColor: opt.dotColor }}
+                        title={`${opt.label}: ${opt.description}`}
+                      >
+                        {isSelected && <Check className="w-3.5 h-3.5 text-white stroke-[3]" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
 
               {/* Notes */}
               <div>

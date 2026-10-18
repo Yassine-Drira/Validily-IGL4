@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import {
   Calendar as CalendarIcon,
   CheckSquare,
@@ -56,50 +56,84 @@ export function PlannerShell({
   const [history, setHistory] = useState<PlannerHistorySummary>(initialHistory);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  const isFirstRender = useRef(true);
+
   const { isRunning, isPaused, timeLeft, setIsModalOpen } = useFocus();
 
-  // Full refresh handler with resilience against transient network blips
-  const handleRefresh = useCallback(async () => {
+  // Optimized refresh handler
+  const handleRefresh = useCallback(async (forceHistory = false) => {
     setIsRefreshing(true);
     try {
-      const now = new Date(currentDate);
+      const now = new Date(currentDate + "T12:00:00");
       // Range: 14 days before to 21 days after current date
       const startRange = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
       const endRange = new Date(now.getTime() + 21 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
-      const [tasksRes, blocksRes, historyRes] = await Promise.allSettled([
+      const fetchHistory = forceHistory || section === "history";
+      const promises: [Promise<any>, Promise<any>, Promise<any>?] = [
         getAcademicTasksAction(),
         getCalendarTimeblocksAction(startRange, endRange),
-        getPlannerHistoryAction(30),
-      ]);
+      ];
+      if (fetchHistory) {
+        promises.push(getPlannerHistoryAction(30));
+      }
+
+      const [tasksRes, blocksRes, historyRes] = await Promise.allSettled(promises);
 
       if (tasksRes.status === "fulfilled" && tasksRes.value.success) setTasks(tasksRes.value.data);
       if (blocksRes.status === "fulfilled" && blocksRes.value.success) setTimeblocks(blocksRes.value.data);
-      if (historyRes.status === "fulfilled" && historyRes.value.success) setHistory(historyRes.value.data);
+      if (historyRes && historyRes.status === "fulfilled" && historyRes.value.success) setHistory(historyRes.value.data);
     } catch {
       // Safe resilience against transient failures
     } finally {
       setIsRefreshing(false);
     }
-  }, [currentDate]);
+  }, [currentDate, section]);
 
   // When date changes, refresh timeblocks range
   const handleDateChange = (newDate: string) => {
     setCurrentDate(newDate);
   };
 
+  // Only refresh when currentDate changes after initial render (initial data comes from SSR)
   useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
     handleRefresh();
   }, [currentDate, handleRefresh]);
 
-  const todayStr = getLocalTodayDateString();
-  const todayTasks = tasks.filter((t) => t.due_date === todayStr);
-  const todayBlocks = timeblocks.filter((b) => b.block_date === todayStr);
+  // Lazy-load history when switching to history tab if not loaded
+  const handleSelectSection = (s: PlannerSection) => {
+    setSection(s);
+    if (s === "history") {
+      handleRefresh(true);
+    }
+  };
+
+  // Synchronize task toggles across shell sections without re-querying network
+  const handleTasksChange = useCallback((updatedTasks: AcademicTask[]) => {
+    setTasks((prev) => {
+      const map = new Map(updatedTasks.map((t) => [t.id, t]));
+      return prev.map((t) => map.get(t.id) || t);
+    });
+  }, []);
+
+  const todayStr = useMemo(() => getLocalTodayDateString(), []);
+  const todayTasks = useMemo(
+    () => tasks.filter((t) => t.due_date === todayStr),
+    [tasks, todayStr]
+  );
+  const todayBlocks = useMemo(
+    () => timeblocks.filter((b) => b.block_date === todayStr),
+    [timeblocks, todayStr]
+  );
 
   return (
     <div className="space-y-6">
       {/* 1. Planner Top Banner & Section Selector */}
-      <div className="bg-white border border-[#E4E8F0] rounded-2xl p-4 sm:p-5 shadow-xs">
+      <div className="bg-white/90 backdrop-blur-md border border-[#E4E8F0] rounded-2xl p-4 sm:p-5 shadow-xs">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
@@ -154,8 +188,9 @@ export function PlannerShell({
         <div className="flex items-center gap-1.5 mt-5 border-t border-[#E4E8F0] pt-4 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
           <button
             type="button"
-            onClick={() => setSection("today")}
-            className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-medium transition-all shrink-0 whitespace-nowrap ${
+            id="planner-tab-today"
+            onClick={() => handleSelectSection("today")}
+            className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-medium transition-all shrink-0 whitespace-nowrap cursor-pointer ${
               section === "today"
                 ? "bg-[#2855D9] text-white shadow-xs"
                 : "text-[#68748A] hover:bg-[#EDF2FF] hover:text-[#111A2E]"
@@ -174,8 +209,9 @@ export function PlannerShell({
 
           <button
             type="button"
-            onClick={() => setSection("calendar")}
-            className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-medium transition-all shrink-0 whitespace-nowrap ${
+            id="planner-tab-calendar"
+            onClick={() => handleSelectSection("calendar")}
+            className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-medium transition-all shrink-0 whitespace-nowrap cursor-pointer ${
               section === "calendar"
                 ? "bg-[#2855D9] text-white shadow-xs"
                 : "text-[#68748A] hover:bg-[#EDF2FF] hover:text-[#111A2E]"
@@ -187,8 +223,9 @@ export function PlannerShell({
 
           <button
             type="button"
-            onClick={() => setSection("todo")}
-            className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-medium transition-all shrink-0 whitespace-nowrap ${
+            id="planner-tab-todo"
+            onClick={() => handleSelectSection("todo")}
+            className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-medium transition-all shrink-0 whitespace-nowrap cursor-pointer ${
               section === "todo"
                 ? "bg-[#2855D9] text-white shadow-xs"
                 : "text-[#68748A] hover:bg-[#EDF2FF] hover:text-[#111A2E]"
@@ -207,8 +244,9 @@ export function PlannerShell({
 
           <button
             type="button"
-            onClick={() => setSection("history")}
-            className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-medium transition-all shrink-0 whitespace-nowrap ${
+            id="planner-tab-history"
+            onClick={() => handleSelectSection("history")}
+            className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-medium transition-all shrink-0 whitespace-nowrap cursor-pointer ${
               section === "history"
                 ? "bg-[#2855D9] text-white shadow-xs"
                 : "text-[#68748A] hover:bg-[#EDF2FF] hover:text-[#111A2E]"
@@ -265,6 +303,7 @@ export function PlannerShell({
                 subjects={subjects}
                 onRefresh={handleRefresh}
                 selectedDate={todayStr}
+                onTasksChange={handleTasksChange}
               />
             </div>
 
@@ -347,6 +386,7 @@ export function PlannerShell({
               tasks={tasks}
               subjects={subjects}
               onRefresh={handleRefresh}
+              onTasksChange={handleTasksChange}
             />
           </div>
         </div>

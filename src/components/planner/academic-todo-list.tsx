@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import {
   CheckCircle2,
   Circle,
@@ -38,13 +38,21 @@ import {
 } from "@/lib/actions/planner-actions";
 import { SubjectIcon } from "@/components/academic/subject-icon";
 import { FocusTriggerButton } from "./focus-trigger-button";
-import { getLocalTodayDateString } from "@/lib/utils";
+import { getLocalTodayDateString, cn } from "@/lib/utils";
+import {
+  PLANNER_COLOR_OPTIONS,
+  resolvePlannerColorKey,
+  resolvePlannerTheme,
+  formatNotesWithColor,
+  type PlannerColorKey,
+} from "@/lib/planner/planner-theme";
 
 interface AcademicTodoListProps {
   tasks: AcademicTask[];
   subjects: Subject[];
   onRefresh: () => void;
   selectedDate?: string;
+  onTasksChange?: (updatedTasks: AcademicTask[]) => void;
 }
 
 type FilterTab = "all" | "today" | "upcoming" | "overdue" | "completed";
@@ -54,17 +62,34 @@ export function AcademicTodoList({
   subjects,
   onRefresh,
   selectedDate,
+  onTasksChange,
 }: AcademicTodoListProps) {
   // Local optimistic state for instant checkbox response (< 1ms)
   const [localTasks, setLocalTasks] = useState<AcademicTask[]>(tasks);
-  const [togglingIds, setTogglingIds] = useState<Set<string>>(new Set());
+  // Track sequence per task to reject stale out-of-order server responses during rapid toggles
+  const taskToggleSeq = useRef<Record<string, number>>({});
+  // Track tasks toggled during current session so they stay visible & stable in current view
+  const [sessionToggledIds, setSessionToggledIds] = useState<Set<string>>(new Set());
 
-  // Keep local tasks in sync with incoming props
+  // Keep local tasks in sync with incoming props without reverting in-flight toggles
   useEffect(() => {
-    setLocalTasks(tasks);
+    setLocalTasks((prev) => {
+      const hasPending = Object.values(taskToggleSeq.current).some((seq) => (seq as number) > 0);
+      if (!hasPending) {
+        return tasks;
+      }
+      const prevMap = new Map(prev.map((t) => [t.id, t]));
+      return tasks.map((t) => {
+        if ((taskToggleSeq.current[t.id] || 0) > 0) {
+          const current = prevMap.get(t.id);
+          return current ? { ...t, is_completed: current.is_completed } : t;
+        }
+        return t;
+      });
+    });
   }, [tasks]);
 
-  const [activeTab, setActiveTab] = useState<FilterTab>("all");
+  const [activeTab, setActiveTab] = useState<FilterTab>(selectedDate ? "today" : "all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>("all");
   const [selectedPriority, setSelectedPriority] = useState<string>("all");
@@ -74,12 +99,18 @@ export function AcademicTodoList({
   const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null);
   const [activeMenuTaskId, setActiveMenuTaskId] = useState<string | null>(null);
 
+  const handleTabChange = (tab: FilterTab) => {
+    setActiveTab(tab);
+    setSessionToggledIds(new Set()); // Fresh view when switching tabs
+  };
+
   // Quick scheduling state
   const [schedulingTask, setSchedulingTask] = useState<AcademicTask | null>(null);
   const [scheduleDate, setScheduleDate] = useState("");
   const [scheduleStart, setScheduleStart] = useState("09:00");
   const [scheduleEnd, setScheduleEnd] = useState("10:00");
   const [scheduleNotes, setScheduleNotes] = useState("");
+  const [scheduleColor, setScheduleColor] = useState<PlannerColorKey>("cobalt");
   const [scheduleConflictWarning, setScheduleConflictWarning] = useState<string | null>(null);
   const [isScheduling, setIsScheduling] = useState(false);
 
@@ -108,6 +139,8 @@ export function AcademicTodoList({
     const endMin = endM % 60;
     setScheduleEnd(`${endH.toString().padStart(2, "0")}:${endMin.toString().padStart(2, "0")}`);
     setScheduleNotes("");
+    const matchingSub = subjects.find((s) => s.id === task.subject_id) || task.subject;
+    setScheduleColor(resolvePlannerColorKey(null, matchingSub, task.category));
     setScheduleConflictWarning(null);
   };
 
@@ -126,6 +159,7 @@ export function AcademicTodoList({
     e.preventDefault();
     if (!schedulingTask) return;
     setIsScheduling(true);
+    const encodedNotes = formatNotesWithColor(scheduleNotes || null, scheduleColor);
     await createCalendarTimeblockAction({
       title: schedulingTask.title,
       block_date: scheduleDate,
@@ -133,43 +167,74 @@ export function AcademicTodoList({
       end_time: scheduleEnd,
       subject_id: schedulingTask.subject_id || null,
       task_id: schedulingTask.id,
-      notes: scheduleNotes || null,
+      notes: encodedNotes,
     });
     setIsScheduling(false);
     setSchedulingTask(null);
     onRefresh();
   };
 
-  // High-performance optimistic task toggle (< 1ms UI response)
-  const handleToggleTask = async (taskId: string, currentStatus: boolean) => {
-    if (togglingIds.has(taskId)) return; // Guard against rapid duplicate clicks
-
-    setTogglingIds((prev) => new Set(prev).add(taskId));
-    const nextStatus = !currentStatus;
-
-    // 1. Instant optimistic update
-    setLocalTasks((prev) =>
-      prev.map((t) => (t.id === taskId ? { ...t, is_completed: nextStatus } : t))
-    );
-
-    // 2. Server mutation in background
-    const res = await toggleAcademicTaskAction(taskId, nextStatus);
-
-    if (!res.success) {
-      // 3. Rollback on failure
-      setLocalTasks((prev) =>
-        prev.map((t) => (t.id === taskId ? { ...t, is_completed: currentStatus } : t))
-      );
-    } else {
-      // Background revalidation
-      onRefresh();
+  // High-performance non-blocking optimistic task toggle (< 1ms) with sequence guard
+  const handleToggleTask = async (taskId: string, e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
     }
 
-    setTogglingIds((prev) => {
-      const next = new Set(prev);
-      next.delete(taskId);
-      return next;
-    });
+    const currentTask = localTasks.find((t) => t.id === taskId);
+    if (!currentTask) return;
+
+    const nextStatus = !currentTask.is_completed;
+    const nextSeq = (taskToggleSeq.current[taskId] || 0) + 1;
+    taskToggleSeq.current[taskId] = nextSeq;
+
+    // Track as session-toggled so the task stays stable in view and doesn't jump
+    setSessionToggledIds((prev) => new Set(prev).add(taskId));
+
+    // Instant optimistic update (< 1ms)
+    const updated = localTasks.map((t) =>
+      t.id === taskId
+        ? {
+            ...t,
+            is_completed: nextStatus,
+            completed_at: nextStatus ? new Date().toISOString() : null,
+          }
+        : t
+    );
+    setLocalTasks(updated);
+    onTasksChange?.(updated);
+
+    try {
+      const res = await toggleAcademicTaskAction(taskId, nextStatus);
+
+      // If a newer click occurred while this request was in flight, discard this response
+      if (taskToggleSeq.current[taskId] !== nextSeq) {
+        return;
+      }
+
+      taskToggleSeq.current[taskId] = 0;
+
+      if (!res.success) {
+        // Rollback only if the authoritative latest request failed
+        setLocalTasks((prev) => {
+          const rolledBack = prev.map((t) =>
+            t.id === taskId ? { ...t, is_completed: currentTask.is_completed } : t
+          );
+          onTasksChange?.(rolledBack);
+          return rolledBack;
+        });
+      }
+    } catch {
+      if (taskToggleSeq.current[taskId] === nextSeq) {
+        taskToggleSeq.current[taskId] = 0;
+        setLocalTasks((prev) => {
+          const rolledBack = prev.map((t) =>
+            t.id === taskId ? { ...t, is_completed: currentTask.is_completed } : t
+          );
+          onTasksChange?.(rolledBack);
+          return rolledBack;
+        });
+      }
+    }
   };
 
   // Duplicate task
@@ -212,21 +277,54 @@ export function AcademicTodoList({
 
       // 4. Tab Filter
       if (activeTab === "today") {
-        return task.due_date === todayStr && !task.is_completed;
+        return task.due_date === todayStr;
       }
       if (activeTab === "upcoming") {
-        return task.due_date > todayStr && !task.is_completed;
+        return task.due_date > todayStr;
       }
       if (activeTab === "overdue") {
-        return task.due_date < todayStr && !task.is_completed;
+        return task.due_date < todayStr && (!task.is_completed || sessionToggledIds.has(task.id));
       }
       if (activeTab === "completed") {
-        return task.is_completed;
+        return task.is_completed || sessionToggledIds.has(task.id);
       }
 
       return true;
+    }).sort((a, b) => {
+      // Completed tab: sort by completed_at desc
+      if (activeTab === "completed") {
+        return (b.completed_at || "").localeCompare(a.completed_at || "") || (b.due_date || "").localeCompare(a.due_date || "");
+      }
+
+      // In interactive views, already-settled completed tasks sort below active tasks.
+      // Session-toggled tasks preserve their position in-place so they never jump underneath the cursor!
+      const isSettledCompletedA = a.is_completed && !sessionToggledIds.has(a.id);
+      const isSettledCompletedB = b.is_completed && !sessionToggledIds.has(b.id);
+      if (isSettledCompletedA !== isSettledCompletedB) {
+        return isSettledCompletedA ? 1 : -1;
+      }
+
+      // Deterministic priority weight (urgent > high > medium > low)
+      const prioWeight: Record<string, number> = { urgent: 4, high: 3, medium: 2, low: 1 };
+      const weightA = prioWeight[a.priority] || 2;
+      const weightB = prioWeight[b.priority] || 2;
+      if (weightA !== weightB) {
+        return weightB - weightA;
+      }
+
+      // Due time (earlier time first)
+      if (a.due_time && b.due_time && a.due_time !== b.due_time) {
+        return a.due_time.localeCompare(b.due_time);
+      }
+
+      // Due date
+      if (a.due_date && b.due_date && a.due_date !== b.due_date) {
+        return a.due_date.localeCompare(b.due_date);
+      }
+
+      return (b.created_at || b.id).localeCompare(a.created_at || a.id);
     });
-  }, [localTasks, searchQuery, selectedSubjectId, selectedPriority, activeTab, todayStr]);
+  }, [localTasks, searchQuery, selectedSubjectId, selectedPriority, activeTab, todayStr, sessionToggledIds]);
 
   // Toggle subtask completion
   const handleToggleSubtask = async (task: AcademicTask, subtaskId: string) => {
@@ -314,8 +412,8 @@ export function AcademicTodoList({
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
           <button
             type="button"
-            onClick={() => setActiveTab("all")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+            onClick={() => handleTabChange("all")}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
               activeTab === "all"
                 ? "bg-[#2855D9] text-white shadow-xs"
                 : "text-[#68748A] hover:bg-[#EDF2FF] hover:text-[#111A2E]"
@@ -325,8 +423,8 @@ export function AcademicTodoList({
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab("today")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1 ${
+            onClick={() => handleTabChange("today")}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1 cursor-pointer ${
               activeTab === "today"
                 ? "bg-[#2855D9] text-white shadow-xs"
                 : "text-[#68748A] hover:bg-[#EDF2FF] hover:text-[#111A2E]"
@@ -345,8 +443,8 @@ export function AcademicTodoList({
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab("upcoming")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+            onClick={() => handleTabChange("upcoming")}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
               activeTab === "upcoming"
                 ? "bg-[#2855D9] text-white shadow-xs"
                 : "text-[#68748A] hover:bg-[#EDF2FF] hover:text-[#111A2E]"
@@ -356,8 +454,8 @@ export function AcademicTodoList({
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab("overdue")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1 ${
+            onClick={() => handleTabChange("overdue")}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1 cursor-pointer ${
               activeTab === "overdue"
                 ? "bg-[#DC2626] text-white shadow-xs"
                 : "text-[#DC2626] hover:bg-[#DC2626]/10"
@@ -376,8 +474,8 @@ export function AcademicTodoList({
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab("completed")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+            onClick={() => handleTabChange("completed")}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
               activeTab === "completed"
                 ? "bg-[#059669] text-white shadow-xs"
                 : "text-[#68748A] hover:bg-[#EDF2FF] hover:text-[#111A2E]"
@@ -466,34 +564,54 @@ export function AcademicTodoList({
             const completedSubtasks = task.subtasks.filter((st) => st.done).length;
             const totalSubtasks = task.subtasks.length;
             const matchingSubject = subjects.find((s) => s.id === task.subject_id) || task.subject;
+            const theme = resolvePlannerTheme(null, matchingSubject, task.category);
             const prio = getPriorityDot(task.priority);
             const isMenuOpen = activeMenuTaskId === task.id;
 
             return (
               <div
                 key={task.id}
-                className={`group bg-white border rounded-xl p-3 transition-all shadow-2xs hover:border-[#2855D9]/40 ${
+                className={cn(
+                  "group relative overflow-hidden rounded-xl p-3 transition-all duration-300 ease-out border",
                   task.is_completed
-                    ? "opacity-65 border-[#E4E8F0] bg-[#FAFAF7]"
+                    ? "opacity-75 border-[#E4E8F0] bg-[#FAFAF7]/95 backdrop-blur-xs shadow-none"
                     : isOverdue
-                    ? "border-[#DC2626]/30 bg-[#FFF5F5]/30"
-                    : "border-[#E4E8F0]"
-                }`}
+                    ? "border-rose-300/60 bg-gradient-to-r from-rose-50/60 via-white/95 to-rose-50/20 backdrop-blur-md shadow-2xs hover:shadow-md"
+                    : cn(
+                        "bg-white/95 backdrop-blur-md hover:bg-white hover:shadow-[0_4px_16px_-2px_rgba(0,0,0,0.06)]",
+                        theme.cardBorder
+                      )
+                )}
               >
-                {/* Primary Row: Checkbox, Title, Priority dot, Focus Action, Overflow Menu */}
-                <div className="flex items-center justify-between gap-3">
+                {/* Luminous left accent glow bar */}
+                {!task.is_completed && (
+                  <div
+                    className={cn(
+                      "absolute left-0 top-0 bottom-0 w-1",
+                      isOverdue ? "bg-rose-500 shadow-[0_0_6px_rgba(244,63,94,0.4)]" : theme.accentBar
+                    )}
+                  />
+                )}
+
+                {/* Primary Row: Animated Checkbox, Title, Priority dot, Focus Action, Overflow Menu */}
+                <div className="flex items-center justify-between gap-3 pl-1.5">
                   <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                    {/* Completion checkbox with 0ms optimistic flip */}
+                    {/* Completion checkbox with tactile scale-pop micro-animation */}
                     <button
                       type="button"
-                      onClick={() => handleToggleTask(task.id, task.is_completed)}
-                      className="text-[#68748A] hover:text-[#2855D9] transition-colors shrink-0"
-                      title={task.is_completed ? "Marquer non terminée" : "Marquer terminée"}
+                      onClick={(e) => handleToggleTask(task.id, e)}
+                      className={cn(
+                        "relative flex items-center justify-center w-5 h-5 rounded-full border transition-all duration-200 shrink-0 cursor-pointer active:scale-80 select-none focus:outline-none",
+                        task.is_completed
+                          ? "border-emerald-500 bg-gradient-to-tr from-emerald-600 to-emerald-400 text-white shadow-[0_0_10px_rgba(5,150,105,0.45)] animate-task-halo scale-100"
+                          : "border-[#68748A]/40 hover:border-[#2855D9] hover:bg-[#EDF2FF]/60 hover:scale-110"
+                      )}
+                      title={task.is_completed ? "Cliquer pour réactiver (marquer non terminée)" : "Cliquer pour valider la tâche"}
                     >
                       {task.is_completed ? (
-                        <CheckCircle2 className="w-4 h-4 text-[#059669] fill-[#059669]/10" />
+                        <Check className="w-3.5 h-3.5 stroke-[3] text-white animate-check-pop" />
                       ) : (
-                        <Circle className="w-4 h-4 hover:stroke-[#2855D9]" />
+                        <Circle className="w-3.5 h-3.5 opacity-0 hover:opacity-100 text-[#2855D9] transition-opacity" />
                       )}
                     </button>
 
@@ -505,9 +623,12 @@ export function AcademicTodoList({
 
                     {/* Title */}
                     <span
-                      className={`text-xs font-semibold leading-tight break-words line-clamp-2 ${
-                        task.is_completed ? "line-through text-[#68748A]" : "text-[#111A2E]"
-                      }`}
+                      className={cn(
+                        "text-xs font-semibold leading-tight break-words line-clamp-2 transition-all duration-200",
+                        task.is_completed
+                          ? "line-through decoration-emerald-600/80 decoration-[1.5px] text-[#68748A] opacity-75"
+                          : "text-[#111A2E]"
+                      )}
                     >
                       {task.title}
                     </span>
@@ -607,13 +728,20 @@ export function AcademicTodoList({
 
                   {/* Subject Badge */}
                   {matchingSubject && (
-                    <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.2 rounded bg-[#EDF2FF] text-[#2855D9] font-medium">
+                    <span
+                      className={cn(
+                        "inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-lg font-medium border shadow-2xs",
+                        theme.badgeBg,
+                        theme.badgeText,
+                        theme.badgeBorder
+                      )}
+                    >
                       <SubjectIcon
                         name={matchingSubject.name}
                         slug={matchingSubject.slug}
                         className="w-2.5 h-2.5"
                       />
-                      <span className="max-w-[80px] truncate">{matchingSubject.name}</span>
+                      <span className="max-w-[80px] truncate font-semibold">{matchingSubject.name}</span>
                     </span>
                   )}
 
@@ -816,6 +944,37 @@ export function AcademicTodoList({
                   <span>{scheduleConflictWarning}</span>
                 </div>
               )}
+
+              {/* Color Tag Picker (Glassmorphism Pro Color Themes) */}
+              <div>
+                <label className="block text-[11px] font-semibold text-[#111A2E] mb-1.5 flex items-center justify-between">
+                  <span>Couleur & Thème visuel</span>
+                  <span className="text-[10px] text-[#2855D9] font-medium bg-[#EDF2FF] px-2 py-0.5 rounded-full">
+                    {PLANNER_COLOR_OPTIONS.find((c) => c.key === scheduleColor)?.label || "Cobalt"}
+                  </span>
+                </label>
+                <div className="flex items-center justify-between gap-1.5 bg-[#F4F6FA] p-2 rounded-xl border border-[#E4E8F0]">
+                  {PLANNER_COLOR_OPTIONS.map((opt) => {
+                    const isSelected = scheduleColor === opt.key;
+                    return (
+                      <button
+                        key={opt.key}
+                        type="button"
+                        onClick={() => setScheduleColor(opt.key)}
+                        className={`w-7 h-7 rounded-full transition-all duration-150 flex items-center justify-center relative ${
+                          isSelected
+                            ? "scale-110 ring-2 ring-offset-2 ring-[#2855D9] shadow-sm"
+                            : "opacity-75 hover:opacity-100 hover:scale-105"
+                        }`}
+                        style={{ backgroundColor: opt.dotColor }}
+                        title={`${opt.label}: ${opt.description}`}
+                      >
+                        {isSelected && <Check className="w-3.5 h-3.5 text-white stroke-[3]" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
 
               <div>
                 <label className="block text-[11px] font-medium text-[#68748A] mb-1">

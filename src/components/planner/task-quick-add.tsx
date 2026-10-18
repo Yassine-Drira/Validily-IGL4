@@ -141,7 +141,7 @@ export function TaskQuickAdd({
   };
 
   return (
-    <div className="bg-white border border-[#E4E8F0] rounded-xl p-3 shadow-xs transition-all">
+    <div className="bg-white/90 backdrop-blur-md border border-[#E4E8F0] hover:border-[#2855D9]/40 focus-within:border-[#2855D9]/60 focus-within:shadow-[0_8px_24px_-4px_rgba(40,85,217,0.12)] rounded-2xl p-3.5 shadow-xs transition-all duration-200">
       <form onSubmit={handleQuickSubmit}>
         <div className="flex items-center gap-2">
           <input

@@ -129,19 +129,21 @@ export function AcademicGoalsCard({
 
   const activeDate = currentDate || getLocalTodayDateString();
 
-  // Compute period key
-  const periodKey = useMemo(() => {
-    if (period === "daily") return activeDate;
-    const parts = activeDate.split("-");
+  function computePeriodKey(type: AcademicGoalPeriod, dateStr: string): string {
+    if (type === "daily") return dateStr;
+    const parts = dateStr.split("-");
     const y = parts[0];
     const m = parts[1];
-    if (period === "monthly") return `${y}-${m}`;
-    if (period === "custom") return "custom";
+    if (type === "monthly") return `${y}-${m}`;
+    if (type === "custom") return "custom";
     // weekly
-    const d = new Date(activeDate + "T12:00:00");
+    const d = new Date(dateStr + "T12:00:00");
     const weekNum = Math.ceil(((d.getTime() - new Date(d.getFullYear(), 0, 1).getTime()) / 86400000 + 1) / 7);
     return `${y}-W${weekNum.toString().padStart(2, "0")}`;
-  }, [period, activeDate]);
+  }
+
+  // Compute period key for active tab
+  const periodKey = useMemo(() => computePeriodKey(period, activeDate), [period, activeDate]);
 
   const loadGoals = useCallback(async () => {
     setLoading(true);
@@ -205,16 +207,9 @@ export function AcademicGoalsCard({
     if (!title.trim() && !metricType) return;
 
     setSaving(true);
-    const targetPeriodKey =
-      periodType === "daily"
-        ? activeDate
-        : periodType === "monthly"
-        ? activeDate.slice(0, 7)
-        : periodType === "weekly"
-        ? periodKey
-        : "custom";
+    const targetPeriodKey = computePeriodKey(periodType, activeDate);
 
-    await setAcademicGoalAction({
+    const res = await setAcademicGoalAction({
       id: editingGoalId || undefined,
       title: title.trim(),
       description: description.trim() || undefined,
@@ -229,35 +224,64 @@ export function AcademicGoalsCard({
     });
 
     setSaving(false);
+
+    if (!res.success) {
+      alert(res.error || "Erreur lors de l'enregistrement de l'objectif");
+      return;
+    }
+
     setIsModalOpen(false);
-    loadGoals();
+    if (period !== periodType) {
+      setPeriod(periodType);
+    } else {
+      loadGoals();
+    }
   };
 
-  // Delete Goal
+  // Delete Goal with instant optimistic removal
   const handleDeleteGoal = async (goalId: string) => {
+    setGoals((prev) => prev.filter((g) => g.id !== goalId));
     await deleteAcademicGoalAction(goalId);
-    loadGoals();
   };
 
-  // Quick Manual Progress Increment / Decrement
+  // Quick Manual Progress Increment / Decrement (Instant 0ms UI feedback)
   const handleAdjustManualProgress = async (goal: AcademicGoalWithProgress, delta: number) => {
     const current = goal.current_progress || 0;
-    const nextVal = Math.max(0, current + delta);
-    // Optimistic UI update
+    const nextVal = Math.max(0, Math.min(goal.target_value * 2, current + delta));
+    
+    // Instant optimistic update
     setGoals((prev) =>
       prev.map((g) =>
         g.id === goal.id
           ? {
               ...g,
               current_progress: nextVal,
+              manual_progress: nextVal,
               percentage: Math.min(100, Math.round((nextVal / g.target_value) * 100)),
               is_completed: nextVal >= g.target_value,
             }
           : g
       )
     );
-    await updateAcademicGoalProgressAction(goal.id, nextVal);
-    loadGoals();
+
+    // Background sync without re-triggering heavy loadGoals
+    const res = await updateAcademicGoalProgressAction(goal.id, nextVal);
+    if (!res.success) {
+      // Rollback on failure
+      setGoals((prev) =>
+        prev.map((g) =>
+          g.id === goal.id
+            ? {
+                ...g,
+                current_progress: current,
+                manual_progress: current,
+                percentage: Math.min(100, Math.round((current / g.target_value) * 100)),
+                is_completed: current >= g.target_value,
+              }
+            : g
+        )
+      );
+    }
   };
 
   const periodLabels: Record<AcademicGoalPeriod, string> = {
@@ -342,10 +366,10 @@ export function AcademicGoalsCard({
             return (
               <div
                 key={goal.id}
-                className={`p-3 rounded-xl border transition-all flex flex-col justify-between space-y-2.5 ${
+                className={`p-3.5 rounded-2xl border transition-all flex flex-col justify-between space-y-3 ${
                   goal.is_completed
-                    ? "bg-[#F0FDF4] border-[#059669]/30"
-                    : "bg-white border-[#E4E8F0] shadow-2xs hover:border-[#2855D9]/40"
+                    ? "bg-gradient-to-br from-emerald-50/90 via-white/95 to-emerald-50/30 border-emerald-400/40 shadow-[inset_0_1px_1px_rgba(255,255,255,0.9),0_4px_16px_rgba(5,150,105,0.08)]"
+                    : "bg-gradient-to-br from-white/95 via-white/90 to-blue-50/20 backdrop-blur-md border-[#E4E8F0] shadow-[inset_0_1px_1px_rgba(255,255,255,0.9),0_2px_10px_rgba(0,0,0,0.03)] hover:border-[#2855D9]/40 hover:shadow-md"
                 }`}
               >
                 {/* Header row of card */}
@@ -356,7 +380,7 @@ export function AcademicGoalsCard({
                         {goal.title}
                       </h4>
                       {subject && (
-                        <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-[#EDF2FF] text-[#2855D9] text-[9px] font-medium shrink-0">
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-lg bg-blue-50 border border-blue-200/50 text-[#2855D9] text-[9px] font-semibold shrink-0">
                           <SubjectIcon name={subject.name} slug={subject.slug} className="w-2.5 h-2.5" />
                           <span className="max-w-[70px] truncate">{subject.name}</span>
                         </span>
@@ -373,45 +397,45 @@ export function AcademicGoalsCard({
                     <button
                       type="button"
                       onClick={() => handleOpenEditModal(goal)}
-                      className="p-1 text-[#68748A] hover:text-[#2855D9] hover:bg-[#F4F6FA] rounded transition-colors"
+                      className="p-1.5 text-[#68748A] hover:text-[#2855D9] hover:bg-[#F4F6FA] rounded-lg transition-colors"
                       title="Modifier l'objectif"
                     >
-                      <Edit2 className="w-3 h-3" />
+                      <Edit2 className="w-3.5 h-3.5" />
                     </button>
                     <button
                       type="button"
                       onClick={() => handleDeleteGoal(goal.id)}
-                      className="p-1 text-[#68748A] hover:text-[#DC2626] hover:bg-[#F4F6FA] rounded transition-colors"
+                      className="p-1.5 text-[#68748A] hover:text-[#DC2626] hover:bg-[#F4F6FA] rounded-lg transition-colors"
                       title="Supprimer l'objectif"
                     >
-                      <Trash2 className="w-3 h-3" />
+                      <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>
 
                 {/* Progress bar and values */}
-                <div className="space-y-1">
+                <div className="space-y-1.5">
                   <div className="flex items-center justify-between text-[11px] font-medium font-tabular">
-                    <div className="flex items-center gap-1 text-[#68748A]">
+                    <div className="flex items-center gap-1.5 text-[#68748A]">
                       {goal.is_automated ? (
-                        <span className="inline-flex items-center gap-1 text-[#2855D9] text-[10px] font-semibold" title="Calculé automatiquement depuis vos sessions réelles">
-                          <Sparkles className="w-3 h-3" />
+                        <span className="inline-flex items-center gap-1 text-[#2855D9] bg-blue-50/80 px-1.5 py-0.2 rounded border border-blue-200/40 text-[10px] font-semibold" title="Calculé automatiquement depuis vos sessions réelles">
+                          <Sparkles className="w-3 h-3 text-[#2855D9]" />
                           <span>Vérifié</span>
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 text-[#D97706] text-[10px] font-semibold" title="Progression manuelle">
-                          <Edit2 className="w-3 h-3" />
+                        <span className="inline-flex items-center gap-1 text-[#D97706] bg-amber-50/80 px-1.5 py-0.2 rounded border border-amber-200/40 text-[10px] font-semibold" title="Progression manuelle">
+                          <Edit2 className="w-3 h-3 text-[#D97706]" />
                           <span>Manuel</span>
                         </span>
                       )}
                       <span>•</span>
-                      <span>
+                      <span className="font-semibold text-[#111A2E]">
                         {goal.current_progress} / {goal.target_value} {goal.unit || "unités"}
                       </span>
                     </div>
 
                     <span
-                      className={`text-xs font-bold ${
+                      className={`text-xs font-bold font-tabular ${
                         goal.is_completed ? "text-[#059669]" : "text-[#2855D9]"
                       }`}
                     >
@@ -419,11 +443,13 @@ export function AcademicGoalsCard({
                     </span>
                   </div>
 
-                  {/* Visual Bar */}
-                  <div className="h-1.5 w-full bg-[#E4E8F0] rounded-full overflow-hidden">
+                  {/* Visual Glowing Glass Bar */}
+                  <div className="h-2 w-full bg-[#E4E8F0]/70 rounded-full overflow-hidden p-0.5 shadow-inner">
                     <div
-                      className={`h-full transition-all duration-300 rounded-full ${
-                        goal.is_completed ? "bg-[#059669]" : "bg-[#2855D9]"
+                      className={`h-full transition-all duration-500 rounded-full ${
+                        goal.is_completed
+                          ? "bg-gradient-to-r from-[#059669] to-[#10B981] shadow-[0_0_8px_rgba(5,150,105,0.4)]"
+                          : "bg-gradient-to-r from-[#2855D9] via-[#4F46E5] to-[#7C3AED] shadow-[0_0_8px_rgba(40,85,217,0.35)]"
                       }`}
                       style={{ width: `${goal.percentage}%` }}
                     />
@@ -632,19 +658,20 @@ export function AcademicGoalsCard({
                 </div>
               )}
 
-              {/* Initial progress for manual goals */}
-              {metricType !== "study_minutes" && metricType !== "tasks_completed" && metricType !== "study_sessions" && (
+              {/* Progression actuelle (accessible pour tous les objectifs manuels) */}
+              {metricType !== "study_minutes" && metricType !== "study_sessions" && (
                 <div>
                   <label className="block text-[11px] font-semibold text-[#68748A] mb-1">
-                    Progression actuelle initiale
+                    Progression manuelle actuelle ({manualProgress} / {targetValue} {unit})
                   </label>
                   <input
                     type="number"
                     min="0"
-                    max={targetValue}
+                    max={targetValue * 2}
                     value={manualProgress}
-                    onChange={(e) => setManualProgress(Number(e.target.value))}
+                    onChange={(e) => setManualProgress(Math.max(0, Number(e.target.value) || 0))}
                     className="w-full px-2.5 py-1.5 text-xs bg-[#F4F6FA] border border-[#E4E8F0] rounded-lg outline-none font-tabular text-[#111A2E]"
+                    placeholder="ex: 2"
                   />
                 </div>
               )}

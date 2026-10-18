@@ -65,10 +65,10 @@ export function PresenceAndAnalyticsTracker() {
   const lastPathnameRef = useRef<string | null>(null);
   const lastHeartbeatRef = useRef<number>(0);
   const pathnameRef = useRef(pathname);
-  pathnameRef.current = pathname;
 
   // 1. Record Page Views on route transitions
   useEffect(() => {
+    pathnameRef.current = pathname;
     if (pathname === lastPathnameRef.current) return;
     lastPathnameRef.current = pathname;
 

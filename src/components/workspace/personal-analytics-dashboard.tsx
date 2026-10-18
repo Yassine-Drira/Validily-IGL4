@@ -274,7 +274,7 @@ export function PersonalAnalyticsDashboard({
         color: SUBJECT_COLORS[idx % SUBJECT_COLORS.length],
       }))
       .sort((a, b) => b.count - a.count);
-  }, [userAttempts, revisionProgress?.subjects]);
+  }, [userAttempts, revisionProgress]);
 
   // Subjects completed with 100% progression (strictly per user)
   const completedSubjects = useMemo(() => {
@@ -287,7 +287,7 @@ export function PersonalAnalyticsDashboard({
       }
     });
     return completed;
-  }, [revisionProgress?.subjects]);
+  }, [revisionProgress]);
 
   // Subjects in progress (pending "en cours", strictly < 100% but started)
   const inProgressSubjects = useMemo(() => {
@@ -304,7 +304,7 @@ export function PersonalAnalyticsDashboard({
       }
     });
     return inProgress;
-  }, [revisionProgress?.subjects]);
+  }, [revisionProgress]);
 
   const completedSubjectsCount = useMemo(() => {
     if (completedSubjects.size === 0) return 0;
@@ -320,7 +320,7 @@ export function PersonalAnalyticsDashboard({
     return (
       revisionProgress?.subjects?.filter((s) => s.totalResources > 0 && s.percentage === 100).length || 0
     );
-  }, [completedSubjects, allSubjects, revisionProgress?.subjects]);
+  }, [completedSubjects, allSubjects, revisionProgress]);
 
   const inProgressSubjectsCount = useMemo(() => {
     if (inProgressSubjects.size === 0) return 0;
@@ -341,7 +341,7 @@ export function PersonalAnalyticsDashboard({
           (s.inProgressCount > 0 || (s.revisedCount > 0 && s.percentage < 100))
       ).length || 0
     );
-  }, [inProgressSubjects, allSubjects, revisionProgress?.subjects]);
+  }, [inProgressSubjects, allSubjects, revisionProgress]);
 
   // Distinct subjects practiced out of available (combining Revisions, Quizzes & Focus sessions)
   const practicedSubjects = useMemo(() => {
@@ -368,7 +368,7 @@ export function PersonalAnalyticsDashboard({
       }
     });
     return matched;
-  }, [userAttempts, practicedSubjectIds, revisionProgress?.subjects, allSubjects]);
+  }, [userAttempts, practicedSubjectIds, revisionProgress, allSubjects]);
 
   // Semester syllabus coverage strictly counts subjects with 100% completed progression
   const uniqueSubjectsCount = completedSubjectsCount;
