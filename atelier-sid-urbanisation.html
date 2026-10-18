@@ -1,0 +1,2766 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <!-- Titre formatté obligatoire pour ingestion Validily -->
+  <title>Systèmes d'Information & Urbanisation : Architectures SID, TOGAF & Zachman — Atelier de Révision Validily</title>
+  
+  <!-- Métadonnées lues nativement par extractHtmlMetadata() dans Validily -->
+  <meta name="description" content="Atelier interactif complet : 20 QCM certifiés examen avec explications et pièges, 4 scénarios d'ingénierie avec scratchpad, flashcards Leitner 3D, cheatsheet et anti-patterns d'examen sur les SI, SIP/SIO, Zachman, TOGAF ADM et la modélisation de processus.">
+  <meta name="subject" content="Systèmes d'Information & Urbanisation">
+  <meta name="difficulty" content="intermediate">
+  <meta name="target-duration" content="25">
+  <meta name="total-questions" content="20">
+  <meta name="author" content="Validily-IGL4 • Promotion IGL4">
+  <meta name="platform-target" content="Validily-IGL4-InteractiveRunner-v2">
+
+  <!-- Polices Google Fonts élégantes -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    /* ==========================================================================
+       1. VARIABLES ET DESIGN SYSTEM VALIDILY DARK NAVY ACADEMIC
+       ========================================================================== */
+    :root {
+      --bg: #0b1120;
+      --panel: #111a2e;
+      --card: #182238;
+      --card-hover: #1e2c47;
+      --border: rgba(255, 255, 255, 0.08);
+      --border-accent: rgba(40, 85, 217, 0.35);
+      --accent: #2855D9;
+      --accent-hover: #1e40af;
+      --accent-light: #4776F2;
+      --accent-glow: rgba(40, 85, 217, 0.25);
+      --ok: #10b981;
+      --ok-bg: rgba(16, 185, 129, 0.12);
+      --ok-border: rgba(16, 185, 129, 0.3);
+      --warn: #f59e0b;
+      --warn-bg: rgba(245, 158, 11, 0.12);
+      --warn-border: rgba(245, 158, 11, 0.3);
+      --err: #ef4444;
+      --err-bg: rgba(239, 68, 68, 0.12);
+      --err-border: rgba(239, 68, 68, 0.3);
+      --txt: #f8fafc;
+      --txt-muted: #94a3b8;
+      --txt-dim: #64748b;
+      --radius-sm: 8px;
+      --radius-md: 14px;
+      --radius-lg: 20px;
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--txt);
+      font-family: var(--font-sans);
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      padding-bottom: 60px;
+      overflow-x: hidden;
+    }
+
+    a { color: var(--accent-light); text-decoration: none; }
+    button { font-family: inherit; cursor: pointer; border: none; outline: none; }
+
+    /* Surlignage de recherche */
+    mark.hl {
+      background: rgba(245, 158, 11, 0.35);
+      color: #fef08a;
+      padding: 0 4px;
+      border-radius: 4px;
+      font-weight: 600;
+    }
+
+    /* ==========================================================================
+       2. EN-TÊTE FIXE & BARRE DE CONCENTRATION LIVE
+       ========================================================================== */
+    .top-header {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: rgba(17, 26, 46, 0.92);
+      backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 20px;
+    }
+
+    .top-header-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .brand-block {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: var(--radius-sm);
+      background: linear-gradient(135deg, var(--accent), #1e3a8a);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 16px;
+      color: #fff;
+      box-shadow: 0 0 15px var(--accent-glow);
+    }
+
+    .brand-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .badge-promo {
+      font-size: 10px;
+      font-family: var(--font-mono);
+      background: rgba(40, 85, 217, 0.2);
+      color: var(--accent-light);
+      border: 1px solid var(--border-accent);
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-weight: 600;
+    }
+
+    .controls-block {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    /* Minuteur de Session */
+    .timer-widget {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border);
+      padding: 6px 12px;
+      border-radius: var(--radius-md);
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: var(--txt);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .timer-widget:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: var(--border-accent);
+    }
+
+    .timer-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--ok);
+      box-shadow: 0 0 8px var(--ok);
+      animation: pulseDot 2s infinite;
+    }
+
+    @keyframes pulseDot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
+
+    /* Lecteur Audio Focus */
+    .audio-widget {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border);
+      padding: 6px 12px;
+      border-radius: var(--radius-md);
+      font-size: 12px;
+    }
+
+    .audio-btn {
+      background: transparent;
+      color: var(--txt);
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.1s;
+    }
+
+    .audio-btn:hover { transform: scale(1.1); color: var(--accent-light); }
+
+    .audio-waves {
+      display: flex;
+      align-items: flex-end;
+      gap: 2px;
+      height: 12px;
+    }
+
+    .audio-bar {
+      width: 2px;
+      height: 100%;
+      background: var(--accent-light);
+      border-radius: 2px;
+      animation: waveAnim 1s ease-in-out infinite alternate;
+    }
+
+    .audio-bar:nth-child(2) { animation-delay: 0.2s; }
+    .audio-bar:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes waveAnim {
+      0% { height: 20%; opacity: 0.4; }
+      100% { height: 100%; opacity: 1; }
+    }
+
+    /* Barre de Recherche Ctrl+K */
+    .search-input-wrap {
+      position: relative;
+    }
+
+    .search-input {
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid var(--border);
+      color: var(--txt);
+      font-size: 12px;
+      padding: 6px 12px 6px 28px;
+      border-radius: var(--radius-md);
+      width: 170px;
+      transition: all 0.2s;
+    }
+
+    .search-input:focus {
+      outline: none;
+      width: 220px;
+      border-color: var(--accent);
+      box-shadow: 0 0 10px var(--accent-glow);
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 9px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 11px;
+      color: var(--txt-muted);
+      pointer-events: none;
+    }
+
+    /* Jauge de Readiness Examen */
+    .readiness-pill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 12px;
+      border-radius: var(--radius-md);
+      background: rgba(40, 85, 217, 0.1);
+      border: 1px solid var(--border-accent);
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .readiness-val {
+      font-family: var(--font-mono);
+      color: var(--accent-light);
+    }
+
+    /* ==========================================================================
+       3. NAVIGATION PAR ONGLETS
+       ========================================================================== */
+    .nav-tabs-container {
+      max-width: 1200px;
+      margin: 18px auto 0;
+      padding: 0 20px;
+    }
+
+    .nav-tabs {
+      display: flex;
+      gap: 6px;
+      background: var(--panel);
+      padding: 6px;
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border);
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+
+    .nav-tabs::-webkit-scrollbar { display: none; }
+
+    .tab-btn {
+      flex: 1;
+      min-width: 140px;
+      padding: 10px 14px;
+      border-radius: var(--radius-md);
+      background: transparent;
+      color: var(--txt-muted);
+      font-size: 13px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+
+    .tab-btn:hover {
+      color: var(--txt);
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .tab-btn.active {
+      background: var(--accent);
+      color: #fff;
+      box-shadow: 0 4px 15px var(--accent-glow);
+    }
+
+    .tab-badge {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    /* ==========================================================================
+       4. CONTENEUR PRINCIPAL & ONGLETS
+       ========================================================================== */
+    .main-content {
+      max-width: 1200px;
+      margin: 20px auto 0;
+      padding: 0 20px;
+    }
+
+    .tab-panel {
+      display: none;
+      animation: fadeIn 0.25s ease-out;
+    }
+
+    .tab-panel.active {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ==========================================================================
+       5. ONGLET ① : QCM INTERACTIF (20 QUESTIONS)
+       ========================================================================== */
+    .qcm-dashboard {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      margin-bottom: 24px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .stats-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+    }
+
+    .stat-item {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .stat-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--txt-muted);
+    }
+
+    .stat-value {
+      font-size: 22px;
+      font-weight: 800;
+      font-family: var(--font-mono);
+      color: var(--txt);
+    }
+
+    .stat-value.ok { color: var(--ok); }
+    .stat-value.err { color: var(--err); }
+    .stat-value.accent { color: var(--accent-light); }
+
+    .btn-sync-validily {
+      background: linear-gradient(135deg, var(--accent), #1d4ed8);
+      color: #fff;
+      padding: 10px 18px;
+      border-radius: var(--radius-md);
+      font-size: 13px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 4px 15px var(--accent-glow);
+      transition: all 0.2s;
+    }
+
+    .btn-sync-validily:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(40, 85, 217, 0.4);
+    }
+
+    /* Grille de navigation des 20 questions */
+    .palette-box {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 14px 18px;
+      margin-bottom: 24px;
+    }
+
+    .palette-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      font-size: 12px;
+      color: var(--txt-muted);
+    }
+
+    .palette-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(36px, 1fr));
+      gap: 8px;
+    }
+
+    .palette-btn {
+      height: 36px;
+      border-radius: var(--radius-sm);
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--txt-muted);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--border);
+      transition: all 0.15s;
+      position: relative;
+    }
+
+    .palette-btn:hover {
+      border-color: var(--accent-light);
+      color: var(--txt);
+    }
+
+    .palette-btn.current {
+      border-color: var(--accent);
+      color: #fff;
+      box-shadow: 0 0 10px var(--accent-glow);
+    }
+
+    .palette-btn.correct {
+      background: var(--ok-bg);
+      border-color: var(--ok-border);
+      color: var(--ok);
+    }
+
+    .palette-btn.wrong {
+      background: var(--err-bg);
+      border-color: var(--err-border);
+      color: var(--err);
+    }
+
+    .palette-btn.bookmarked::after {
+      content: '🔖';
+      position: absolute;
+      top: -4px;
+      right: -4px;
+      font-size: 9px;
+    }
+
+    /* Filtres */
+    .filter-bar {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+
+    .filter-btn {
+      padding: 6px 12px;
+      border-radius: var(--radius-sm);
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+      color: var(--txt-muted);
+      font-size: 12px;
+      font-weight: 600;
+      transition: all 0.15s;
+    }
+
+    .filter-btn.active, .filter-btn:hover {
+      background: rgba(40, 85, 217, 0.15);
+      border-color: var(--accent);
+      color: var(--txt);
+    }
+
+    /* Carte de Question */
+    .question-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      margin-bottom: 20px;
+      transition: all 0.2s;
+    }
+
+    .question-card:hover {
+      border-color: rgba(255, 255, 255, 0.15);
+    }
+
+    .q-top-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+
+    .q-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .q-num-badge {
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: 11px;
+      background: rgba(255, 255, 255, 0.08);
+      padding: 3px 8px;
+      border-radius: var(--radius-sm);
+    }
+
+    .q-chapter-tag {
+      font-size: 11px;
+      color: var(--txt-muted);
+    }
+
+    .q-diff-badge {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      padding: 2px 7px;
+      border-radius: 999px;
+    }
+
+    .q-diff-badge.facile { background: rgba(16, 185, 129, 0.15); color: var(--ok); }
+    .q-diff-badge.moyen { background: rgba(245, 158, 11, 0.15); color: var(--warn); }
+    .q-diff-badge.difficile { background: rgba(239, 68, 68, 0.15); color: var(--err); }
+
+    .btn-bookmark {
+      background: transparent;
+      color: var(--txt-dim);
+      font-size: 16px;
+      padding: 4px;
+      transition: transform 0.15s;
+    }
+
+    .btn-bookmark.active { color: var(--warn); transform: scale(1.15); }
+
+    .q-text {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--txt);
+      margin-bottom: 18px;
+      line-height: 1.5;
+    }
+
+    /* Options A, B, C, D */
+    .options-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+
+    .option-btn {
+      width: 100%;
+      text-align: left;
+      padding: 12px 16px;
+      border-radius: var(--radius-md);
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border);
+      color: var(--txt);
+      font-size: 13px;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      transition: all 0.15s;
+      cursor: pointer;
+    }
+
+    .option-btn:hover:not(:disabled) {
+      background: var(--card-hover);
+      border-color: var(--border-accent);
+      transform: translateX(3px);
+    }
+
+    .opt-letter {
+      font-family: var(--font-mono);
+      font-weight: 700;
+      color: var(--accent-light);
+      background: rgba(40, 85, 217, 0.15);
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-size: 11px;
+    }
+
+    .option-btn.correct {
+      background: var(--ok-bg) !important;
+      border-color: var(--ok) !important;
+      color: #fff;
+    }
+
+    .option-btn.correct .opt-letter {
+      background: var(--ok);
+      color: #fff;
+    }
+
+    .option-btn.wrong {
+      background: var(--err-bg) !important;
+      border-color: var(--err) !important;
+      color: #fff;
+    }
+
+    .option-btn.wrong .opt-letter {
+      background: var(--err);
+      color: #fff;
+    }
+
+    /* Boîtes Pédagogiques */
+    .feedback-box {
+      margin-top: 14px;
+      border-radius: var(--radius-md);
+      padding: 14px 16px;
+      font-size: 13px;
+      line-height: 1.5;
+      display: none;
+      animation: fadeIn 0.2s ease-out;
+    }
+
+    .feedback-box.show { display: block; }
+
+    .feedback-why {
+      background: rgba(40, 85, 217, 0.1);
+      border: 1px solid var(--border-accent);
+      color: #dbeafe;
+      margin-bottom: 10px;
+    }
+
+    .feedback-why strong { color: var(--accent-light); }
+
+    .feedback-trap {
+      background: var(--warn-bg);
+      border: 1px solid var(--warn-border);
+      color: #fef3c7;
+    }
+
+    .feedback-trap strong { color: var(--warn); }
+
+    /* ==========================================================================
+       6. ONGLET ② : EXERCICES PRATIQUES & SCRATCHPAD
+       ========================================================================== */
+    .exercise-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+
+    .ex-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 16px;
+    }
+
+    .ex-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .ex-tag {
+      font-size: 10px;
+      font-family: var(--font-mono);
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--ok);
+      padding: 3px 8px;
+      border-radius: 999px;
+    }
+
+    .ex-desc {
+      font-size: 13px;
+      color: var(--txt-muted);
+      margin-bottom: 16px;
+      line-height: 1.6;
+    }
+
+    .scratchpad-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--txt-dim);
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .scratchpad-textarea {
+      width: 100%;
+      height: 120px;
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      color: #f8fafc;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      padding: 12px;
+      resize: vertical;
+      margin-bottom: 14px;
+      transition: border-color 0.2s;
+    }
+
+    .scratchpad-textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 10px var(--accent-glow);
+    }
+
+    .ex-accordion-btn {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border);
+      color: var(--txt-muted);
+      padding: 8px 14px;
+      border-radius: var(--radius-md);
+      font-size: 12px;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-right: 8px;
+      margin-bottom: 10px;
+      transition: all 0.2s;
+    }
+
+    .ex-accordion-btn:hover {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--txt);
+    }
+
+    .ex-accordion-body {
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 16px;
+      font-size: 13px;
+      line-height: 1.6;
+      margin-top: 10px;
+      display: none;
+    }
+
+    .ex-accordion-body.open { display: block; animation: fadeIn 0.2s ease-out; }
+
+    .ex-mastered-toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--txt-muted);
+      cursor: pointer;
+      margin-top: 12px;
+    }
+
+    .ex-mastered-toggle input { cursor: pointer; accent-color: var(--ok); }
+
+    /* ==========================================================================
+       7. ONGLET ③ : FLASHCARDS LEITNER 3D
+       ========================================================================== */
+    .flashcards-container {
+      max-width: 680px;
+      margin: 0 auto;
+      perspective: 1200px;
+    }
+
+    .flashcard-wrapper {
+      position: relative;
+      width: 100%;
+      height: 340px;
+      cursor: pointer;
+      margin-bottom: 20px;
+    }
+
+    .flashcard-inner {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      transform-style: preserve-3d;
+      transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+      border-radius: var(--radius-lg);
+    }
+
+    .flashcard-inner.flipped {
+      transform: rotateY(180deg);
+    }
+
+    .flashcard-face {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      backface-visibility: hidden;
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border);
+      padding: 32px 28px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+    }
+
+    .flashcard-front {
+      background: linear-gradient(145deg, #182238, #111a2e);
+    }
+
+    .flashcard-back {
+      background: linear-gradient(145deg, #111a2e, #0e1526);
+      transform: rotateY(180deg);
+      border-color: var(--border-accent);
+    }
+
+    .fc-badge-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      font-family: var(--font-mono);
+      color: var(--txt-dim);
+    }
+
+    .fc-center-content {
+      text-align: center;
+      margin: auto 0;
+    }
+
+    .fc-question {
+      font-size: 19px;
+      font-weight: 700;
+      color: #fff;
+      line-height: 1.4;
+    }
+
+    .fc-answer {
+      font-size: 15px;
+      color: #e2e8f0;
+      line-height: 1.6;
+      text-align: left;
+    }
+
+    .fc-hint {
+      font-size: 11px;
+      color: var(--txt-dim);
+      text-align: center;
+    }
+
+    .fc-controls {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .btn-fc-rate {
+      flex: 1;
+      padding: 10px 14px;
+      border-radius: var(--radius-md);
+      font-size: 13px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.15s;
+    }
+
+    .btn-fc-rate.box1 {
+      background: var(--err-bg);
+      border: 1px solid var(--err-border);
+      color: var(--err);
+    }
+
+    .btn-fc-rate.box2 {
+      background: var(--warn-bg);
+      border: 1px solid var(--warn-border);
+      color: var(--warn);
+    }
+
+    .btn-fc-rate.box3 {
+      background: var(--ok-bg);
+      border: 1px solid var(--ok-border);
+      color: var(--ok);
+    }
+
+    .btn-fc-rate:hover {
+      transform: translateY(-2px);
+      filter: brightness(1.2);
+    }
+
+    /* ==========================================================================
+       8. ONGLET ④ : CHEAT SHEET & MÉMOS VISUELS
+       ========================================================================== */
+    .cheat-section {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+
+    .cheat-title {
+      font-size: 16px;
+      font-weight: 800;
+      color: #fff;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .cheat-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      margin-bottom: 16px;
+    }
+
+    .cheat-table th, .cheat-table td {
+      border: 1px solid var(--border);
+      padding: 10px 14px;
+      text-align: left;
+    }
+
+    .cheat-table th {
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--txt-muted);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      text-transform: uppercase;
+    }
+
+    .cheat-table tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .code-snippet-box {
+      background: #060a12;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 14px 16px;
+      position: relative;
+      margin-bottom: 12px;
+    }
+
+    .code-snippet-box pre {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: #38bdf8;
+      overflow-x: auto;
+    }
+
+    .btn-copy-code {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid var(--border);
+      color: var(--txt-muted);
+      font-size: 11px;
+      padding: 4px 8px;
+      border-radius: 6px;
+      transition: all 0.2s;
+    }
+
+    .btn-copy-code:hover {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    /* ==========================================================================
+       9. ONGLET ⑤ : PIÈGES D'EXAMEN & ANTI-PATTERNS
+       ========================================================================== */
+    .trap-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      margin-bottom: 20px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .trap-card::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 4px;
+      background: var(--warn);
+    }
+
+    .trap-card.severe::before { background: var(--err); }
+
+    .trap-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+
+    .trap-badge {
+      font-size: 11px;
+      font-family: var(--font-mono);
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: var(--warn-bg);
+      color: var(--warn);
+      border: 1px solid var(--warn-border);
+    }
+
+    .trap-badge.severe {
+      background: var(--err-bg);
+      color: var(--err);
+      border-color: var(--err-border);
+    }
+
+    .trap-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 14px;
+    }
+
+    @media (max-width: 768px) {
+      .trap-grid { grid-template-columns: 1fr; }
+    }
+
+    .trap-box-wrong {
+      background: var(--err-bg);
+      border: 1px solid var(--err-border);
+      border-radius: var(--radius-md);
+      padding: 14px;
+      font-size: 13px;
+    }
+
+    .trap-box-right {
+      background: var(--ok-bg);
+      border: 1px solid var(--ok-border);
+      border-radius: var(--radius-md);
+      padding: 14px;
+      font-size: 13px;
+    }
+
+    .trap-rule {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 12px 14px;
+      font-size: 13px;
+      color: #fde68a;
+    }
+
+    /* ==========================================================================
+       10. TOAST & PIED DE PAGE
+       ========================================================================== */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: var(--panel);
+      color: #fff;
+      border: 1px solid var(--border-accent);
+      padding: 12px 20px;
+      border-radius: var(--radius-md);
+      font-size: 13px;
+      font-weight: 600;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      z-index: 100;
+      opacity: 0;
+      transform: translateY(20px);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      pointer-events: none;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+
+    .footer-signature {
+      text-align: center;
+      padding: 40px 20px 20px;
+      font-size: 12px;
+      color: var(--txt-dim);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ==========================================================================
+       BARRE SUPÉRIEURE FIXE & OUTILS DE CONCENTRATION
+       ========================================================================== -->
+  <header class="top-header">
+    <div class="top-header-inner">
+      <div class="brand-block">
+        <div class="brand-icon">SI</div>
+        <div>
+          <div class="brand-title">
+            <span>SID & Urbanisation</span>
+            <span class="badge-promo">Promotion IGL4</span>
+          </div>
+          <div style="font-size: 11px; color: var(--txt-muted);">Atelier Certifié Validily • Architectures SI, TOGAF & Zachman</div>
+        </div>
+      </div>
+
+      <div class="controls-block">
+        <!-- Minuteur de Focus -->
+        <div class="timer-widget" id="timerWidget" title="Cliquer pour Mettre en Pause / Reprendre">
+          <div class="timer-dot" id="timerDot"></div>
+          <span id="sessionTimerText">00:00</span>
+        </div>
+
+        <!-- Lecteur Audio Focus Web Audio API (100% hors-ligne) -->
+        <div class="audio-widget">
+          <button class="audio-btn" id="audioToggleBtn" title="Activer / Désactiver le flux audio de concentration">🎵</button>
+          <div class="audio-waves" id="audioWaves" style="display: none;">
+            <div class="audio-bar"></div>
+            <div class="audio-bar"></div>
+            <div class="audio-bar"></div>
+          </div>
+          <span style="font-size: 11px; color: var(--txt-muted);" id="audioStatusText">Zen Focus</span>
+        </div>
+
+        <!-- Recherche Temps Réel -->
+        <div class="search-input-wrap">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="globalSearchInput" class="search-input" placeholder="Rechercher (Ctrl+K)...">
+        </div>
+
+        <!-- Jauge de Préparation Examen -->
+        <div class="readiness-pill">
+          <span>Readiness :</span>
+          <span class="readiness-val" id="readinessScoreVal">0%</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ==========================================================================
+       NAVIGATION PAR ONGLETS
+       ========================================================================== -->
+  <div class="nav-tabs-container">
+    <nav class="nav-tabs">
+      <button class="tab-btn active" data-tab="tab-qcm">
+        <span>① 20 QCM Certifiés</span>
+        <span class="tab-badge" id="qcmBadgeCounter">0/20</span>
+      </button>
+      <button class="tab-btn" data-tab="tab-exercises">
+        <span>② Exercices Pratiques</span>
+        <span class="tab-badge" id="exBadgeCounter">0/4</span>
+      </button>
+      <button class="tab-btn" data-tab="tab-flashcards">
+        <span>③ Flashcards Leitner 3D</span>
+        <span class="tab-badge" id="fcBadgeCounter">12 Cartes</span>
+      </button>
+      <button class="tab-btn" data-tab="tab-cheatsheet">
+        <span>④ Cheat Sheet & Mémos</span>
+      </button>
+      <button class="tab-btn" data-tab="tab-traps">
+        <span>⑤ Pièges d'Examen</span>
+        <span class="tab-badge" style="background: rgba(239, 68, 68, 0.2); color: #f87171;">5 Anti-patterns</span>
+      </button>
+    </nav>
+  </div>
+
+  <!-- ==========================================================================
+       CORPS PRINCIPAL
+       ========================================================================== -->
+  <main class="main-content">
+
+    <!-- ========================================================================
+         ONGLET ① : 20 QCM CERTIFIÉS EXAMEN
+         ======================================================================== -->
+    <section class="tab-panel active" id="tab-qcm">
+      <div class="qcm-dashboard">
+        <div class="stats-grid">
+          <div class="stat-item">
+            <span class="stat-label">Répondues</span>
+            <span class="stat-value" id="statAnswered">0 / 20</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Réussite</span>
+            <span class="stat-value ok" id="statCorrect">0</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Erreurs</span>
+            <span class="stat-value err" id="statWrong">0</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Score</span>
+            <span class="stat-value accent" id="statPercent">0%</span>
+          </div>
+        </div>
+
+        <button class="btn-sync-validily" id="btnSyncValidily">
+          <span>⚡ Transmettre mon score à Validily</span>
+        </button>
+      </div>
+
+      <!-- Grille Numérotée de 1 à 20 -->
+      <div class="palette-box">
+        <div class="palette-header">
+          <span>Palette des 20 questions d'examen</span>
+          <span>Codes : 🟢 Juste | 🔴 Erreur | 🔖 Signet</span>
+        </div>
+        <div class="palette-grid" id="paletteGrid">
+          <!-- Injecté dynamiquement par JavaScript -->
+        </div>
+      </div>
+
+      <!-- Barre de Filtres -->
+      <div class="filter-bar">
+        <button class="filter-btn active" data-filter="all">Toutes les questions (20)</button>
+        <button class="filter-btn" data-filter="wrong">Mes Erreurs uniquement</button>
+        <button class="filter-btn" data-filter="bookmarks">Mes Signets 🔖</button>
+        <button class="filter-btn" data-filter="unanswered">Non répondues</button>
+      </div>
+
+      <!-- Liste des 20 Questions -->
+      <div id="questionsContainer">
+        <!-- Injecté dynamiquement par JavaScript -->
+      </div>
+    </section>
+
+    <!-- ========================================================================
+         ONGLET ② : 4 EXERCICES PRATIQUES & SCRATCHPAD
+         ======================================================================== -->
+    <section class="tab-panel" id="tab-exercises">
+      <!-- Exercice 1 -->
+      <div class="exercise-card" data-ex="0">
+        <div class="ex-header">
+          <div>
+            <div class="ex-title">
+              <span>Exercice 1 : Audit & Classification des SI d'une Entreprise de Meubles</span>
+              <span class="ex-tag">TD Chap. 1</span>
+            </div>
+            <div style="font-size: 11px; color: var(--txt-dim); margin-top: 4px;">Objectif : Distinguer le Système Opérant (SIO) du Système de Pilotage (SIP/SID)</div>
+          </div>
+        </div>
+        <div class="ex-desc">
+          Une entreprise industrielle fabrique du mobilier. Classez chacun des 4 systèmes suivants en <strong>SIO</strong> ou <strong>SIP</strong> en formulant la justification selon la <em>nature des acteurs</em> et la <em>temporalité des décisions</em> :
+          <br><br>
+          1. <em>Système de supervision en temps réel des chaînes de production de découpe bois.</em><br>
+          2. <em>Tableau de bord de suivi mensuel des marges commerciales par région.</em><br>
+          3. <em>Système automatisé d'alerte de réapprovisionnement des stocks de quincaillerie.</em><br>
+          4. <em>Rapport financier trimestriel consolidé pour le comité de direction.</em>
+        </div>
+
+        <div class="scratchpad-label">
+          <span>Votre analyse et justification (Sauvegarde automatique) :</span>
+          <span style="font-size: 10px; color: var(--ok);">💾 Auto-saved</span>
+        </div>
+        <textarea class="scratchpad-textarea" id="scratchpad_ex0" placeholder="Tapez vos classifications et justifications ici..."></textarea>
+
+        <div>
+          <button class="ex-accordion-btn" onclick="toggleAccordion('hint_ex0')">💡 Indice de réflexion</button>
+          <button class="ex-accordion-btn" onclick="toggleAccordion('sol_ex0')">📖 Solution certifiée</button>
+        </div>
+
+        <div class="ex-accordion-body" id="hint_ex0">
+          Demandez-vous : <em>Qui utilise ce système au quotidien ?</em> S'il s'agit d'opérateurs/techniciens exécutant une tâche opérationnelle avec des données temps réel, c'est un SIO. Si ce sont des directeurs/managers analysant des agrégats pour décider de la stratégie, c'est un SIP.
+        </div>
+
+        <div class="ex-accordion-body" id="sol_ex0">
+          <strong>1. Système de production : SIO.</strong> Acteurs opérateurs/techniciens, exécution quotidienne, données temps réel.<br>
+          <strong>2. Tableau de bord des ventes : SIP.</strong> Acteurs direction/managers, pilotage tactique et stratégique, consolidation des indicateurs.<br>
+          <strong>3. Suivi des stocks : SIO.</strong> Gestion opérationnelle des ressources nécessaires à la production, seuils de rupture immédiats.<br>
+          <strong>4. Rapport financier trimestriel : SIP.</strong> Analyse rétrospective et prospective, arbitrage stratégique d'investissement.
+        </div>
+
+        <label class="ex-mastered-toggle">
+          <input type="checkbox" id="check_ex0" onchange="toggleExerciseMastered(0)">
+          <span>J'ai maîtrisé cet exercice (ajoute des points à la jauge de Readiness)</span>
+        </label>
+      </div>
+
+      <!-- Exercice 2 -->
+      <div class="exercise-card" data-ex="1">
+        <div class="ex-header">
+          <div>
+            <div class="ex-title">
+              <span>Exercice 2 : Matrice Zachman pour HealthTech Solutions (DME)</span>
+              <span class="ex-tag">TD Chap. 2</span>
+            </div>
+            <div style="font-size: 11px; color: var(--txt-dim); margin-top: 4px;">Objectif : Décliner les perspectives (6) et dimensions (6) pour un Dossier Médical Électronique</div>
+          </div>
+        </div>
+        <div class="ex-desc">
+          HealthTech Solutions modernise son progiciel de Dossier Médical Électronique (DME) pour hôpitaux. Définissez le contenu de la colonne <strong>Quoi (Data)</strong> et de la colonne <strong>Qui (People)</strong> pour les 3 premières perspectives de Zachman : <em>Planificateur (Scope)</em>, <em>Propriétaire (Business)</em> et <em>Concepteur (System/Logiciel)</em>.
+        </div>
+
+        <div class="scratchpad-label">
+          <span>Votre tableau ou ébauche textuelle :</span>
+          <span style="font-size: 10px; color: var(--ok);">💾 Auto-saved</span>
+        </div>
+        <textarea class="scratchpad-textarea" id="scratchpad_ex1" placeholder="Rédigez la décomposition Quoi/Qui pour Scope, Business et System..."></textarea>
+
+        <div>
+          <button class="ex-accordion-btn" onclick="toggleAccordion('hint_ex1')">💡 Indice de réflexion</button>
+          <button class="ex-accordion-btn" onclick="toggleAccordion('sol_ex1')">📖 Solution certifiée</button>
+        </div>
+
+        <div class="ex-accordion-body" id="hint_ex1">
+          La vue <em>Scope</em> liste les entités majeures du domaine. La vue <em>Business</em> formalise les modèles conceptuels de données et les rôles métier des soignants. La vue <em>System</em> définit les diagrammes de classes/entités logiques et les profils d'accès applicatifs (RBAC).
+        </div>
+
+        <div class="ex-accordion-body" id="sol_ex1">
+          <strong>1. Planificateur (Scope) :</strong>
+          - <em>Quoi (Data) :</em> Liste brute des concepts (Patients, Dossiers médicaux, Praticiens, Hôpitaux).
+          - <em>Qui (People) :</em> Établissements de santé, autorités de tutelle, patients.<br>
+          <strong>2. Propriétaire (Business) :</strong>
+          - <em>Quoi :</em> Modèle Conceptuel de Données (MCD) : relations entre consultation, prescription et antécédents.
+          - <em>Qui :</em> Médecin traitant, chef de service, infirmier, agent d'admission.<br>
+          <strong>3. Concepteur (System/Logical) :</strong>
+          - <em>Quoi :</em> Modèle Logique de Données (MLD), format d'interopérabilité HL7/FHIR, schéma relationnel/NoSQL.
+          - <em>Qui :</em> Matrice RBAC (rôles applicatifs, sessions chiffrées, audit trail).
+        </div>
+
+        <label class="ex-mastered-toggle">
+          <input type="checkbox" id="check_ex1" onchange="toggleExerciseMastered(1)">
+          <span>J'ai maîtrisé cet exercice</span>
+        </label>
+      </div>
+
+      <!-- Exercice 3 -->
+      <div class="exercise-card" data-ex="2">
+        <div class="ex-header">
+          <div>
+            <div class="ex-title">
+              <span>Exercice 3 : Modélisation Algorithmique d'un Processus de Commande E-commerce</span>
+              <span class="ex-tag">TD Chap. 3</span>
+            </div>
+            <div style="font-size: 11px; color: var(--txt-dim); margin-top: 4px;">Objectif : Structuration rigoureuse en Phases, Déclencheurs, Actions élémentaires et Gestion des Anomalies</div>
+          </div>
+        </div>
+        <div class="ex-desc">
+          En respectant scrupuleusement la règle vue en cours : <em>Phase 1 = Déclencheur + Action</em> ; <em>Phase i = Action + Résultat</em> ; <em>La décision est portée par le bloc action</em>. Décrivez les 3 premières phases de la commande en ligne avec la prise en compte de l'anomalie de paiement rejeté.
+        </div>
+
+        <div class="scratchpad-label">
+          <span>Votre description formelle des phases :</span>
+          <span style="font-size: 10px; color: var(--ok);">💾 Auto-saved</span>
+        </div>
+        <textarea class="scratchpad-textarea" id="scratchpad_ex2" placeholder="Phase 1: Déclencheur: ... | Action: ...&#10;Phase 2: Action: ... | Résultat: ..."></textarea>
+
+        <div>
+          <button class="ex-accordion-btn" onclick="toggleAccordion('hint_ex2')">💡 Indice de réflexion</button>
+          <button class="ex-accordion-btn" onclick="toggleAccordion('sol_ex2')">📖 Solution certifiée</button>
+        </div>
+
+        <div class="ex-accordion-body" id="hint_ex2">
+          N'écrivez jamais "Résultat : décision". La décision (ex: tester la validité du solde bancaire) est une opération interne à l'action. Le résultat n'est que l'état factuel produit (ex: "Transaction bancaire confirmée" ou "Échec paiement").
+        </div>
+
+        <div class="ex-accordion-body" id="sol_ex2">
+          <strong>Phase 1 : Prise de commande</strong><br>
+          - <em>Déclencheur :</em> Le client valide son panier d'achat sur la boutique web (SI E-commerce).<br>
+          - <em>Action :</em> Le système enregistre la commande, calcule le montant TTC et transmet l'ordre au module de paiement sécurisé.<br><br>
+          <strong>Phase 2 : Traitement et Validation du Paiement</strong><br>
+          - <em>Action :</em> La passerelle bancaire vérifie la solvabilité et applique le protocole 3D-Secure.<br>
+          - <em>Résultat Nominal :</em> Transaction approuvée → Commande marquée "Payée".<br>
+          - <em>Anomalie (Branche de retour) :</em> Solde insuffisant / Rejet → Notification immédiate du client et invitation à changer de carte (retour à l'étape de saisie).<br><br>
+          <strong>Phase 3 : Réservation & Préparation Logistique</strong><br>
+          - <em>Action :</em> Le WMS (SI Entrepôt) vérifie les stocks physiques et imprime le bon de préparation.<br>
+          - <em>Résultat :</em> Colis assemblé, scellé et prêt sur le quai d'expédition.
+        </div>
+
+        <label class="ex-mastered-toggle">
+          <input type="checkbox" id="check_ex2" onchange="toggleExerciseMastered(2)">
+          <span>J'ai maîtrisé cet exercice</span>
+        </label>
+      </div>
+
+      <!-- Exercice 4 -->
+      <div class="exercise-card" data-ex="3">
+        <div class="ex-header">
+          <div>
+            <div class="ex-title">
+              <span>Exercice 4 : Ishikawa & BMM appliqués au Service Après-Vente (SAV)</span>
+              <span class="ex-tag">TD Chap. 3</span>
+            </div>
+            <div style="font-size: 11px; color: var(--txt-dim); margin-top: 4px;">Objectif : Évaluer les objectifs stratégiques et identifier les causes racines de dysfonctionnement</div>
+          </div>
+        </div>
+        <div class="ex-desc">
+          Une entreprise subit un taux de réclamations de 24% sur ses livraisons.
+          1. Formulez le <strong>BMM</strong> (Objectif, Moyens, Évaluation, Influenceurs).
+          2. Déclinez les 4 causes potentielles selon un diagramme d'<strong>Ishikawa</strong> (Matière, Matériel, Méthode, Main-d'œuvre).
+        </div>
+
+        <div class="scratchpad-label">
+          <span>Votre formulation BMM et branches Ishikawa :</span>
+          <span style="font-size: 10px; color: var(--ok);">💾 Auto-saved</span>
+        </div>
+        <textarea class="scratchpad-textarea" id="scratchpad_ex3" placeholder="BMM: ... &#10;Ishikawa: 4M..."></textarea>
+
+        <div>
+          <button class="ex-accordion-btn" onclick="toggleAccordion('hint_ex3')">💡 Indice de réflexion</button>
+          <button class="ex-accordion-btn" onclick="toggleAccordion('sol_ex3')">📖 Solution certifiée</button>
+        </div>
+
+        <div class="ex-accordion-body" id="hint_ex3">
+          Le BMM est défini une seule fois pour lancer le plan stratégique. Ishikawa sert d'outil d'investigation pour diagnostiquer pourquoi l'objectif n'est pas atteint en remontant aux causes techniques, humaines et procédurales.
+        </div>
+
+        <div class="ex-accordion-body" id="sol_ex3">
+          <strong>1. Modèle BMM :</strong><br>
+          - <em>Objectif :</em> Réduire le taux de réclamation client sous la barre des 5% d'ici fin Q4.<br>
+          - <em>Moyens :</em> Déploiement d'un portail unifié de suivi transporteur et traçabilité par scans code-barres.<br>
+          - <em>Évaluation :</em> Indicateurs hebdomadaires de non-conformité et score CSAT client.<br>
+          - <em>Influenceurs :</em> Exigences accrues des clients en rapidité, fiabilité des transporteurs sous-traitants.<br><br>
+          <strong>2. Diagramme d'Ishikawa (Causes du pic de réclamations) :</strong><br>
+          - <em>Méthode :</em> Absence de contrôle contradictoire au moment du chargement dans les camions.<br>
+          - <em>Matériel :</em> Scanners portables défectueux dans l'entrepôt provoquant des erreurs d'étiquetage.<br>
+          - <em>Main-d'œuvre :</em> Intérimaires non formés aux protocoles de manipulation des colis fragiles.<br>
+          - <em>Matière :</em> Cartons d'emballage de mauvaise qualité se déchirant pendant le transit.
+        </div>
+
+        <label class="ex-mastered-toggle">
+          <input type="checkbox" id="check_ex3" onchange="toggleExerciseMastered(3)">
+          <span>J'ai maîtrisé cet exercice</span>
+        </label>
+      </div>
+    </section>
+
+    <!-- ========================================================================
+         ONGLET ③ : FLASHCARDS LEITNER 3D
+         ======================================================================== -->
+    <section class="tab-panel" id="tab-flashcards">
+      <div class="flashcards-container">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+          <span style="font-size: 13px; color: var(--txt-muted);">Carte <span id="fcCurrentIdx">1</span> sur 12</span>
+          <span style="font-size: 11px; font-family: var(--font-mono); color: var(--accent-light);">Raccourcis : [Espace] Retourner • [← / →] Naviguer</span>
+        </div>
+
+        <div class="flashcard-wrapper" id="flashcardWrapper">
+          <div class="flashcard-inner" id="flashcardInner">
+            <!-- Recto -->
+            <div class="flashcard-face flashcard-front">
+              <div class="fc-badge-row">
+                <span id="fcTopicTag">Urbanisation des SI</span>
+                <span>RECTO</span>
+              </div>
+              <div class="fc-center-content">
+                <div class="fc-question" id="fcFrontText">Chargement de la question...</div>
+              </div>
+              <div class="fc-hint">Cliquez ou appuyez sur [Espace] pour retourner la carte</div>
+            </div>
+
+            <!-- Verso -->
+            <div class="flashcard-face flashcard-back">
+              <div class="fc-badge-row">
+                <span style="color: var(--ok);">RÉPONSE D'EXAMEN</span>
+                <span>VERSO</span>
+              </div>
+              <div class="fc-center-content">
+                <div class="fc-answer" id="fcBackText">Chargement de la réponse...</div>
+              </div>
+              <div class="fc-hint">Évaluez votre degré d'acquisition ci-dessous</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Boutons Leitner -->
+        <div class="fc-controls">
+          <button class="btn-fc-rate box1" onclick="rateFlashcard(1)">❌ À revoir (1)</button>
+          <button class="btn-fc-rate box2" onclick="rateFlashcard(2)">∼ Moyen (2)</button>
+          <button class="btn-fc-rate box3" onclick="rateFlashcard(3)">✅ Maîtrisé (3)</button>
+        </div>
+
+        <div style="display: flex; justify-content: space-between;">
+          <button class="filter-btn" onclick="prevFlashcard()">← Carte précédente</button>
+          <button class="filter-btn" onclick="nextFlashcard()">Carte suivante →</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================================
+         ONGLET ④ : CHEAT SHEET & MÉMOS VISUELS
+         ======================================================================== -->
+    <section class="tab-panel" id="tab-cheatsheet">
+      <!-- Grand Tableau Comparatif -->
+      <div class="cheat-section">
+        <div class="cheat-title">
+          <span>📊 Comparatif Décisionnel : Zachman vs TOGAF vs Découpage en Couches</span>
+        </div>
+        <div style="overflow-x: auto;">
+          <table class="cheat-table">
+            <thead>
+              <tr>
+                <th>Critères</th>
+                <th>Zachman Framework</th>
+                <th>TOGAF (ADM)</th>
+                <th>Découpage en Couches</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Structure</strong></td>
+                <td>Matrice 6 perspectives × 6 dimensions (Quoi, Comment, Où, Qui, Quand, Pourquoi)</td>
+                <td>Cycle itératif ADM en 9 phases autour de la gestion des exigences</td>
+                <td>Piles modulaires (Métier, Fonctionnelle, Applicative, Technique)</td>
+              </tr>
+              <tr>
+                <td><strong>Philosophie</strong></td>
+                <td>Taxonomie / Ontologie descriptive (statique)</td>
+                <td>Méthodologie de développement d'architecture (dynamique)</td>
+                <td>Séparation claire des responsabilités techniques et métier</td>
+              </tr>
+              <tr>
+                <td><strong>Flexibilité</strong></td>
+                <td>Faible (très stricte et rigide)</td>
+                <td>Très élevée (itérative et adaptable)</td>
+                <td>Moyenne à élevée selon la granularité des services</td>
+              </tr>
+              <tr>
+                <td><strong>Systèmes Hérités</strong></td>
+                <td>Lourd pour la modernisation continue</td>
+                <td>Idéal pour migrer et intégrer l'hérité (*legacy*)</td>
+                <td>Facile si l'hérité peut être encapsulé sous forme de service</td>
+              </tr>
+              <tr>
+                <td><strong>Cible Idéale</strong></td>
+                <td>Grands groupes industriels, gouvernements, défense</td>
+                <td>Grandes entreprises en transformation numérique agile</td>
+                <td>PME, projets applicatifs ciblés, architecture logicielle</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Les 9 Phases du Cycle ADM de TOGAF -->
+      <div class="cheat-section">
+        <div class="cheat-title">
+          <span>🔄 Les 9 Phases du Cycle ADM de TOGAF</span>
+        </div>
+        <div class="code-snippet-box">
+          <button class="btn-copy-code" onclick="copySnippet('codeAdmPhases')">📋 Copier</button>
+          <pre id="codeAdmPhases">
+Phase Préliminaire       : Définition du cadre, étude du marché, ressources & gouvernance.
+Phase A : Vision         : Objectifs stratégiques, parties prenantes et validation du périmètre.
+Phase B : Métier         : Processus d'affaires, flux opérationnels, modélisation fonctionnelle.
+Phase C : Systèmes (SI)  : Architecture des Données et Architecture des Applications.
+Phase D : Technique      : Choix de l'infrastructure logicielle, matérielle et réseaux.
+Phase E : Solutions      : Identification des opportunités, projets cibles et arbitrages SIP/SI.
+Phase F : Migration      : Planification détaillée du déploiement opérationnel (SIO).
+Phase G : Gouvernance    : Suivi de conformité des réalisations par rapport à l'architecture.
+Phase H : Changement     : Gestion continue des évolutions et ajustements du cycle ADM.
+Au Centre : Exigences    : Gestion transversale permanente des besoins tout au long du cycle.
+          </pre>
+        </div>
+      </div>
+
+      <!-- Règle de Modélisation des Processus Métier -->
+      <div class="cheat-section">
+        <div class="cheat-title">
+          <span>📐 Grammaire de Modélisation de Processus Métier</span>
+        </div>
+        <div class="code-snippet-box">
+          <button class="btn-copy-code" onclick="copySnippet('codeProcessGrammar')">📋 Copier</button>
+          <pre id="codeProcessGrammar">
+1. DÉFINITION :
+   Processus Métier = 1 Déclencheur + N Phases successives.
+
+2. STRUCTURE DES PHASES :
+   - Phase 1       : [Déclencheur] + [Action(s) élémentaire(s)].
+   - Phase i (i>=2): [Action(s)] + [Résultat factuel].
+   - Règle de liaison: Le Résultat de la Phase i déclenche la Phase i+1.
+
+3. RÈGLE D'OR DE L'ACTION :
+   - Une action doit être ÉLÉMENTAIRE.
+   - La décision (ex: contrôle solvabilité, test disponibilité stock) est DEDANS l'action.
+   - Ne jamais créer une étape "Résultat : Décision".
+
+4. GESTION DES ANOMALIES :
+   - Une anomalie est un défaut ou une information manquante nécessitant un retour en arrière.
+   - Doit toujours spécifier la branche de dérivation (ex: rejet, relance, annulation).
+          </pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================================
+         ONGLET ⑤ : PIÈGES D'EXAMEN & ANTI-PATTERNS
+         ======================================================================== -->
+    <section class="tab-panel" id="tab-traps">
+      <!-- Piège 1 -->
+      <div class="trap-card severe">
+        <div class="trap-header">
+          <strong style="color: #fff; font-size: 15px;">Piège #1 : Confondre Temps Réel et Décision Stratégique (SIO vs SIP)</strong>
+          <span class="trap-badge severe">Éliminatoire à l'examen</span>
+        </div>
+        <div class="trap-grid">
+          <div class="trap-box-wrong">
+            <strong style="color: var(--err);">❌ Ce que répond l'étudiant :</strong><br>
+            "Puisque le tableau de bord de supervision des machines affiche des données en temps réel et permet d'éviter des pannes, c'est un Système d'Information de Pilotage (SIP)."
+          </div>
+          <div class="trap-box-right">
+            <strong style="color: var(--ok);">✅ La réalité académique exacte :</strong><br>
+            "C'est un <strong>SIO (Système d'Information Opérant)</strong>. Il sert aux opérateurs et techniciens dans l'exécution de leurs tâches quotidiennes d'exploitation. Le SIP s'adresse aux directeurs et managers pour de la planification et des arbitrages tactiques/stratégiques."
+          </div>
+        </div>
+        <div class="trap-rule">
+          📌 <strong>Règle d'or mnémotechnique :</strong> Ne jugez pas un système sur sa technologie (temps réel ou non), mais sur la <strong>nature des acteurs</strong> qui l'utilisent (Opérateurs = SIO ; Décideurs = SIP).
+        </div>
+      </div>
+
+      <!-- Piège 2 -->
+      <div class="trap-card severe">
+        <div class="trap-header">
+          <strong style="color: #fff; font-size: 15px;">Piège #2 : Considérer Zachman comme une Méthode de Gestion de Projet</strong>
+          <span class="trap-badge severe">Confusion Fréquente</span>
+        </div>
+        <div class="trap-grid">
+          <div class="trap-box-wrong">
+            <strong style="color: var(--err);">❌ Ce que répond l'étudiant :</strong><br>
+            "Zachman est une méthodologie itérative qui explique pas à pas comment développer un système d'information."
+          </div>
+          <div class="trap-box-right">
+            <strong style="color: var(--ok);">✅ La réalité académique exacte :</strong><br>
+            "<strong>NON</strong>. Zachman est une <em>ontologie descriptive</em> et une <em>taxonomie à 36 cellules</em>. Elle dit <strong>quoi</strong> documenter pour avoir une vue complète, mais n'indique aucune séquence temporelle, aucun processus de développement, ni aucune démarche itérative (contrairement à TOGAF ADM)."
+          </div>
+        </div>
+        <div class="trap-rule">
+          📌 <strong>Règle d'or mnémotechnique :</strong> Zachman = <em>Classification statique (Matrice 6x6)</em>. TOGAF = <em>Processus dynamique et itératif (Méthode ADM)</em>.
+        </div>
+      </div>
+
+      <!-- Piège 3 -->
+      <div class="trap-card">
+        <div class="trap-header">
+          <strong style="color: #fff; font-size: 15px;">Piège #3 : Séparer la Décision de l'Action dans un Processus Métier</strong>
+          <span class="trap-badge">Erreur de Modélisation</span>
+        </div>
+        <div class="trap-grid">
+          <div class="trap-box-wrong">
+            <strong style="color: var(--err);">❌ Ce que répond l'étudiant :</strong><br>
+            Créer une étape "Action : Vérifier le paiement" puis une étape séparée "Résultat : Prendre la décision d'accepter ou refuser".
+          </div>
+          <div class="trap-box-right">
+            <strong style="color: var(--ok);">✅ La réalité académique exacte :</strong><br>
+            "La décision <strong>fait partie intégrante de l'action</strong>. L'action évalue la condition et prend la décision. Le résultat doit être l'état factuel qui en découle (ex: 'Commande confirmée' ou 'Commande rejetée')."
+          </div>
+        </div>
+        <div class="trap-rule">
+          📌 <strong>Règle d'or mnémotechnique :</strong> L'action calcule et décide ; le résultat constate l'état final produit.
+        </div>
+      </div>
+
+      <!-- Piège 4 -->
+      <div class="trap-card">
+        <div class="trap-header">
+          <strong style="color: #fff; font-size: 15px;">Piège #4 : Confondre les Outils Stratégiques BMM et Ishikawa</strong>
+          <span class="trap-badge">Confusion Conceptuelle</span>
+        </div>
+        <div class="trap-grid">
+          <div class="trap-box-wrong">
+            <strong style="color: var(--err);">❌ Ce que répond l'étudiant :</strong><br>
+            "On utilise Ishikawa pour définir les objectifs stratégiques de l'entreprise et BMM pour chercher les pannes du système."
+          </div>
+          <div class="trap-box-right">
+            <strong style="color: var(--ok);">✅ La réalité académique exacte :</strong><br>
+            "C'est l'inverse ! Le <strong>BMM (Business Motivation Model)</strong> est élaboré une seule fois au début pour formaliser Objectifs, Moyens, Évaluations et Influenceurs. <strong>Ishikawa (causes-effets)</strong> sert à évaluer et diagnostiquer la cause d'un problème ou d'un échec de stratégie."
+          </div>
+        </div>
+        <div class="trap-rule">
+          📌 <strong>Règle d'or mnémotechnique :</strong> BMM = <em>Où veut-on aller ? (Motivation)</em>. Ishikawa = <em>Pourquoi n'y arrive-t-on pas ? (Diagnostic des pannes)</em>.
+        </div>
+      </div>
+
+      <!-- Piège 5 -->
+      <div class="trap-card">
+        <div class="trap-header">
+          <strong style="color: #fff; font-size: 15px;">Piège #5 : Oublier la Gestion des Anomalies dans les Processus</strong>
+          <span class="trap-badge">Piège Typique en TD/Examen</span>
+        </div>
+        <div class="trap-grid">
+          <div class="trap-box-wrong">
+            <strong style="color: var(--err);">❌ Ce que répond l'étudiant :</strong><br>
+            Décrire uniquement le chemin nominal ("Happy Path") : le client commande, le paiement passe, le stock est là, le colis est livré.
+          </div>
+          <div class="trap-box-right">
+            <strong style="color: var(--ok);">✅ La réalité académique exacte :</strong><br>
+            "Un processus sans gestion des anomalies est sanctionné. Il faut impérativement spécifier les branches d'exception : rupture de stock, échec de paiement, colis non livré, réclamation SAV et retour arrière."
+          </div>
+        </div>
+        <div class="trap-rule">
+          📌 <strong>Règle d'or mnémotechnique :</strong> En génie logiciel, un processus métier n'est complet que s'il prévoit la gestion des pannes et informations manquantes.
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Notification Toast -->
+  <div class="toast" id="toastBox">Notification Validily</div>
+
+  <!-- Pied de page officiel -->
+  <footer class="footer-signature">
+    ✦ Validily-IGL4 Academic Excellence Engine • Atelier certifié conçu pour la promotion IGL4 • Systèmes d'Information & Urbanisation
+  </footer>
+
+  <!-- ==========================================================================
+       JAVASCRIPT AUTONOME (VANILLA ES6+ • ZÉRO DÉPENDANCE EXTERNE)
+       ========================================================================== -->
+  <script>
+    /* ==========================================================================
+       1. GESTIONNAIRE DE STOCKAGE SANDBOX SÉCURISÉ (ZERO SECURITY ERROR)
+       ========================================================================== */
+    const safeStorage = {
+      _mem: {},
+      getItem: function(k) {
+        try { return window.localStorage.getItem(k); }
+        catch(e) { return this._mem.hasOwnProperty(k) ? this._mem[k] : null; }
+      },
+      setItem: function(k, v) {
+        try { window.localStorage.setItem(k, String(v)); }
+        catch(e) { this._mem[k] = String(v); }
+      },
+      removeItem: function(k) {
+        try { window.localStorage.removeItem(k); }
+        catch(e) { delete this._mem[k]; }
+      }
+    };
+
+    /* ==========================================================================
+       2. SYNTHÉTISEUR AUDIO NÉGOCIÉ (WEB AUDIO API • 100% OFFLINE)
+       ========================================================================== */
+    let audioCtx = null;
+    function getAudioContext() {
+      if (!audioCtx) {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (AudioContextClass) audioCtx = new AudioContextClass();
+      }
+      if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+      return audioCtx;
+    }
+
+    function playSynthSound(type) {
+      try {
+        const ctx = getAudioContext();
+        if (!ctx) return;
+        const now = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        if (type === 'correct') {
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(587.33, now);
+          osc.frequency.exponentialRampToValueAtTime(880, now + 0.12);
+          gain.gain.setValueAtTime(0.15, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
+          osc.start(now);
+          osc.stop(now + 0.3);
+        } else if (type === 'wrong') {
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(220, now);
+          osc.frequency.exponentialRampToValueAtTime(160, now + 0.18);
+          gain.gain.setValueAtTime(0.18, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+          osc.start(now);
+          osc.stop(now + 0.26);
+        } else if (type === 'click') {
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(1000, now);
+          gain.gain.setValueAtTime(0.05, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+          osc.start(now);
+          osc.stop(now + 0.05);
+        }
+      } catch (err) {}
+    }
+
+    let bgOscNode = null;
+    let bgGainNode = null;
+    let isBgAudioPlaying = false;
+
+    function toggleBackgroundAudio() {
+      const ctx = getAudioContext();
+      if (!ctx) return;
+      const btn = document.getElementById('audioToggleBtn');
+      const waves = document.getElementById('audioWaves');
+      const statusText = document.getElementById('audioStatusText');
+
+      if (!isBgAudioPlaying) {
+        try {
+          bgOscNode = ctx.createOscillator();
+          bgGainNode = ctx.createGain();
+          const filter = ctx.createBiquadFilter();
+
+          bgOscNode.type = 'sine';
+          bgOscNode.frequency.setValueAtTime(136.1, ctx.currentTime);
+          filter.type = 'lowpass';
+          filter.frequency.setValueAtTime(220, ctx.currentTime);
+
+          bgGainNode.gain.setValueAtTime(0.04, ctx.currentTime);
+
+          bgOscNode.connect(filter);
+          filter.connect(bgGainNode);
+          bgGainNode.connect(ctx.destination);
+
+          bgOscNode.start();
+          isBgAudioPlaying = true;
+          btn.textContent = '🔊';
+          waves.style.display = 'flex';
+          statusText.textContent = 'Onde Alpha';
+          showToast('🎵 Ambiance Zen activée (Onde Alpha 136Hz)');
+        } catch(e) {
+          showToast('Audio restreint par le navigateur');
+        }
+      } else {
+        if (bgOscNode) {
+          try { bgOscNode.stop(); bgOscNode.disconnect(); } catch(e) {}
+          bgOscNode = null;
+        }
+        isBgAudioPlaying = false;
+        btn.textContent = '🎵';
+        waves.style.display = 'none';
+        statusText.textContent = 'Zen Focus';
+        showToast('Ambiance audio mise en pause');
+      }
+    }
+
+    /* ==========================================================================
+       3. PASSERELLE OFFICIELLE DE TÉLÉMÉTRIE VALIDILY
+       ========================================================================== */
+    function syncWithValidily(score, total, extra) {
+      extra = extra || {};
+      const finalScore = Number(score) || 0;
+      const finalTotal = Number(total) || 20;
+      const percent = Math.round((finalScore / (finalTotal || 1)) * 100);
+      
+      const payload = {
+        type: 'VALIDILY_QUIZ_COMPLETED',
+        score: finalScore,
+        total: finalTotal,
+        percentage: percent,
+        timeSpentSeconds: Number(extra.timeSpentSeconds || sessionTimerSeconds || 0),
+        mistakesCount: Number(extra.mistakesCount || (finalTotal - finalScore)),
+        flashcardsReviewed: Number(extra.flashcardsReviewed || flashcardReviewCount || 0),
+        exercisesCompleted: Number(extra.exercisesCompleted || getMasteredExercisesCount() || 0),
+        subject: document.querySelector('meta[name="subject"]')?.content || "Systèmes d'Information & Urbanisation",
+        timestamp: new Date().toISOString()
+      };
+
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage(payload, '*');
+      }
+
+      if (typeof window.reportValidilyScore === 'function') {
+        window.reportValidilyScore(finalScore, finalTotal, payload);
+      }
+
+      showToast("✦ Score Validily synchronisé : " + finalScore + " / " + finalTotal + " (" + percent + "%)");
+      playSynthSound('correct');
+    }
+
+    function sendProgressToValidily(currentQ, totalQ, scoreSoFar) {
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({
+          type: 'VALIDILY_QUIZ_PROGRESS',
+          current: Number(currentQ),
+          total: Number(totalQ || 20),
+          scoreSoFar: Number(scoreSoFar || 0)
+        }, '*');
+      }
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('toastBox');
+      if (!toast) return;
+      toast.textContent = msg;
+      toast.classList.add('show');
+      clearTimeout(window.__toastTimer);
+      window.__toastTimer = setTimeout(function() {
+        toast.classList.remove('show');
+      }, 3500);
+    }
+
+    /* ==========================================================================
+       4. CHRONOMÈTRE DE SESSION LIVE
+       ========================================================================== */
+    let sessionTimerSeconds = 0;
+    let isTimerRunning = true;
+    const timerTextElem = document.getElementById('sessionTimerText');
+    const timerDotElem = document.getElementById('timerDot');
+
+    setInterval(function() {
+      if (isTimerRunning) {
+        sessionTimerSeconds++;
+        const mins = Math.floor(sessionTimerSeconds / 60);
+        const secs = sessionTimerSeconds % 60;
+        timerTextElem.textContent = 
+          String(mins).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
+      }
+    }, 1000);
+
+    document.getElementById('timerWidget').addEventListener('click', function() {
+      isTimerRunning = !isTimerRunning;
+      timerDotElem.style.background = isTimerRunning ? 'var(--ok)' : 'var(--warn)';
+      timerDotElem.style.boxShadow = isTimerRunning ? '0 0 8px var(--ok)' : 'none';
+      showToast(isTimerRunning ? '▶ Chronomètre de session repris' : '⏸ Chronomètre de session en pause');
+    });
+
+    document.getElementById('audioToggleBtn').addEventListener('click', toggleBackgroundAudio);
+
+    /* ==========================================================================
+       5. DONNÉES DES 20 QCM CERTIFIÉS EXAMEN
+       ========================================================================== */
+    const QCM_DATA = [
+      {
+        id: 1,
+        chapter: "Concepts Fondamentaux",
+        difficulty: "facile",
+        question: "Quelle est la définition fonctionnelle complète d'un Système d'Information (SI) selon le cours ?",
+        options: [
+          "Informatiser, automatiser, archiver et auditer les données d'entreprise.",
+          "Collecter, traiter, exploiter et communiquer l'information à travers l'organisation.",
+          "Prendre des décisions autonomes sans intervention des acteurs métier.",
+          "Remplacer l'ensemble des systèmes hérités par un modèle orienté microservices."
+        ],
+        answer: 1,
+        why: "Le cours formalise le cycle fonctionnel du SI en 4 étapes indissociables : Collecter les données brutes, les Traiter, les Exploiter pour l'action et les Communiquer aux acteurs.",
+        trap: "Confondre l'informatique pure (outils matériels/logiciels) avec le Système d'Information qui englobe aussi les acteurs humains et les processus organisationnels."
+      },
+      {
+        id: 2,
+        chapter: "Organisation & Niveaux",
+        difficulty: "facile",
+        question: "Dans le découpage organisationnel tripartite du SI, quel est le rôle dévolu au SIP (Système de Pilotage) ?",
+        options: [
+          "Exécuter les tâches d'exploitation physique et surveiller les capteurs d'atelier.",
+          "Servir de tampon mémoire pour compenser la lenteur des bases de données SQL.",
+          "Consolider les données pour éclairer les décisions stratégiques et tactiques de la direction.",
+          "Gérer exclusivement les sauvegardes nocturnes et les protocoles de reprise après sinistre."
+        ],
+        answer: 2,
+        why: "Le SIP (ou SID - Système d'Information Décisionnel) se situe au sommet hiérarchique. Il transforme les données en indicateurs pour guider les choix des managers et directeurs.",
+        trap: "Penser que le SIP exécute les opérations métiers. L'exécution quotidienne incombe strictement au SIO."
+      },
+      {
+        id: 3,
+        chapter: "TD Chapitre 1",
+        difficulty: "moyen",
+        question: "Un système de supervision en temps réel des machines d'une chaîne de production de meubles relève de quelle catégorie ?",
+        options: [
+          "Du SIP, car la rapidité des alertes permet aux directeurs de piloter l'usine.",
+          "Du SIO, car il assure la gestion quotidienne des processus assurés par les opérateurs.",
+          "Du BMM, car il mesure l'alignement stratégique des machines.",
+          "Du Zachman Scope, car il décrit uniquement les entités physiques."
+        ],
+        answer: 1,
+        why: "La justification officielle du TD repose sur la nature des acteurs (opérateurs, techniciens) et la fréquence des tâches opérationnelles en temps réel.",
+        trap: "Se laisser piéger par le mot 'supervision' et l'associer à tort au pilotage stratégique de la direction."
+      },
+      {
+        id: 4,
+        chapter: "TD Chapitre 1",
+        difficulty: "facile",
+        question: "Un tableau de bord des ventes permettant de comparer les performances régionales et planifier la stratégie marketing relève :",
+        options: [
+          "Du SIO (Système d'Information Opérant).",
+          "Du SIP (Système d'Information de Pilotage / Décisionnel).",
+          "De l'Architecture Technique pure.",
+          "Du Diagramme d'Ishikawa."
+        ],
+        answer: 1,
+        why: "Le tableau de bord consolide des indicateurs pour les managers afin d'orienter les décisions tactiques et d'adapter la politique commerciale de l'entreprise.",
+        trap: "Penser qu'un système de saisie de factures et un tableau de bord des ventes sont de même nature."
+      },
+      {
+        id: 5,
+        chapter: "Urbanisation des SI",
+        difficulty: "facile",
+        question: "Qu'appelle-t-on 'l'effet plat de spaghettis' dans une architecture d'entreprise ?",
+        options: [
+          "Un protocole de routage réseau circulaire à très haute vitesse.",
+          "Un enchevêtrement de fortes dépendances directes et non maîtrisées entre applications.",
+          "Une méthode d'ordonnancement itérative préconisée par TOGAF.",
+          "La structure matricielle orthogonale propre au framework Zachman."
+        ],
+        answer: 1,
+        why: "Quand les SI évoluent sans plan d'urbanisme, les connexions point-à-point se multiplient de façon anarchique, rendant toute modification risquée et coûteuse.",
+        trap: "Penser que l'effet spaghettis concerne uniquement le code spaghetti. En urbanisation, il s'agit d'un problème macroscopique entre systèmes entiers."
+      },
+      {
+        id: 6,
+        chapter: "Concepts Fondamentaux",
+        difficulty: "facile",
+        question: "Quels sont les deux grands types d'acteurs distingués dans l'écosystème d'un SI ?",
+        options: [
+          "Les acteurs décisionnels et les acteurs pour l'exécution (opérateurs).",
+          "Les développeurs frontend et les administrateurs de bases de données.",
+          "Les clients externes et les fournisseurs logistiques uniquement.",
+          "Les régulateurs étatiques et les auditeurs financiers."
+        ],
+        answer: 0,
+        why: "Le schéma fondamental de la page 1 sépare nettement les acteurs décisionnels (qui alimentent et consultent le SIP) des acteurs d'exécution/opérateurs (qui interagissent avec le SIO).",
+        trap: "Classer les acteurs par spécialité technique informatique plutôt que par leur rôle organisationnel vis-à-vis du SI."
+      },
+      {
+        id: 7,
+        chapter: "Approches d'Urbanisation",
+        difficulty: "moyen",
+        question: "Quelle est la structure mathématique et géométrique du Framework de Zachman ?",
+        options: [
+          "Un arbre hiérarchique ternaire avec héritage multiple.",
+          "Une matrice de 6 perspectives (lignes) croisées avec 6 dimensions fondamentales (colonnes).",
+          "Un cycle circulaire infini composé de 9 phases séquentielles.",
+          "Un graphe orienté acyclique d'activités BPMN."
+        ],
+        answer: 1,
+        why: "Zachman organise l'architecture en une grille rigoureuse de 36 cellules : 6 perspectives d'acteurs (Scope, Business, System, Technology, Component, Operations) x 6 questions (Quoi, Comment, Où, Qui, Quand, Pourquoi).",
+        trap: "Confondre la matrice 6x6 statique de Zachman avec le cycle de phases itératives d'ADM TOGAF."
+      },
+      {
+        id: 8,
+        chapter: "Zachman Framework",
+        difficulty: "moyen",
+        question: "Dans le Zachman Framework, à quoi correspond la colonne 'Pourquoi ?' (Why / Motivation) ?",
+        options: [
+          "Au calcul du retour sur investissement (ROI) en devises étrangères.",
+          "Aux objectifs, motivations stratégiques et règles métier justifiant l'existence du SI.",
+          "Au calendrier des livraisons et aux dépendances d'ordonnancement temporel.",
+          "Aux adresses IP et aux localisations géographiques des serveurs."
+        ],
+        answer: 1,
+        why: "La colonne 'Pourquoi' trace la motivation : les buts, objectifs et politiques d'entreprise qui justifient la création ou la modification de chaque composant du SI.",
+        trap: "Confondre 'Quand' (Time/événements) et 'Pourquoi' (Motivation/objectifs)."
+      },
+      {
+        id: 9,
+        chapter: "Zachman Framework",
+        difficulty: "moyen",
+        question: "Pour quel type d'environnement le Framework Zachman est-il particulièrement recommandé ?",
+        options: [
+          "Les startups agiles aux besoins volatils et pivots réguliers.",
+          "Les organisations rigides aux processus stables, formalisés et peu changeants.",
+          "Les équipes de développement Web utilisant exclusivement le framework React.",
+          "Les petits projets universitaires sans contraintes réglementaires."
+        ],
+        answer: 1,
+        why: "Selon les notes de cours et le tableau comparatif, la complexité et l'exhaustivité de Zachman le destinent aux grandes organisations stables (secteur public, industrie lourde, défense).",
+        trap: "Penser qu'un cadre aussi lourd peut convenir à une PME agile sans expertise architecturale dédiée."
+      },
+      {
+        id: 10,
+        chapter: "TOGAF & ADM",
+        difficulty: "facile",
+        question: "Quelle est la caractéristique majeure différenciant TOGAF du Framework Zachman ?",
+        options: [
+          "TOGAF est une méthode itérative et flexible, adaptée aux systèmes en évolution continue.",
+          "TOGAF interdit formellement l'utilisation de bases de données relationnelles.",
+          "TOGAF ne comporte aucune phase d'analyse métier.",
+          "TOGAF est réservé uniquement aux entreprises de moins de 5 salariés."
+        ],
+        answer: 0,
+        why: "Alors que Zachman est une taxonomie descriptive statique, TOGAF fournit une méthode dynamique (l'ADM - Architecture Development Method) hautement adaptable et itérative.",
+        trap: "Considérer que TOGAF et Zachman sont deux outils concurrents interchangeables ayant la même fonction."
+      },
+      {
+        id: 11,
+        chapter: "TOGAF & ADM",
+        difficulty: "moyen",
+        question: "Dans le cycle ADM de TOGAF, quel est le rôle clé de la 'Phase Préliminaire' ?",
+        options: [
+          "Écrire le code source des microservices en langage Java.",
+          "Réaliser l'étude de marché, cadrer les ressources et définir les principes d'architecture.",
+          "Gérer immédiatement les réclamations clients du service après-vente.",
+          "Archiver définitivement les anciens serveurs de l'entreprise."
+        ],
+        answer: 1,
+        why: "La phase préliminaire prépare le terrain : elle contextualise l'entreprise, évalue sa maturité, identifie les contraintes de gouvernance et personnalise la méthode ADM.",
+        trap: "Confondre la Phase Préliminaire (préparation du cadre) avec la Phase A (Vision de l'architecture spécifique à un projet)."
+      },
+      {
+        id: 12,
+        chapter: "TOGAF & ADM",
+        difficulty: "difficile",
+        question: "Dans le schéma standard de l'ADM de TOGAF, quel élément se situe exactement au centre de toutes les phases ?",
+        options: [
+          "L'Architecture Technique (Phase D).",
+          "La Gestion des Exigences (Requirements Management).",
+          "La Planification de la Migration (Phase F).",
+          "Le Registre des Brevets d'Invention."
+        ],
+        answer: 1,
+        why: "La 'Gestion des exigences' est centrale : chaque phase de l'ADM interagit en permanence avec elle pour vérifier que l'architecture répond aux besoins réels et évolutifs du métier.",
+        trap: "Penser que la phase centrale est une phase technique (comme la phase SI ou technologique)."
+      },
+      {
+        id: 13,
+        chapter: "TD Chapitre 2",
+        difficulty: "moyen",
+        question: "Une entreprise aux systèmes hérités hétérogènes souhaitant améliorer l'intégration et préserver la flexibilité future doit choisir prioritairement :",
+        options: [
+          "Zachman, car sa grille interdira toute modification ultérieure.",
+          "TOGAF, car son approche itérative facilite l'intégration des systèmes hérités et l'adaptabilité.",
+          "L'abandon pur et simple de tout cadre d'urbanisation.",
+          "Une architecture monolithique non documentée."
+        ],
+        answer: 1,
+        why: "C'est la conclusion officielle du TD : face à des systèmes hérités (legacy) complexes, l'ouverture et la flexibilité du cycle itératif de TOGAF en font le meilleur choix.",
+        trap: "Choisir Zachman en pensant que sa rigueur résoudra magiquement les problèmes d'intégration des systèmes historiques."
+      },
+      {
+        id: 14,
+        chapter: "Approches d'Urbanisation",
+        difficulty: "facile",
+        question: "Qu'est-ce qui caractérise l'approche d'urbanisation 'en couches' ?",
+        options: [
+          "Elle est modulaire, simple à comprendre, et sépare nettement métier, fonctions, applicatifs et technique.",
+          "Elle nécessite la rédaction obligatoire de 36 diagrammes formels.",
+          "Elle ne s'applique qu'aux systèmes fonctionnant sous Linux.",
+          "Elle remplace les directeurs par des algorithmes d'apprentissage profond."
+        ],
+        answer: 0,
+        why: "L'approche en couches découpe le SI en strates indépendantes (Métier, Fonctionnelle, Applicative, Technique). C'est la méthode la plus intuitive et adaptée aux PME.",
+        trap: "Croire que l'approche en couches offre la même vision métier globale et exhaustive que Zachman ou TOGAF."
+      },
+      {
+        id: 15,
+        chapter: "Modélisation Stratégique",
+        difficulty: "moyen",
+        question: "Quels sont les 4 composants majeurs formalisés dans le modèle BMM (Business Motivation Model) ?",
+        options: [
+          "Clients, Fournisseurs, Actionnaires, Banques.",
+          "Objectifs, Moyens, Évaluations, Influenceurs.",
+          "Serveurs, Réseaux, Routeurs, Pare-feu.",
+          "Entrées, Traitements, Sorties, Stockage."
+        ],
+        answer: 1,
+        why: "Le BMM structure la motivation d'entreprise : les Objectifs (ce que l'on veut atteindre), les Moyens (comment on y parvient), les Évaluations et les Influenceurs externes/internes.",
+        trap: "Confondre BMM (motivation métier stratégique) avec BPMN (modélisation opérationnelle des flux de processus)."
+      },
+      {
+        id: 16,
+        chapter: "Modélisation Stratégique",
+        difficulty: "facile",
+        question: "À quel moment et dans quel but utilise-t-on le diagramme d'Ishikawa dans les SI selon le cours ?",
+        options: [
+          "Pour crypter les mots de passe des opérateurs dans la base de données.",
+          "Pour évaluer les stratégies et identifier les causes racines des dysfonctionnements / réclamations.",
+          "Pour concevoir les maquettes d'interface utilisateur en CSS.",
+          "Pour planifier les sauvegardes journalières sur bande magnétique."
+        ],
+        answer: 1,
+        why: "Le diagramme d'Ishikawa (ou causes-effets en arête de poisson) est utilisé pour investiguer les causes multiples qui provoquent un dysfonctionnement dans le SI.",
+        trap: "Penser qu'Ishikawa sert à définir les objectifs futurs. Il sert à diagnostiquer les anomalies et causes d'échec."
+      },
+      {
+        id: 17,
+        chapter: "Modélisation des Processus",
+        difficulty: "moyen",
+        question: "Selon les règles de modélisation du cours, quelle est la structure obligatoire de la Phase 1 d'un processus métier ?",
+        options: [
+          "Action élémentaire + Résultat final de l'entreprise.",
+          "Déclencheur + Action(s) à faire suite à ce déclencheur.",
+          "Anomalie bloquante + Décision de justice.",
+          "Rapport de synthèse SIP + Archivage SIO."
+        ],
+        answer: 1,
+        why: "Règle fondamentale du cours : la Phase 1 s'ouvre obligatoirement par un Déclencheur suivi d'Actions. À partir de la Phase 2, chaque phase se structure en Action + Résultat.",
+        trap: "Penser que toutes les phases ont la même composition symétrique."
+      },
+      {
+        id: 18,
+        chapter: "Modélisation des Processus",
+        difficulty: "difficile",
+        question: "Où doit obligatoirement être positionnée une prise de décision (ex: solde bancaire suffisant) lors de la modélisation d'une étape ?",
+        options: [
+          "Dans un bloc 'Résultat' séparé en fin de processus.",
+          "À l'intérieur même du bloc 'Action' qui effectue l'évaluation.",
+          "Dans un courriel envoyé manuellement à la direction.",
+          "Dans le déclencheur initial de la phase 1."
+        ],
+        answer: 1,
+        why: "L'annotation manuscrite officielle précise : 'la décision doit être dans le bloc action'. L'action évalue la condition et décide de la branche à suivre.",
+        trap: "Créer une étape indépendante intitulée 'Prise de décision' sans action technique sous-jacente."
+      },
+      {
+        id: 19,
+        chapter: "Modélisation des Processus",
+        difficulty: "moyen",
+        question: "Comment est définie une 'Anomalie' dans un processus métier d'ingénierie ?",
+        options: [
+          "Une panne matérielle irréversible nécessitant l'achat de nouveaux serveurs.",
+          "Un défaut ou une information manquante qui impose un retour en arrière ou une dérivation.",
+          "Une augmentation imprévue du chiffre d'affaires mensuel.",
+          "Un changement de version du système d'exploitation des postes de travail."
+        ],
+        answer: 1,
+        why: "Selon la définition manuscrite du cours, l'anomalie est un incident ou manque de données exigeant un traitement d'exception (ex: rupture de stock, échec de paiement).",
+        trap: "Penser qu'un processus ne doit modéliser que le scénario idéal ('Happy Path') sans prévoir les anomalies."
+      },
+      {
+        id: 20,
+        chapter: "TD HealthTech Zachman",
+        difficulty: "difficile",
+        question: "Dans le cas HealthTech (DME), que formalise la dimension 'Qui ?' (People) à la perspective de l'Architecte (Technology/Physical) ?",
+        options: [
+          "La liste des noms et prénoms de tous les patients admis à l'hôpital.",
+          "La matrice des droits d'accès techniques (RBAC), protocoles de chiffrement et permissions système.",
+          "Le montant des salaires versés aux praticiens hospitaliers.",
+          "La marque des ordinateurs portables utilisés par le secrétariat médical."
+        ],
+        answer: 1,
+        why: "À la vue Architecte/Technology, la dimension 'Qui' traduit les rôles métier en mécanismes techniques : annuaire LDAP/Active Directory, tokens JWT, rôles RBAC et règles de pare-feu.",
+        trap: "Confondre la vue Architecte (technologique) avec la vue Propriétaire (rôles métier comme 'Médecin', 'Infirmier')."
+      }
+    ];
+
+    /* ==========================================================================
+       6. ÉTAT D'EXÉCUTION & VARIABLES
+       ========================================================================== */
+    let userAnswers = {};
+    let bookmarkedQuestions = new Set();
+    let currentFilter = 'all';
+
+    try {
+      const savedAns = safeStorage.getItem('validily_sid_answers');
+      if (savedAns) userAnswers = JSON.parse(savedAns);
+      const savedBm = safeStorage.getItem('validily_sid_bookmarks');
+      if (savedBm) bookmarkedQuestions = new Set(JSON.parse(savedBm));
+    } catch(e) {}
+
+    /* ==========================================================================
+       7. INITIALISATION DU QCM & PALETTE
+       ========================================================================== */
+    function renderPalette() {
+      const grid = document.getElementById('paletteGrid');
+      if (!grid) return;
+      grid.innerHTML = '';
+
+      QCM_DATA.forEach(function(q, idx) {
+        const btn = document.createElement('button');
+        btn.className = 'palette-btn';
+        btn.textContent = idx + 1;
+        btn.id = 'pal_btn_' + idx;
+
+        const ans = userAnswers[idx];
+        if (ans !== undefined) {
+          if (ans === q.answer) btn.classList.add('correct');
+          else btn.classList.add('wrong');
+        }
+        if (bookmarkedQuestions.has(idx)) {
+          btn.classList.add('bookmarked');
+        }
+
+        btn.onclick = function() {
+          const card = document.getElementById('q_card_' + idx);
+          if (card) {
+            card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            card.style.borderColor = 'var(--accent-light)';
+            setTimeout(function() { card.style.borderColor = ''; }, 1500);
+          }
+        };
+
+        grid.appendChild(btn);
+      });
+    }
+
+    function renderQuestions() {
+      const container = document.getElementById('questionsContainer');
+      if (!container) return;
+      container.innerHTML = '';
+
+      QCM_DATA.forEach(function(q, idx) {
+        const card = document.createElement('div');
+        card.className = 'question-card';
+        card.id = 'q_card_' + idx;
+        card.dataset.idx = idx;
+
+        const isAnswered = userAnswers[idx] !== undefined;
+        const userAnswer = userAnswers[idx];
+        const isBm = bookmarkedQuestions.has(idx);
+
+        let optionsHtml = '';
+        q.options.forEach(function(opt, optIdx) {
+          const letter = String.fromCharCode(65 + optIdx);
+          let optClass = 'option-btn';
+          if (isAnswered) {
+            if (optIdx === q.answer) optClass += ' correct';
+            else if (optIdx === userAnswer) optClass += ' wrong';
+          }
+          optionsHtml += '<button class="' + optClass + '" ' +
+            (isAnswered ? 'disabled' : '') +
+            ' onclick="handleSelectOption(' + idx + ', ' + optIdx + ')">' +
+            '<span class="opt-letter">' + letter + '</span>' +
+            '<span>' + opt + '</span>' +
+            '</button>';
+        });
+
+        card.innerHTML = 
+          '<div class="q-top-row">' +
+            '<div class="q-meta">' +
+              '<span class="q-num-badge">Question ' + (idx + 1) + ' / 20</span>' +
+              '<span class="q-chapter-tag">' + q.chapter + '</span>' +
+              '<span class="q-diff-badge ' + q.difficulty + '">' + q.difficulty + '</span>' +
+            '</div>' +
+            '<button class="btn-bookmark ' + (isBm ? 'active' : '') + '" onclick="toggleBookmark(' + idx + ')" title="Marquer d\'un signet pour révision">' +
+              '🔖' +
+            '</button>' +
+          '</div>' +
+          '<div class="q-text">' + q.question + '</div>' +
+          '<div class="options-grid">' + optionsHtml + '</div>' +
+          '<div class="feedback-box feedback-why ' + (isAnswered ? 'show' : '') + '" id="why_' + idx + '">' +
+            '<strong>💡 Analyse du Concept :</strong> ' + q.why +
+          '</div>' +
+          '<div class="feedback-box feedback-trap ' + (isAnswered ? 'show' : '') + '" id="trap_' + idx + '">' +
+            '<strong>⚠️ Le Piège Classique d\'Examen :</strong> ' + q.trap +
+          '</div>';
+
+        container.appendChild(card);
+      });
+
+      updateStatsDisplay();
+    }
+
+    function handleSelectOption(qIdx, optIdx) {
+      if (userAnswers[qIdx] !== undefined) return;
+
+      userAnswers[qIdx] = optIdx;
+      safeStorage.setItem('validily_sid_answers', JSON.stringify(userAnswers));
+
+      const isCorrect = optIdx === QCM_DATA[qIdx].answer;
+      playSynthSound(isCorrect ? 'correct' : 'wrong');
+
+      renderQuestions();
+      renderPalette();
+      updateReadinessScore();
+
+      const answeredCount = Object.keys(userAnswers).length;
+      const correctCount = Object.entries(userAnswers).filter(function(entry) {
+        return entry[1] === QCM_DATA[entry[0]].answer;
+      }).length;
+      sendProgressToValidily(answeredCount, 20, correctCount);
+    }
+
+    function toggleBookmark(qIdx) {
+      if (bookmarkedQuestions.has(qIdx)) {
+        bookmarkedQuestions.delete(qIdx);
+      } else {
+        bookmarkedQuestions.add(qIdx);
+      }
+      safeStorage.setItem('validily_sid_bookmarks', JSON.stringify(Array.from(bookmarkedQuestions)));
+      renderQuestions();
+      renderPalette();
+      playSynthSound('click');
+    }
+
+    function updateStatsDisplay() {
+      const total = 20;
+      const answered = Object.keys(userAnswers).length;
+      const correct = Object.entries(userAnswers).filter(function(entry) {
+        return entry[1] === QCM_DATA[entry[0]].answer;
+      }).length;
+      const wrong = answered - correct;
+      const percent = answered > 0 ? Math.round((correct / answered) * 100) : 0;
+
+      document.getElementById('statAnswered').textContent = answered + ' / ' + total;
+      document.getElementById('statCorrect').textContent = correct;
+      document.getElementById('statWrong').textContent = wrong;
+      document.getElementById('statPercent').textContent = percent + '%';
+      document.getElementById('qcmBadgeCounter').textContent = correct + '/' + total;
+    }
+
+    /* ==========================================================================
+       8. JAUGE DE READINESS EXAMEN
+       ========================================================================== */
+    function updateReadinessScore() {
+      const correctQcm = Object.entries(userAnswers).filter(function(entry) {
+        return entry[1] === QCM_DATA[entry[0]].answer;
+      }).length;
+      const qcmFactor = (correctQcm / 20) * 60;
+
+      const masteredEx = getMasteredExercisesCount();
+      const exFactor = (masteredEx / 4) * 20;
+
+      const masteredFc = getMasteredFlashcardsCount();
+      const fcFactor = (masteredFc / 12) * 20;
+
+      const totalReadiness = Math.min(100, Math.round(qcmFactor + exFactor + fcFactor));
+      const valElem = document.getElementById('readinessScoreVal');
+      if (valElem) {
+        valElem.textContent = totalReadiness + '%';
+        if (totalReadiness >= 80) valElem.style.color = 'var(--ok)';
+        else if (totalReadiness >= 50) valElem.style.color = 'var(--warn)';
+        else valElem.style.color = 'var(--accent-light)';
+      }
+    }
+
+    function getMasteredExercisesCount() {
+      let count = 0;
+      for (let i = 0; i < 4; i++) {
+        if (safeStorage.getItem('validily_sid_ex_' + i) === 'true') count++;
+      }
+      return count;
+    }
+
+    function getMasteredFlashcardsCount() {
+      let count = 0;
+      for (let i = 0; i < FLASHCARDS_DATA.length; i++) {
+        if (safeStorage.getItem('validily_sid_fc_' + i) === '3') count++;
+      }
+      return count;
+    }
+
+    /* ==========================================================================
+       9. GESTION DES EXERCICES & SCRATCHPAD
+       ========================================================================== */
+    function initExercises() {
+      for (let i = 0; i < 4; i++) {
+        const txtArea = document.getElementById('scratchpad_ex' + i);
+        if (txtArea) {
+          txtArea.value = safeStorage.getItem('validily_sid_scratch_' + i) || '';
+          txtArea.addEventListener('input', function(e) {
+            safeStorage.setItem('validily_sid_scratch_' + i, e.target.value);
+          });
+        }
+        const check = document.getElementById('check_ex' + i);
+        if (check) {
+          check.checked = safeStorage.getItem('validily_sid_ex_' + i) === 'true';
+        }
+      }
+      updateExerciseBadge();
+    }
+
+    function toggleAccordion(id) {
+      const el = document.getElementById(id);
+      if (el) {
+        el.classList.toggle('open');
+        playSynthSound('click');
+      }
+    }
+
+    function toggleExerciseMastered(idx) {
+      const check = document.getElementById('check_ex' + idx);
+      if (check) {
+        safeStorage.setItem('validily_sid_ex_' + idx, check.checked ? 'true' : 'false');
+        updateExerciseBadge();
+        updateReadinessScore();
+        playSynthSound(check.checked ? 'correct' : 'click');
+      }
+    }
+
+    function updateExerciseBadge() {
+      const count = getMasteredExercisesCount();
+      document.getElementById('exBadgeCounter').textContent = count + '/4';
+    }
+
+    /* ==========================================================================
+       10. DONNÉES ET MOTEUR FLASHCARDS LEITNER 3D
+       ========================================================================== */
+    const FLASHCARDS_DATA = [
+      {
+        topic: "Organisation SI",
+        question: "Quelle est la vocation fondamentale d'un Système d'Information Opérant (SIO) ?",
+        answer: "Le SIO assure l'exécution quotidienne des activités opérationnelles de l'entreprise. Il traite les flux physiques et d'information en temps réel pour assister les opérateurs et optimiser les processus réguliers."
+      },
+      {
+        topic: "Organisation SI",
+        question: "En quoi le SIP (Système de Pilotage) se distingue-t-il du SIO ?",
+        answer: "Le SIP (ou SID) traite des données agrégées et consolidées sous forme de tableaux de bord et rapports financiers. Il est destiné à la direction pour la prise de décisions stratégiques et tactiques."
+      },
+      {
+        topic: "Urbanisation",
+        question: "Pourquoi les entreprises entreprennent-elles une démarche d'Urbanisation de leur SI ?",
+        answer: "Pour éradiquer 'l'effet plat de spaghettis' : découpler les applications, réduire les fortes interdépendances chaotiques et permettre l'évolution modulaire du SI sans risque de régression."
+      },
+      {
+        topic: "Frameworks",
+        question: "Quelle est la nature exacte du Framework Zachman ?",
+        answer: "C'est une ontologie descriptive et une taxonomie matricielle 6x6. Elle définit 36 perspectives d'observation orthogonales sans imposer aucune séquence temporelle ni démarche de développement."
+      },
+      {
+        topic: "Frameworks",
+        question: "Quels sont les piliers fondamentaux de la méthode TOGAF (ADM) ?",
+        answer: "L'ADM (Architecture Development Method) est un cycle itératif en 9 phases (A à H + Préliminaire) centré sur la gestion des exigences. Il est hautement flexible et taillé pour intégrer les systèmes hérités."
+      },
+      {
+        topic: "Approches d'Urbanisation",
+        question: "Quelles sont les 4 couches classiques de l'urbanisation en couches ?",
+        answer: "1. Couche Métier (processus et acteurs) \n2. Couche Fonctionnelle (services du SI) \n3. Couche Applicative (composants logiciels) \n4. Couche Technique (infrastructures, serveurs, réseaux)."
+      },
+      {
+        topic: "Stratégie",
+        question: "À quoi sert le Business Motivation Model (BMM) et quand est-il élaboré ?",
+        answer: "Le BMM formalise les Objectifs, Moyens, Évaluations et Influenceurs de l'entreprise. Il est réalisé une seule fois au tout début pour lancer le plan stratégique et cadrer l'architecture."
+      },
+      {
+        topic: "Qualité & Audit",
+        question: "Quel rôle joue le diagramme d'Ishikawa dans la gouvernance des SI ?",
+        answer: "Il sert à évaluer et diagnostiquer les causes racines d'un problème ou d'une anomalie métier (ex: pic de réclamations SAV) en classant les causes selon la méthode des 5M."
+      },
+      {
+        topic: "Processus Métier",
+        question: "Quelle est la règle de décomposition des phases d'un processus métier ?",
+        answer: "La Phase 1 s'ouvre par un Déclencheur + Action(s). Les phases suivantes (i >= 2) s'articulent en Action + Résultat. Le Résultat de la Phase i sert d'événement déclencheur de la Phase i+1."
+      },
+      {
+        topic: "Processus Métier",
+        question: "Où doit obligatoirement figurer la prise de décision dans un processus métier ?",
+        answer: "La décision doit TOUJOURS être intégrée à l'intérieur du bloc Action. Elle ne constitue jamais un bloc résultat autonome. Le résultat n'est que l'état factuel produit."
+      },
+      {
+        topic: "Processus Métier",
+        question: "Comment gérer une anomalie dans un processus sans violer les règles du cours ?",
+        answer: "Une anomalie (rupture de stock, rejet paiement) est une branche d'exception nécessitant un retour en arrière ou un processus de compensation. Elle doit être explicitement documentée avec l'acteur et le SI responsable."
+      },
+      {
+        topic: "HealthTech Zachman",
+        question: "Dans le cas DME HealthTech, quelle différence sépare la vue Propriétaire de la vue Concepteur pour la donnée ?",
+        answer: "La vue Propriétaire définit le Modèle Conceptuel de Données (relations métier entre patient, consultation, antécédents). La vue Concepteur définit le Modèle Logique de Données et les protocoles d'échange (HL7/FHIR)."
+      }
+    ];
+
+    let currentFcIndex = 0;
+    let isFcCardFlipped = false;
+    let flashcardReviewCount = 0;
+
+    function renderCurrentFlashcard() {
+      const fc = FLASHCARDS_DATA[currentFcIndex];
+      document.getElementById('fcCurrentIdx').textContent = currentFcIndex + 1;
+      document.getElementById('fcTopicTag').textContent = fc.topic;
+      document.getElementById('fcFrontText').textContent = fc.question;
+      document.getElementById('fcBackText').textContent = fc.answer;
+
+      const inner = document.getElementById('flashcardInner');
+      inner.classList.remove('flipped');
+      isFcCardFlipped = false;
+    }
+
+    function flipFlashcard() {
+      const inner = document.getElementById('flashcardInner');
+      isFcCardFlipped = !isFcCardFlipped;
+      inner.classList.toggle('flipped', isFcCardFlipped);
+      playSynthSound('click');
+    }
+
+    function nextFlashcard() {
+      currentFcIndex = (currentFcIndex + 1) % FLASHCARDS_DATA.length;
+      renderCurrentFlashcard();
+      playSynthSound('click');
+    }
+
+    function prevFlashcard() {
+      currentFcIndex = (currentFcIndex - 1 + FLASHCARDS_DATA.length) % FLASHCARDS_DATA.length;
+      renderCurrentFlashcard();
+      playSynthSound('click');
+    }
+
+    function rateFlashcard(boxLevel) {
+      safeStorage.setItem('validily_sid_fc_' + currentFcIndex, String(boxLevel));
+      flashcardReviewCount++;
+      playSynthSound(boxLevel === 3 ? 'correct' : 'click');
+      updateReadinessScore();
+      nextFlashcard();
+    }
+
+    document.getElementById('flashcardWrapper').addEventListener('click', flipFlashcard);
+
+    /* ==========================================================================
+       11. SYSTÈME DE RECHERCHE GLOBALE TEMPS RÉEL (CTRL+K)
+       ========================================================================== */
+    const searchInput = document.getElementById('globalSearchInput');
+    searchInput.addEventListener('input', function(e) {
+      const query = e.target.value.trim().toLowerCase();
+      if (!query || query.length < 2) {
+        removeHighlights();
+        return;
+      }
+      applyGlobalSearch(query);
+    });
+
+    document.addEventListener('keydown', function(e) {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        searchInput.focus();
+      }
+      const fcTab = document.getElementById('tab-flashcards');
+      if (fcTab && fcTab.classList.contains('active')) {
+        if (e.code === 'Space') {
+          e.preventDefault();
+          flipFlashcard();
+        } else if (e.code === 'ArrowRight') {
+          e.preventDefault();
+          nextFlashcard();
+        } else if (e.code === 'ArrowLeft') {
+          e.preventDefault();
+          prevFlashcard();
+        } else if (['Digit1', 'Numpad1'].includes(e.code)) {
+          rateFlashcard(1);
+        } else if (['Digit2', 'Numpad2'].includes(e.code)) {
+          rateFlashcard(2);
+        } else if (['Digit3', 'Numpad3'].includes(e.code)) {
+          rateFlashcard(3);
+        }
+      }
+    });
+
+    function applyGlobalSearch(term) {
+      removeHighlights();
+      const targets = document.querySelectorAll('.q-text, .ex-desc, .cheat-table td, .trap-card');
+      targets.forEach(function(el) {
+        const text = el.textContent;
+        const regex = new RegExp('(' + term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+        if (regex.test(text)) {
+          el.innerHTML = text.replace(regex, '<mark class="hl">$1</mark>');
+        }
+      });
+    }
+
+    function removeHighlights() {
+      document.querySelectorAll('mark.hl').forEach(function(m) {
+        const parent = m.parentNode;
+        parent.replaceChild(document.createTextNode(m.textContent), m);
+        parent.normalize();
+      });
+    }
+
+    /* ==========================================================================
+       12. NAVIGATION DES ONGLETS & BOUTONS
+       ========================================================================== */
+    document.querySelectorAll('.tab-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
+        document.querySelectorAll('.tab-panel').forEach(function(p) { p.classList.remove('active'); });
+        btn.classList.add('active');
+        const targetId = btn.dataset.tab;
+        const targetPanel = document.getElementById(targetId);
+        if (targetPanel) targetPanel.classList.add('active');
+        playSynthSound('click');
+      });
+    });
+
+    document.querySelectorAll('.filter-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        document.querySelectorAll('.filter-btn').forEach(function(b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+        currentFilter = btn.dataset.filter;
+        applyQuestionFilter();
+        playSynthSound('click');
+      });
+    });
+
+    function applyQuestionFilter() {
+      const cards = document.querySelectorAll('.question-card');
+      cards.forEach(function(card) {
+        const idx = parseInt(card.dataset.idx, 10);
+        const ans = userAnswers[idx];
+        const isBm = bookmarkedQuestions.has(idx);
+        let show = true;
+
+        if (currentFilter === 'wrong') {
+          show = ans !== undefined && ans !== QCM_DATA[idx].answer;
+        } else if (currentFilter === 'bookmarks') {
+          show = isBm;
+        } else if (currentFilter === 'unanswered') {
+          show = ans === undefined;
+        }
+
+        card.style.display = show ? 'block' : 'none';
+      });
+    }
+
+    function copySnippet(elemId) {
+      const code = document.getElementById(elemId)?.textContent;
+      if (!code) return;
+      navigator.clipboard.writeText(code.trim()).then(function() {
+        showToast('📋 Extrait copié dans le presse-papier !');
+        playSynthSound('click');
+      });
+    }
+
+    document.getElementById('btnSyncValidily').addEventListener('click', function() {
+      const correct = Object.entries(userAnswers).filter(function(entry) {
+        return entry[1] === QCM_DATA[entry[0]].answer;
+      }).length;
+      syncWithValidily(correct, 20);
+    });
+
+    /* ==========================================================================
+       13. INITIALISATION COMPLÈTE AU CHARGEMENT
+       ========================================================================== */
+    window.addEventListener('DOMContentLoaded', function() {
+      renderPalette();
+      renderQuestions();
+      initExercises();
+      renderCurrentFlashcard();
+      updateReadinessScore();
+      showToast('✦ Atelier SID & Urbanisation prêt • Bonnes révisions !');
+    });
+  </script>
+</body>
+</html>

@@ -42,36 +42,34 @@ export function extractHtmlMetadata(html: string): {
   const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
   const title = titleMatch ? titleMatch[1].trim() : "Atelier de Révision Interactif";
 
-  const descMatch =
-    html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']+)["']/i) ||
-    html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*name=["']description["']/i);
-  const description = descMatch ? descMatch[1].trim() : undefined;
+  function getMeta(name: string): string | undefined {
+    const pattern = new RegExp(
+      `<meta[^>]*name=["']${name}["'][^>]*content=(?:"([^"]*)"|'([^']*)')|<meta[^>]*content=(?:"([^"]*)"|'([^']*)')[^>]*name=["']${name}["']`,
+      "i"
+    );
+    const m = html.match(pattern);
+    if (!m) return undefined;
+    const val = m[1] || m[2] || m[3] || m[4];
+    return val ? val.trim() : undefined;
+  }
 
-  const diffMatch =
-    html.match(/<meta[^>]*name=["']difficulty["'][^>]*content=["']([^"']+)["']/i) ||
-    html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*name=["']difficulty["']/i);
+  const description = getMeta("description");
+
+  const rawDiff = getMeta("difficulty")?.toLowerCase();
   let difficulty: "beginner" | "intermediate" | "advanced" | undefined;
-  if (diffMatch) {
-    const rawDiff = diffMatch[1].trim().toLowerCase();
+  if (rawDiff) {
     if (rawDiff === "beginner" || rawDiff === "facile" || rawDiff === "debutant") difficulty = "beginner";
     else if (rawDiff === "advanced" || rawDiff === "difficile" || rawDiff === "avance") difficulty = "advanced";
     else difficulty = "intermediate";
   }
 
-  const subjMatch =
-    html.match(/<meta[^>]*name=["']subject["'][^>]*content=["']([^"']+)["']/i) ||
-    html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*name=["']subject["']/i);
-  const subject = subjMatch ? subjMatch[1].trim() : undefined;
+  const subject = getMeta("subject");
 
-  const countMatch =
-    html.match(/<meta[^>]*name=["']total-questions["'][^>]*content=["']([^"']+)["']/i) ||
-    html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*name=["']total-questions["']/i);
-  const totalQuestions = countMatch ? parseInt(countMatch[1].trim(), 10) : undefined;
+  const rawCount = getMeta("total-questions");
+  const totalQuestions = rawCount ? parseInt(rawCount, 10) : undefined;
 
-  const durMatch =
-    html.match(/<meta[^>]*name=["']target-duration["'][^>]*content=["']([^"']+)["']/i) ||
-    html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*name=["']target-duration["']/i);
-  const targetDurationMinutes = durMatch ? parseInt(durMatch[1].trim(), 10) : undefined;
+  const rawDur = getMeta("target-duration");
+  const targetDurationMinutes = rawDur ? parseInt(rawDur, 10) : undefined;
 
   return { title, description, difficulty, subject, totalQuestions, targetDurationMinutes };
 }
