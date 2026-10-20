@@ -18,6 +18,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { StudentPerformanceOverview, StudentPublicProfile } from "@/lib/actions/profile-actions";
 import { StudentProfileModal } from "@/components/profile/student-profile-modal";
+import { VipBadge } from "@/components/ui/vip-badge";
 import { cn } from "@/lib/utils";
 
 interface AdminStudentsViewProps {
@@ -245,10 +246,7 @@ export function AdminStudentsView({
                             </span>
                           )}
                           {s.isVip && (
-                            <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-amber-100 text-amber-900 border border-amber-300 flex items-center space-x-0.5">
-                              <Sparkles className="w-2.5 h-2.5 text-amber-600" />
-                              <span>VIP</span>
-                            </span>
+                            <VipBadge variant="compact" />
                           )}
                         </div>
                       </td>

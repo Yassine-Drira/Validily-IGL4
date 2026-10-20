@@ -42,6 +42,8 @@ export function InteractiveHtmlRunner({
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
   const [fetchedHtml, setFetchedHtml] = useState<string>(htmlContent);
   const [isLoadingContent, setIsLoadingContent] = useState<boolean>(!htmlContent && Boolean(srcUrl));
+  const [capturedMistakes, setCapturedMistakes] = useState<any[]>([]);
+  const [capturedAnswers, setCapturedAnswers] = useState<any[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
@@ -107,14 +109,24 @@ export function InteractiveHtmlRunner({
         const score = Number.isFinite(rawScore) ? Math.min(Math.max(0, Math.round(rawScore)), total) : 0;
         setSelfScore(score);
         setTotalScore(total);
+        if (Array.isArray(event.data.mistakes)) {
+          setCapturedMistakes(event.data.mistakes);
+        }
+        if (Array.isArray(event.data.answers)) {
+          setCapturedAnswers(event.data.answers);
+        }
         const percent = Math.round((score / total) * 100);
         const rawTime = Number(event.data.timeSpentSeconds);
         const timeInfo =
           Number.isFinite(rawTime) && rawTime > 0
             ? ` • Durée : ${Math.floor(rawTime / 60)}m ${Math.round(rawTime % 60)}s`
             : "";
+        const mistakesInfo =
+          Array.isArray(event.data.mistakes) && event.data.mistakes.length > 0
+            ? ` • ${event.data.mistakes.length} erreur(s) à consolider`
+            : "";
         setSubmitSuccess(
-          `Score capturé depuis l'atelier : ${score} / ${total} (${percent}%)${timeInfo}`
+          `Score capturé depuis l'atelier : ${score} / ${total} (${percent}%)${timeInfo}${mistakesInfo}`
         );
       } else if (
         msgType === "VALIDILY_QUIZ_PROGRESS" ||
@@ -127,6 +139,12 @@ export function InteractiveHtmlRunner({
         const scoreSoFar = Number.isFinite(rawScore) ? Math.min(Math.max(0, Math.round(rawScore)), total) : 0;
         setSelfScore(scoreSoFar);
         setTotalScore(total);
+        if (Array.isArray(event.data.mistakes)) {
+          setCapturedMistakes(event.data.mistakes);
+        }
+        if (Array.isArray(event.data.answers)) {
+          setCapturedAnswers(event.data.answers);
+        }
       }
     };
 
@@ -161,7 +179,8 @@ export function InteractiveHtmlRunner({
         quiz_id: quizId,
         score: selfScore,
         total_questions: totalScore,
-        answers: [],
+        answers: capturedAnswers,
+        mistakes: capturedMistakes,
       });
 
       if (res?.error) {

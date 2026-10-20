@@ -176,7 +176,6 @@ export function AppHeader({ initialUser }: { initialUser?: HeaderUser | null }) 
                     {user.name.slice(0, 2).toUpperCase()}
                   </div>
                 )}
-                {user.isVip && <VipBadge variant="avatar-badge" />}
               </div>
               <span className="text-xs font-semibold text-[#182235] hidden sm:inline max-w-[100px] truncate">
                 {user.name}

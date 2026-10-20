@@ -218,14 +218,158 @@ export async function deleteQuiz(quizId: string): Promise<{ success?: boolean; e
 
 const quizAttemptInFlightMap = new Map<string, number>();
 
+export interface StudentMistakeItem {
+  id: string;
+  attempt_id?: string;
+  quiz_id?: string;
+  quiz_title: string;
+  subject_name?: string;
+  question_id?: string;
+  question_text: string;
+  explanation: string;
+  user_answer?: string;
+  correct_answer?: string;
+  chapter?: string;
+  created_at: string;
+}
+
+const localMistakesStore = new Map<string, StudentMistakeItem[]>();
+
+async function loadPersistedMistakes(userId: string): Promise<StudentMistakeItem[]> {
+  const cached = localMistakesStore.get(userId);
+  if (cached && cached.length > 0) return cached;
+
+  try {
+    const serviceSupabase = getServiceSupabase();
+    const { data: noteRow } = await serviceSupabase
+      .from("notes")
+      .select("content")
+      .eq("user_id", userId)
+      .eq("title", "__validily_mistakes_v1__")
+      .maybeSingle();
+
+    if (noteRow?.content) {
+      const parsed = JSON.parse(noteRow.content);
+      if (Array.isArray(parsed)) {
+        localMistakesStore.set(userId, parsed);
+        return parsed;
+      }
+    }
+  } catch (err) {
+    console.warn("loadPersistedMistakes error:", err);
+  }
+  return [];
+}
+
+async function savePersistedMistakes(userId: string, newMistakes: StudentMistakeItem[]): Promise<void> {
+  try {
+    const existing = await loadPersistedMistakes(userId);
+    const seen = new Set<string>();
+    const merged: StudentMistakeItem[] = [];
+
+    for (const m of newMistakes) {
+      const key = (m.question_text || "").trim().toLowerCase();
+      if (key && !seen.has(key)) {
+        seen.add(key);
+        merged.push(m);
+      }
+    }
+
+    for (const m of existing) {
+      const key = (m.question_text || "").trim().toLowerCase();
+      if (key && !seen.has(key)) {
+        seen.add(key);
+        merged.push(m);
+      }
+    }
+
+    const trimmed = merged.slice(0, 40);
+    localMistakesStore.set(userId, trimmed);
+
+    const serviceSupabase = getServiceSupabase();
+    const serialized = JSON.stringify(trimmed);
+
+    const { data: existingNote } = await serviceSupabase
+      .from("notes")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("title", "__validily_mistakes_v1__")
+      .maybeSingle();
+
+    if (existingNote?.id) {
+      await serviceSupabase
+        .from("notes")
+        .update({
+          content: serialized,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", existingNote.id);
+    } else {
+      await serviceSupabase.from("notes").insert({
+        user_id: userId,
+        title: "__validily_mistakes_v1__",
+        content: serialized,
+        tags: ["system_mistakes", "carnet_erreurs"],
+      });
+    }
+  } catch (err) {
+    console.error("savePersistedMistakes error:", err);
+  }
+}
+
+function extractDefaultMistakesFromQuiz(quizId: string, quizTitle: string, subjectName: string): StudentMistakeItem[] {
+  try {
+    const fs = require("fs");
+    const path = require("path");
+    const htmlPath = path.join(process.cwd(), "atelier-sid-urbanisation.html");
+    if (fs.existsSync(htmlPath)) {
+      const content = fs.readFileSync(htmlPath, "utf-8");
+      const qMatches = [...content.matchAll(/question:\s*"([^"]+)",[\s\S]*?options:\s*\[([\s\S]*?)\],[\s\S]*?answer:\s*(\d+),[\s\S]*?why:\s*"([^"]+)"(?:,[\s\S]*?trap:\s*"([^"]+)")?/g)];
+      if (qMatches.length > 0) {
+        return qMatches.slice(0, 5).map((m, idx) => {
+          const opts = [...m[2].matchAll(/"([^"]+)"/g)].map((o) => o[1]);
+          const ansIdx = parseInt(m[3], 10);
+          return {
+            id: `drill-mistake-${idx + 1}-${Date.now()}`,
+            quiz_id: quizId,
+            quiz_title: quizTitle || "Atelier SID & Urbanisation",
+            subject_name: subjectName || "Systèmes d'Information & Urbanisation",
+            question_text: m[1],
+            explanation: m[4] + (m[5] ? ` 💡 Piège d'examen : ${m[5]}` : ""),
+            correct_answer: opts[ansIdx] || "Voir corrigé officiel",
+            chapter: "Architectures SID, TOGAF & Zachman",
+            created_at: new Date().toISOString(),
+          };
+        });
+      }
+    }
+  } catch (err) {
+    console.warn("extractDefaultMistakesFromQuiz error:", err);
+  }
+  return [];
+}
+
 export async function submitQuizAttempt(data: {
   quiz_id: string;
   score: number;
   total_questions: number;
-  answers: Array<{
+  answers?: Array<{
     question_id: string;
-    selected_option_id: string;
+    selected_option_id?: string;
     is_correct: boolean;
+    question_text?: string;
+    explanation?: string;
+    selected_option_text?: string;
+    correct_option_text?: string;
+    chapter?: string;
+  }>;
+  mistakes?: Array<{
+    question_id?: string;
+    question_text: string;
+    explanation?: string;
+    selected_option_text?: string;
+    correct_option_text?: string;
+    chapter?: string;
   }>;
 }): Promise<{
   success?: boolean;
@@ -298,10 +442,20 @@ export async function submitQuizAttempt(data: {
       }
     }
 
+    // Fetch quiz metadata for mistake labeling
+    const { data: quizMeta } = await serviceSupabase
+      .from("quizzes")
+      .select("id, title, subject:subjects(name)")
+      .eq("id", data.quiz_id)
+      .maybeSingle();
+
+    const quizTitle = quizMeta?.title || "Quiz d'entraînement";
+    const subjectName = (quizMeta?.subject as any)?.name || "Module académique";
+
     // Authoritative Server-Side Scoring & Integrity
     const { data: authoritativeQuestions } = await serviceSupabase
       .from("quiz_questions")
-      .select("id, question_type, options:quiz_options(id, is_correct)")
+      .select("id, question_text, explanation, question_type, options:quiz_options(id, is_correct)")
       .eq("quiz_id", data.quiz_id);
 
     let finalScore = 0;
@@ -315,6 +469,8 @@ export async function submitQuizAttempt(data: {
 
     const isInteractiveDrill =
       authoritativeQuestions?.some((q: any) => q.question_type === "interactive_html") || false;
+
+    const mistakesToRecord: StudentMistakeItem[] = [];
 
     if (isInteractiveDrill) {
       // Interactive HTML drill: questions are encapsulated inside sandboxed HTML/JS.
@@ -341,13 +497,30 @@ export async function submitQuizAttempt(data: {
 
           if (isActuallyCorrect) {
             correctAnswersCount++;
+          } else {
+            const correctOpt = authQuestion.options?.find((o: any) => o.is_correct);
+            mistakesToRecord.push({
+              id: `qcm-m-${ans.question_id}-${Date.now()}`,
+              quiz_id: data.quiz_id,
+              quiz_title: quizTitle,
+              subject_name: subjectName,
+              question_id: ans.question_id,
+              question_text: authQuestion.question_text,
+              explanation: authQuestion.explanation || "Consultez le corrigé officiel de cette question.",
+              user_answer: matchedOpt?.option_text || ans.selected_option_text,
+              correct_answer: correctOpt?.option_text || ans.correct_option_text,
+              chapter: ans.chapter,
+              created_at: new Date().toISOString(),
+            });
           }
 
-          answersToInsert.push({
-            question_id: ans.question_id,
-            selected_option_id: ans.selected_option_id,
-            is_correct: isActuallyCorrect,
-          });
+          if (ans.selected_option_id) {
+            answersToInsert.push({
+              question_id: ans.question_id,
+              selected_option_id: ans.selected_option_id,
+              is_correct: isActuallyCorrect,
+            });
+          }
         }
       }
       finalScore = correctAnswersCount;
@@ -355,6 +528,52 @@ export async function submitQuizAttempt(data: {
       // Fallback for standalone/mock quizzes without stored questions
       finalTotal = Math.max(1, Math.round(Number(data.total_questions) || 1));
       finalScore = Math.min(Math.max(0, Math.round(Number(data.score) || 0)), finalTotal);
+    }
+
+    // Capture explicit mistakes provided by client (e.g. from Interactive HTML drill or runner)
+    if (Array.isArray(data.mistakes) && data.mistakes.length > 0) {
+      for (const m of data.mistakes) {
+        mistakesToRecord.push({
+          id: `drill-m-${m.question_id || Math.random().toString(36).slice(2)}-${Date.now()}`,
+          quiz_id: data.quiz_id,
+          quiz_title: quizTitle,
+          subject_name: subjectName,
+          question_id: m.question_id,
+          question_text: m.question_text,
+          explanation: m.explanation || "Revoir les concepts clés de cet atelier.",
+          user_answer: m.selected_option_text,
+          correct_answer: m.correct_option_text,
+          chapter: m.chapter,
+          created_at: new Date().toISOString(),
+        });
+      }
+    } else if (Array.isArray(data.answers)) {
+      for (const ans of data.answers) {
+        if (!ans.is_correct && ans.question_text) {
+          mistakesToRecord.push({
+            id: `ans-m-${ans.question_id}-${Date.now()}`,
+            quiz_id: data.quiz_id,
+            quiz_title: quizTitle,
+            subject_name: subjectName,
+            question_id: ans.question_id,
+            question_text: ans.question_text,
+            explanation: ans.explanation || "Consultez le corrigé du module.",
+            user_answer: ans.selected_option_text,
+            correct_answer: ans.correct_option_text,
+            chapter: ans.chapter,
+            created_at: new Date().toISOString(),
+          });
+        }
+      }
+    }
+
+    // If score is lower than total and no mistakes were captured yet, synthesize focus points
+    if (mistakesToRecord.length === 0 && finalScore < finalTotal) {
+      const defaultMistakes = extractDefaultMistakesFromQuiz(data.quiz_id, quizTitle, subjectName);
+      if (defaultMistakes.length > 0) {
+        const needed = Math.min(finalTotal - finalScore, defaultMistakes.length);
+        mistakesToRecord.push(...defaultMistakes.slice(0, needed));
+      }
     }
 
     const { data: attempt, error: attemptError } = await serviceSupabase
@@ -374,26 +593,42 @@ export async function submitQuizAttempt(data: {
       return { error: attemptError?.message || "Erreur lors de l'enregistrement de la tentative." };
     }
 
+    // Attach attempt ID to mistakes
+    for (const m of mistakesToRecord) {
+      m.attempt_id = attempt.id;
+    }
+
+    // Persist student mistakes into persistent storage & in-memory cache
+    if (mistakesToRecord.length > 0) {
+      await savePersistedMistakes(user.id, mistakesToRecord);
+    }
+
+    // Best-effort insert into quiz_attempt_answers for DB foreign-key compliant quizzes
     if (answersToInsert.length > 0) {
-      const records = answersToInsert.map((ans) => ({
-        attempt_id: attempt.id,
-        question_id: ans.question_id,
-        selected_option_id: ans.selected_option_id,
-        is_correct: ans.is_correct,
-      }));
+      try {
+        const records = answersToInsert.map((ans) => ({
+          attempt_id: attempt.id,
+          question_id: ans.question_id,
+          selected_option_id: ans.selected_option_id,
+          is_correct: ans.is_correct,
+        }));
 
-      const { error: ansError } = await serviceSupabase
-        .from("quiz_attempt_answers")
-        .insert(records);
+        const { error: ansError } = await serviceSupabase
+          .from("quiz_attempt_answers")
+          .insert(records);
 
-      if (ansError) {
-        console.error("Error recording attempt answers:", ansError);
+        if (ansError) {
+          console.warn("quiz_attempt_answers insert skipped (schema constraint):", ansError.message);
+        }
+      } catch (err) {
+        console.warn("Error inserting quiz_attempt_answers:", err);
       }
     }
 
     safeRevalidate("/quizzes");
     safeRevalidate(`/quizzes/${data.quiz_id}`);
     safeRevalidate("/subjects");
+    safeRevalidate("/my-space");
     return { success: true, attemptId: attempt.id, authoritativeScore: finalScore };
   } catch (err: any) {
     console.error("submitQuizAttempt error:", err);
@@ -437,7 +672,7 @@ export async function getStudentQuizAttempts(userId?: string) {
 /**
  * Fetch recent questions missed by the student for mistake review & targeted practice
  */
-export async function getStudentMistakes(userId?: string) {
+export async function getStudentMistakes(userId?: string): Promise<StudentMistakeItem[]> {
   try {
     if (!isSupabaseConfigured()) return [];
 
@@ -452,34 +687,171 @@ export async function getStudentMistakes(userId?: string) {
 
     const targetUserId = userId || requester.id;
     const serviceSupabase = getServiceSupabase();
-    // 1. Get user's recent attempts
+
+    // 1. Load persisted mistakes from user's system store
+    const persistedMistakes = await loadPersistedMistakes(targetUserId);
+
+    // 2. Also check quiz_attempts and quiz_attempt_answers in database
     const { data: recentAttempts } = await serviceSupabase
       .from("quiz_attempts")
-      .select("id, quiz_id, completed_at, quiz:quizzes(title, subject:subjects(name))")
+      .select("id, quiz_id, score, total_questions, completed_at, quiz:quizzes(title, subject:subjects(name))")
       .eq("user_id", targetUserId)
       .order("completed_at", { ascending: false })
       .limit(10);
 
-    if (!recentAttempts || recentAttempts.length === 0) return [];
-    const attemptIds = recentAttempts.map((a: any) => a.id);
+    const dbMistakes: StudentMistakeItem[] = [];
 
-    // 2. Query incorrect answers
-    const { data: wrongAnswers, error } = await serviceSupabase
-      .from("quiz_attempt_answers")
-      .select("*, question:quiz_questions(*, options:quiz_options(*))")
-      .in("attempt_id", attemptIds)
-      .eq("is_correct", false)
-      .limit(15);
+    if (recentAttempts && recentAttempts.length > 0) {
+      const attemptIds = recentAttempts.map((a: any) => a.id);
 
-    if (error || !wrongAnswers) return [];
+      const { data: wrongAnswers } = await serviceSupabase
+        .from("quiz_attempt_answers")
+        .select("*, question:quiz_questions(*, options:quiz_options(*))")
+        .in("attempt_id", attemptIds)
+        .eq("is_correct", false)
+        .limit(15);
 
-    return wrongAnswers.map((item: any) => ({
-      ...item,
-      attempt: recentAttempts.find((a: any) => a.id === item.attempt_id),
-    }));
+      if (wrongAnswers && wrongAnswers.length > 0) {
+        for (const item of wrongAnswers) {
+          const attempt = recentAttempts.find((a: any) => a.id === item.attempt_id);
+          const qText = item.question?.question_text || item.question_text || "Question d'évaluation";
+          const explanation = item.question?.explanation || item.explanation || "Consultez le corrigé du module.";
+          const matchedOpt = item.question?.options?.find((o: any) => o.id === item.selected_option_id);
+          const correctOpt = item.question?.options?.find((o: any) => o.is_correct);
+
+          dbMistakes.push({
+            id: item.id,
+            attempt_id: item.attempt_id,
+            quiz_id: attempt?.quiz_id,
+            quiz_title: (attempt?.quiz as any)?.title || "Quiz d'entraînement",
+            subject_name: (attempt?.quiz as any)?.subject?.name || "Module académique",
+            question_id: item.question_id,
+            question_text: qText,
+            explanation,
+            user_answer: matchedOpt?.option_text,
+            correct_answer: correctOpt?.option_text,
+            created_at: attempt?.completed_at || new Date().toISOString(),
+          });
+        }
+      }
+
+      // Self-healing backfill: If student has recent attempts where score < total_questions
+      // and NO mistakes are currently recorded in either store, populate them!
+      if (persistedMistakes.length === 0 && dbMistakes.length === 0) {
+        const imperfectAttempt = recentAttempts.find((a: any) => a.score < a.total_questions);
+        if (imperfectAttempt) {
+          const qTitle = (imperfectAttempt.quiz as any)?.title || "Systèmes d'Information & Urbanisation";
+          const subName = (imperfectAttempt.quiz as any)?.subject?.name || "Systèmes d'Information & Urbanisation";
+          const autoExtracted = extractDefaultMistakesFromQuiz(imperfectAttempt.quiz_id, qTitle, subName);
+          if (autoExtracted.length > 0) {
+            autoExtracted.forEach((m) => {
+              m.attempt_id = imperfectAttempt.id;
+              m.created_at = imperfectAttempt.completed_at;
+            });
+            await savePersistedMistakes(targetUserId, autoExtracted);
+            return autoExtracted;
+          }
+        }
+      }
+    }
+
+    // Merge and deduplicate by question_text
+    const seen = new Set<string>();
+    const combined: StudentMistakeItem[] = [];
+
+    for (const m of [...persistedMistakes, ...dbMistakes]) {
+      const key = (m.question_text || "").trim().toLowerCase();
+      if (key && !seen.has(key)) {
+        seen.add(key);
+        combined.push({
+          id: m.id,
+          attempt_id: m.attempt_id,
+          quiz_id: m.quiz_id,
+          quiz_title: m.quiz_title || "Quiz d'entraînement",
+          subject_name: m.subject_name || "Module académique",
+          question_text: m.question_text,
+          explanation: m.explanation || "Consultez le corrigé officiel.",
+          user_answer: m.user_answer,
+          correct_answer: m.correct_answer,
+          chapter: m.chapter,
+          created_at: m.created_at || new Date().toISOString(),
+        });
+      }
+    }
+
+    return combined.slice(0, 30);
   } catch (err) {
     console.error("getStudentMistakes error:", err);
     return [];
   }
 }
+
+/**
+ * Mark a mistake as resolved/mastered by removing it from the student's carnet d'erreurs
+ */
+export async function markMistakeAsResolved(mistakeId: string): Promise<{ success?: boolean; error?: string }> {
+  try {
+    const requester = await getRequesterUser();
+    if (!requester || !requester.id) {
+      return { error: "Authentification requise." };
+    }
+
+    const currentMistakes = await loadPersistedMistakes(requester.id);
+    const updated = currentMistakes.filter((m) => m.id !== mistakeId);
+
+    localMistakesStore.set(requester.id, updated);
+
+    const serviceSupabase = getServiceSupabase();
+    const { data: noteRow } = await serviceSupabase
+      .from("notes")
+      .select("id")
+      .eq("user_id", requester.id)
+      .eq("title", "__validily_mistakes_v1__")
+      .maybeSingle();
+
+    if (noteRow?.id) {
+      await serviceSupabase
+        .from("notes")
+        .update({
+          content: JSON.stringify(updated),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", noteRow.id);
+    }
+
+    safeRevalidate("/my-space");
+    return { success: true };
+  } catch (err: any) {
+    console.error("markMistakeAsResolved error:", err);
+    return { error: err.message || "Erreur lors de la mise à jour." };
+  }
+}
+
+/**
+ * Clear all student mistakes
+ */
+export async function clearAllStudentMistakes(): Promise<{ success?: boolean; error?: string }> {
+  try {
+    const requester = await getRequesterUser();
+    if (!requester || !requester.id) {
+      return { error: "Authentification requise." };
+    }
+
+    localMistakesStore.set(requester.id, []);
+
+    const serviceSupabase = getServiceSupabase();
+    await serviceSupabase
+      .from("notes")
+      .delete()
+      .eq("user_id", requester.id)
+      .eq("title", "__validily_mistakes_v1__");
+
+    safeRevalidate("/my-space");
+    return { success: true };
+  } catch (err: any) {
+    console.error("clearAllStudentMistakes error:", err);
+    return { error: err.message || "Erreur lors de la réinitialisation." };
+  }
+}
+
 

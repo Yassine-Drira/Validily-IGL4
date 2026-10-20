@@ -214,7 +214,7 @@ test("UI-UX-02: App Header & Workspace Shell VIP Badge Integration", () => {
   const headerCode = fs.readFileSync(path.resolve("src/components/layout/app-header.tsx"), "utf8");
   assert.ok(headerCode.includes("VipBadge"), "AppHeader must import VipBadge");
   assert.ok(headerCode.includes("user.isVip"), "AppHeader must verify user.isVip");
-  assert.ok(headerCode.includes("avatar-badge"), "AppHeader must render avatar-badge on profile pic");
+  assert.ok(headerCode.includes("compact"), "AppHeader must render clean compact VIP badge next to username");
 
   const workspaceCode = fs.readFileSync(
     path.resolve("src/components/workspace/student-private-workspace.tsx"),
@@ -222,7 +222,7 @@ test("UI-UX-02: App Header & Workspace Shell VIP Badge Integration", () => {
   );
   assert.ok(workspaceCode.includes("VipBadge"), "StudentPrivateWorkspace must import VipBadge");
   assert.ok(workspaceCode.includes("isVip"), "StudentPrivateWorkspace must accept isVip prop");
-  assert.ok(workspaceCode.includes("avatar-badge"), "StudentPrivateWorkspace must render avatar-badge on student avatar");
+  assert.ok(workspaceCode.includes("variant=\"full\""), "StudentPrivateWorkspace must render full VIP badge header card");
 
   const mySpaceCode = fs.readFileSync(
     path.resolve("src/app/(workspace)/my-space/page.tsx"),

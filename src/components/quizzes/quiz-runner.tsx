@@ -139,11 +139,20 @@ export function QuizRunner({
           quiz_id: quizId,
           score: finalScore,
           total_questions: normalizedQuestions.length,
-          answers: answers.map((a) => ({
-            question_id: a.questionId,
-            selected_option_id: a.selectedId,
-            is_correct: a.isCorrect,
-          })),
+          answers: answers.map((a) => {
+            const q = normalizedQuestions.find((nq) => nq.id === a.questionId);
+            const selOpt = q?.options?.find((o: any) => o.id === a.selectedId);
+            const correctOpt = q?.options?.find((o: any) => o.is_correct);
+            return {
+              question_id: a.questionId,
+              selected_option_id: a.selectedId,
+              is_correct: a.isCorrect,
+              question_text: q?.question_text,
+              explanation: q?.explanation,
+              selected_option_text: selOpt?.option_text || selOpt?.text,
+              correct_option_text: correctOpt?.option_text || correctOpt?.text,
+            };
+          }),
         })
           .then((res) => {
             setHasPersisted(true);

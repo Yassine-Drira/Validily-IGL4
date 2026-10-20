@@ -159,7 +159,8 @@ export const SANDBOX_STORAGE_SHIM = `
         if (extra.timeSpentSeconds) payload.timeSpentSeconds = Number(extra.timeSpentSeconds);
         if (extra.mistakesCount !== undefined) payload.mistakesCount = Number(extra.mistakesCount);
         if (extra.flashcardsReviewed !== undefined) payload.flashcardsReviewed = Number(extra.flashcardsReviewed);
-        if (extra.exercisesCompleted !== undefined) payload.exercisesCompleted = Number(extra.exercisesCompleted);
+        if (extra.mistakes && Array.isArray(extra.mistakes)) payload.mistakes = extra.mistakes;
+        if (extra.answers && Array.isArray(extra.answers)) payload.answers = extra.answers;
         if (extra.details) payload.details = extra.details;
       }
       window.parent.postMessage(payload, '*');

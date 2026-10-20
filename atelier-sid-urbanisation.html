@@ -2893,12 +2893,85 @@ Au Centre : Exigences    : Gestion transversale permanente des besoins tout au l
       });
     }
 
-    document.getElementById('btnSyncValidily').addEventListener('click', function() {
-      const correct = Object.entries(userAnswers).filter(function(entry) {
-        return entry[1] === QCM_DATA[entry[0]].answer;
-      }).length;
-      syncWithValidily(correct, 20);
-    });
+    function collectMistakes() {
+      const mistakes = [];
+      Object.entries(userAnswers).forEach(function(entry) {
+        const idx = parseInt(entry[0], 10);
+        const ans = entry[1];
+        const q = QCM_DATA[idx];
+        if (!q) return;
+        if (ans !== q.answer) {
+          mistakes.push({
+            question_id: 'sid-q-' + (q.id || idx + 1),
+            question_text: q.question,
+            selected_option_id: 'sid-opt-' + ans,
+            selected_option_text: q.options ? q.options[ans] : '',
+            correct_option_text: q.options ? q.options[q.answer] : '',
+            explanation: (q.why || '') + (q.trap ? " 💡 Piège d'examen : " + q.trap : ''),
+            chapter: q.chapter || "Systèmes d'Information & Urbanisation",
+            is_correct: false,
+          });
+        }
+      });
+      return mistakes;
+    }
+
+    function collectAllAnswers() {
+      return Object.entries(userAnswers).map(function(entry) {
+        const idx = parseInt(entry[0], 10);
+        const ans = entry[1];
+        const q = QCM_DATA[idx];
+        return {
+          question_id: 'sid-q-' + (q.id || idx + 1),
+          question_text: q ? q.question : '',
+          selected_option_id: 'sid-opt-' + ans,
+          selected_option_text: q && q.options ? q.options[ans] : '',
+          correct_option_text: q && q.options ? q.options[q.answer] : '',
+          explanation: q ? q.why : '',
+          chapter: q ? q.chapter : '',
+          is_correct: q ? ans === q.answer : false,
+        };
+      });
+    }
+
+    function syncWithValidily(correct, total) {
+      const mistakes = collectMistakes();
+      const allAnswers = collectAllAnswers();
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({
+          type: 'VALIDILY_QUIZ_COMPLETED',
+          score: correct,
+          total: total || 20,
+          mistakes: mistakes,
+          answers: allAnswers,
+        }, '*');
+      }
+      showToast('✦ Score (' + correct + '/' + (total || 20) + ') & ' + mistakes.length + ' erreur(s) synchronisées avec votre carnet !');
+      playSynthSound('correct');
+    }
+
+    function sendProgressToValidily(answeredCount, total, correctCount) {
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({
+          type: 'VALIDILY_QUIZ_PROGRESS',
+          scoreSoFar: correctCount,
+          answered: answeredCount,
+          total: total || 20,
+          mistakes: collectMistakes(),
+          answers: collectAllAnswers(),
+        }, '*');
+      }
+    }
+
+    const btnSync = document.getElementById('btnSyncValidily');
+    if (btnSync) {
+      btnSync.addEventListener('click', function() {
+        const correct = Object.entries(userAnswers).filter(function(entry) {
+          return entry[1] === QCM_DATA[entry[0]].answer;
+        }).length;
+        syncWithValidily(correct, 20);
+      });
+    }
 
     /* ==========================================================================
        13. INITIALISATION COMPLÈTE AU CHARGEMENT

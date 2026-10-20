@@ -28,6 +28,7 @@ import { Button } from "@/components/ui/button";
 import { TreeSvg, SPECIES_METADATA } from "@/components/forest/tree-models";
 import { ForestCanvas } from "@/components/forest/forest-canvas";
 import { AchievementBadgeIcon } from "@/components/forest/achievement-badge-icon";
+import { VipBadge } from "@/components/ui/vip-badge";
 import {
   getStudentPublicProfile,
   StudentPublicProfile,
@@ -232,16 +233,6 @@ export function StudentProfileModal({
                     <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#2855D9] to-indigo-700 text-white font-extrabold text-lg flex items-center justify-center border-2 border-white shadow-md">
                       {initials}
                     </div>
-                  )}
-
-                  {profile.isVip && (
-                    <span
-                      className="absolute -bottom-1.5 -right-1.5 px-1.5 py-0.5 rounded-full bg-amber-400 text-amber-950 font-bold text-[9px] border border-white shadow-xs flex items-center space-x-0.5"
-                      title="Membre VIP Validily"
-                    >
-                      <Sparkles className="w-2.5 h-2.5" />
-                      <span>VIP</span>
-                    </span>
                   )}
                 </div>
 
