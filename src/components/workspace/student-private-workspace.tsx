@@ -1040,7 +1040,7 @@ export function StudentPrivateWorkspace({
                 Uniquement accessibles par votre compte. Aucune fuite vers les autres étudiants.
               </p>
             </div>
-            <Link href="/library?action=upload">
+            <Link href="/library?action=upload&visibility=private">
               <Button size="sm" variant="primary" className="text-xs">
                 <Upload className="w-3.5 h-3.5 mr-1" />
                 <span>Ajouter un fichier privé</span>

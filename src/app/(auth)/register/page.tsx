@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { registerWithEmailAction } from "@/lib/actions/auth-actions";
 import { Button } from "@/components/ui/button";
 import { Lock, Mail, User, AlertCircle, CheckCircle2 } from "lucide-react";
 import { ValidilySymbol } from "@/components/brand/validily-logo";
@@ -24,26 +25,48 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      const supabase = createClient();
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: fullName,
-          },
-        },
-      });
-
-      if (error) {
-        setErrorMsg(error.message);
-      } else {
+      // 1. Try server-side action to bypass client extension/fetch hooks
+      const res = await registerWithEmailAction(email, password, fullName);
+      if (res.success) {
         setSuccessMsg(
-          "Registration initiated! Check your university email inbox to verify your account or sign in."
+          "Inscription initiée ! Vérifiez votre boîte email universitaire pour valider votre compte ou vous connecter."
+        );
+        return;
+      }
+
+      // If server returned a business/validation error, display it
+      if (res.error) {
+        setErrorMsg(res.error);
+        return;
+      }
+    } catch (serverErr: any) {
+      console.warn("Server registration attempt failed, falling back to client:", serverErr);
+      try {
+        const supabase = createClient();
+        const { error } = await supabase.auth.signUp({
+          email: email.trim(),
+          password,
+          options: {
+            data: {
+              full_name: fullName.trim(),
+            },
+          },
+        });
+
+        if (error) {
+          setErrorMsg(error.message);
+        } else {
+          setSuccessMsg(
+            "Inscription initiée ! Vérifiez votre boîte email universitaire pour valider votre compte ou vous connecter."
+          );
+        }
+      } catch (err: any) {
+        setErrorMsg(
+          err?.message?.includes("Failed to fetch")
+            ? "Impossible de joindre le serveur. Vérifiez votre connexion internet."
+            : err?.message || "Échec d'inscription. Veuillez réessayer."
         );
       }
-    } catch (err: any) {
-      setErrorMsg(err?.message || "Failed to register. Please try again.");
     } finally {
       setLoading(false);
     }

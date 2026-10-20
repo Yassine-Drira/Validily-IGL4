@@ -305,3 +305,39 @@ test("UI-UX-04: Admin Manager Temporary Admin Governance & UI Controls", () => {
     "updateSubject must await resolveSemesterId to prevent UUID syntax errors"
   );
 });
+
+test("UI-UX-05: VIP Persistence Engine Across User Metadata and Page Refresh", () => {
+  const vipCode = fs.readFileSync(path.resolve("src/lib/actions/vip-actions.ts"), "utf8");
+
+  // 1. grantVipAccess persists to Supabase auth user_metadata
+  assert.ok(
+    vipCode.includes("is_vip: true") &&
+      vipCode.includes("vip_entitlement: newEntitlement") &&
+      vipCode.includes("updateUserById"),
+    "grantVipAccess must persistently write is_vip and vip_entitlement to auth user_metadata"
+  );
+
+  // 2. getUserVipStatus reads persistent metadata so VIP is never lost on refresh
+  assert.ok(
+    vipCode.includes("meta?.is_vip") &&
+      vipCode.includes("vip_entitlement") &&
+      vipCode.includes("getUserById"),
+    "getUserVipStatus must check persistent user_metadata so VIP badge survives page reloads"
+  );
+
+  // 3. listVipEntitlements aggregates from user_metadata so admin list is never empty on refresh
+  assert.ok(
+    vipCode.includes("listUsers") &&
+      vipCode.includes("vip_entitlement") &&
+      vipCode.includes("profileMap"),
+    "listVipEntitlements must load from persistent user_metadata and match user profiles"
+  );
+
+  // 4. revokeVipAccess properly clears is_vip and marks status revoked in user_metadata
+  assert.ok(
+    vipCode.includes("is_vip: false") &&
+      vipCode.includes('status: "revoked"'),
+    "revokeVipAccess must persistently clear is_vip flag and mark status as revoked"
+  );
+});
+

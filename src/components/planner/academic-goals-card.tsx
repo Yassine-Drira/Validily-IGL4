@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   Target,
   Clock,
@@ -115,6 +115,9 @@ export function AcademicGoalsCard({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingGoalId, setEditingGoalId] = useState<string | null>(null);
 
+  // Client-side cache to guarantee instant 0ms tab switching
+  const goalsCacheRef = useRef<Record<string, AcademicGoalWithProgress[]>>({});
+
   // Form State
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -145,21 +148,57 @@ export function AcademicGoalsCard({
   // Compute period key for active tab
   const periodKey = useMemo(() => computePeriodKey(period, activeDate), [period, activeDate]);
 
-  const loadGoals = useCallback(async () => {
-    setLoading(true);
-    const res = await getAcademicGoalsAction({
-      period_type: period,
-      period_key: periodKey,
-    });
-    if (res.success) {
-      setGoals(res.data);
+  // Instant tab switch handler using SWR in-memory cache
+  const handlePeriodChange = (newPeriod: AcademicGoalPeriod) => {
+    setPeriod(newPeriod);
+    const newKey = computePeriodKey(newPeriod, activeDate);
+    if (goalsCacheRef.current[newKey]) {
+      setGoals(goalsCacheRef.current[newKey]);
+      setLoading(false);
     }
-    setLoading(false);
+  };
+
+  const loadGoals = useCallback(async () => {
+    const hasCached = !!goalsCacheRef.current[periodKey];
+    if (!hasCached) {
+      setLoading(true);
+    }
+    try {
+      const res = await getAcademicGoalsAction({
+        period_type: period,
+        period_key: periodKey,
+      });
+      if (res.success) {
+        setGoals(res.data);
+        goalsCacheRef.current[periodKey] = res.data;
+      }
+    } finally {
+      setLoading(false);
+    }
   }, [period, periodKey]);
 
   useEffect(() => {
     loadGoals();
   }, [loadGoals]);
+
+  // Background prefetch for sibling periods so switching between Jour/Semaine/Mois is instant
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      const siblingPeriods: AcademicGoalPeriod[] = (["daily", "weekly", "monthly"] as AcademicGoalPeriod[]).filter(
+        (p) => p !== period
+      );
+      for (const p of siblingPeriods) {
+        const pKey = computePeriodKey(p, activeDate);
+        if (!goalsCacheRef.current[pKey]) {
+          const res = await getAcademicGoalsAction({ period_type: p, period_key: pKey });
+          if (res.success) {
+            goalsCacheRef.current[pKey] = res.data;
+          }
+        }
+      }
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [activeDate, period]);
 
   // Open modal for creation
   const handleOpenCreateModal = () => {
@@ -319,7 +358,7 @@ export function AcademicGoalsCard({
               <button
                 key={p}
                 type="button"
-                onClick={() => setPeriod(p)}
+                onClick={() => handlePeriodChange(p)}
                 className={`px-2 py-1 rounded transition-colors capitalize ${
                   period === p
                     ? "bg-white text-[#2855D9] font-bold shadow-2xs"
@@ -343,7 +382,12 @@ export function AcademicGoalsCard({
       </div>
 
       {/* 2. Goals List */}
-      {goals.length === 0 ? (
+      {loading && goals.length === 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 animate-pulse">
+          <div className="h-28 rounded-2xl bg-[#F4F6FA] border border-[#E4E8F0]" />
+          <div className="h-28 rounded-2xl bg-[#F4F6FA] border border-[#E4E8F0]" />
+        </div>
+      ) : goals.length === 0 ? (
         <div className="p-6 text-center text-xs text-[#68748A] border border-dashed border-[#E4E8F0] rounded-xl space-y-2">
           <Target className="w-6 h-6 mx-auto opacity-35 text-[#2855D9]" />
           <p className="font-semibold text-[#111A2E]">Aucun objectif défini pour {periodLabels[period].toLowerCase()}</p>

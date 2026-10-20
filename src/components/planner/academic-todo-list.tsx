@@ -53,6 +53,7 @@ interface AcademicTodoListProps {
   onRefresh: () => void;
   selectedDate?: string;
   onTasksChange?: (updatedTasks: AcademicTask[]) => void;
+  onTaskDelete?: (taskId: string) => void;
 }
 
 type FilterTab = "all" | "today" | "upcoming" | "overdue" | "completed";
@@ -63,6 +64,7 @@ export function AcademicTodoList({
   onRefresh,
   selectedDate,
   onTasksChange,
+  onTaskDelete,
 }: AcademicTodoListProps) {
   // Local optimistic state for instant checkbox response (< 1ms)
   const [localTasks, setLocalTasks] = useState<AcademicTask[]>(tasks);
@@ -363,12 +365,26 @@ export function AcademicTodoList({
     onRefresh();
   };
 
-  // Delete task
+  // Delete task with 0ms optimistic removal and synchronized parent eviction
   const handleDeleteTask = async (taskId: string) => {
-    setLocalTasks((prev) => prev.filter((t) => t.id !== taskId));
-    await deleteAcademicTaskAction(taskId);
+    // 1. Immediately close modal to eliminate perceived lag
     setDeletingTaskId(null);
-    onRefresh();
+    // 2. Instant optimistic local eviction
+    setLocalTasks((prev) => {
+      const updated = prev.filter((t) => t.id !== taskId);
+      onTasksChange?.(updated);
+      return updated;
+    });
+    // 3. Immediately evict from parent shell state
+    onTaskDelete?.(taskId);
+    // 4. Server persistence with resilient fallback
+    try {
+      await deleteAcademicTaskAction(taskId);
+    } catch (err) {
+      console.error("Error deleting task:", err);
+    } finally {
+      onRefresh();
+    }
   };
 
   // Toggle expand
@@ -572,7 +588,8 @@ export function AcademicTodoList({
               <div
                 key={task.id}
                 className={cn(
-                  "group relative overflow-hidden rounded-xl p-3 transition-all duration-300 ease-out border",
+                  "group relative rounded-xl p-3 transition-all duration-300 ease-out border",
+                  isMenuOpen ? "z-30 overflow-visible" : "z-1 overflow-visible",
                   task.is_completed
                     ? "opacity-75 border-[#E4E8F0] bg-[#FAFAF7]/95 backdrop-blur-xs shadow-none"
                     : isOverdue
@@ -587,7 +604,7 @@ export function AcademicTodoList({
                 {!task.is_completed && (
                   <div
                     className={cn(
-                      "absolute left-0 top-0 bottom-0 w-1",
+                      "absolute left-0 top-0 bottom-0 w-1 rounded-l-xl",
                       isOverdue ? "bg-rose-500 shadow-[0_0_6px_rgba(244,63,94,0.4)]" : theme.accentBar
                     )}
                   />
@@ -644,6 +661,19 @@ export function AcademicTodoList({
                       size="sm"
                     />
 
+                    {/* Quick Direct Delete Action */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDeletingTaskId(task.id);
+                      }}
+                      className="p-1 rounded-md text-[#68748A] hover:text-[#DC2626] hover:bg-rose-50 transition-colors cursor-pointer"
+                      title="Supprimer la tâche"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+
                     {/* Overflow menu toggle */}
                     <button
                       type="button"
@@ -651,7 +681,7 @@ export function AcademicTodoList({
                         e.stopPropagation();
                         setActiveMenuTaskId(isMenuOpen ? null : task.id);
                       }}
-                      className="p-1 rounded-md text-[#68748A] hover:text-[#111A2E] hover:bg-[#F4F6FA] transition-colors"
+                      className="p-1 rounded-md text-[#68748A] hover:text-[#111A2E] hover:bg-[#F4F6FA] transition-colors cursor-pointer"
                       title="Plus d'actions"
                     >
                       <MoreVertical className="w-4 h-4" />
@@ -659,13 +689,13 @@ export function AcademicTodoList({
 
                     {/* Secondary Contextual Menu */}
                     {isMenuOpen && (
-                      <div className="absolute right-0 top-full mt-1 w-44 bg-white border border-[#E4E8F0] rounded-xl shadow-lg z-30 py-1 text-xs animate-in fade-in zoom-in-95 duration-100">
+                      <div className="absolute right-0 top-full mt-1.5 w-48 bg-white border border-[#E4E8F0] rounded-xl shadow-xl z-50 py-1.5 text-xs animate-in fade-in zoom-in-95 duration-100">
                         <button
                           type="button"
                           onClick={() => handleOpenScheduleModal(task)}
-                          className="w-full px-3 py-1.5 text-left flex items-center gap-2 hover:bg-[#EDF2FF] text-[#2855D9] font-medium"
+                          className="w-full px-3 py-2 text-left flex items-center gap-2.5 hover:bg-[#EDF2FF] text-[#2855D9] font-medium transition-colors cursor-pointer"
                         >
-                          <CalendarPlus className="w-3.5 h-3.5" />
+                          <CalendarPlus className="w-4 h-4 shrink-0 text-[#2855D9]" />
                           <span>Planifier sur l'agenda</span>
                         </button>
                         <button
@@ -674,17 +704,17 @@ export function AcademicTodoList({
                             setActiveMenuTaskId(null);
                             setEditingTask(task);
                           }}
-                          className="w-full px-3 py-1.5 text-left flex items-center gap-2 hover:bg-[#F4F6FA] text-[#111A2E]"
+                          className="w-full px-3 py-2 text-left flex items-center gap-2.5 hover:bg-[#F4F6FA] text-[#111A2E] transition-colors cursor-pointer"
                         >
-                          <Edit2 className="w-3.5 h-3.5 text-[#68748A]" />
+                          <Edit2 className="w-4 h-4 shrink-0 text-[#68748A]" />
                           <span>Modifier</span>
                         </button>
                         <button
                           type="button"
                           onClick={() => handleDuplicateTask(task)}
-                          className="w-full px-3 py-1.5 text-left flex items-center gap-2 hover:bg-[#F4F6FA] text-[#111A2E]"
+                          className="w-full px-3 py-2 text-left flex items-center gap-2.5 hover:bg-[#F4F6FA] text-[#111A2E] transition-colors cursor-pointer"
                         >
-                          <Copy className="w-3.5 h-3.5 text-[#68748A]" />
+                          <Copy className="w-4 h-4 shrink-0 text-[#68748A]" />
                           <span>Dupliquer</span>
                         </button>
                         <div className="border-t border-[#E4E8F0] my-1" />
@@ -694,9 +724,9 @@ export function AcademicTodoList({
                             setActiveMenuTaskId(null);
                             setDeletingTaskId(task.id);
                           }}
-                          className="w-full px-3 py-1.5 text-left flex items-center gap-2 hover:bg-[#DC2626]/10 text-[#DC2626]"
+                          className="w-full px-3 py-2 text-left flex items-center gap-2.5 hover:bg-rose-50 text-[#DC2626] font-medium transition-colors cursor-pointer"
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
+                          <Trash2 className="w-4 h-4 shrink-0 text-[#DC2626]" />
                           <span>Supprimer</span>
                         </button>
                       </div>

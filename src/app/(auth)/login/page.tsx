@@ -4,9 +4,10 @@ import Link from "next/link";
 import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { loginWithEmailAction } from "@/lib/actions/auth-actions";
 import { flushAuthCookiesClient } from "@/lib/auth/cookie-utils";
 import { Button } from "@/components/ui/button";
-import { Lock, Mail, AlertCircle, ShieldCheck, ArrowRight } from "lucide-react";
+import { Lock, Mail, AlertCircle, ShieldCheck, ArrowRight, CheckCircle2 } from "lucide-react";
 import { ValidilySymbol } from "@/components/brand/validily-logo";
 
 function LoginForm() {
@@ -14,6 +15,8 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const nextUrl = searchParams.get("next") || "/";
   const isAdminNext = nextUrl.includes("admin");
+  const resetSuccess = searchParams.get("reset") === "success";
+  const urlError = searchParams.get("error");
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -26,22 +29,42 @@ function LoginForm() {
     setLoading(true);
 
     try {
-      // Flush any old accumulated sb-* chunk cookies before setting new session
+      // 1. Flush any old accumulated sb-* chunk cookies before setting new session
       flushAuthCookiesClient();
 
-      const supabase = createClient();
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      // 2. Perform authentication via robust Server Action
+      // This bypasses client-side Chrome extensions, adblockers, and CORS
+      const result = await loginWithEmailAction(email, password);
 
-      if (error) {
-        setErrorMsg(error.message);
-      } else {
-        window.location.href = nextUrl;
+      if (!result.success) {
+        setErrorMsg(result.error || "Échec de connexion. Vérifiez vos identifiants.");
+        return;
       }
+
+      // 3. Navigation with full page reload to activate HTTP session cookies
+      window.location.href = nextUrl;
     } catch (err: any) {
-      setErrorMsg(err?.message || "Échec de connexion. Vérifiez vos identifiants.");
+      console.error("Login attempt error:", err);
+      // Fallback: If server action failed due to transient network, attempt client-side gracefully
+      try {
+        const supabase = createClient();
+        const { error } = await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password,
+        });
+        if (error) {
+          setErrorMsg(error.message);
+          return;
+        }
+        window.location.href = nextUrl;
+        return;
+      } catch (clientErr: any) {
+        setErrorMsg(
+          clientErr?.message?.includes("Failed to fetch")
+            ? "Impossible de contacter le serveur d'authentification. Vérifiez votre connexion internet."
+            : err?.message || "Échec de connexion. Vérifiez vos identifiants."
+        );
+      }
     } finally {
       setLoading(false);
     }
@@ -70,6 +93,29 @@ function LoginForm() {
               Connectez-vous avec votre compte administrateur pour configurer les matières et semestres.
             </p>
           </div>
+        </div>
+      )}
+
+      {resetSuccess && (
+        <div className="mb-5 p-3.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs flex items-start space-x-2.5 shadow-2xs">
+          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+          <div>
+            <span className="font-semibold text-emerald-900">Mot de passe réinitialisé !</span>
+            <p className="text-[11px] text-emerald-700 mt-0.5">
+              Votre mot de passe a été mis à jour avec succès. Vous pouvez maintenant vous connecter.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {urlError && !errorMsg && (
+        <div className="mb-4 p-3 rounded-md bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center space-x-2">
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          <span>
+            {urlError === "auth-code-error"
+              ? "Le lien d'authentification est invalide ou a expiré. Veuillez refaire une demande."
+              : decodeURIComponent(urlError)}
+          </span>
         </div>
       )}
 

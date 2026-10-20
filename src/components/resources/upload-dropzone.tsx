@@ -20,6 +20,7 @@ interface UploadDropzoneProps {
   subjects: Subject[];
   categories: ResourceCategory[];
   defaultSubjectId?: string;
+  initialVisibility?: "public" | "private";
   onSuccess?: () => void;
 }
 
@@ -27,6 +28,7 @@ export function UploadDropzone({
   subjects,
   categories,
   defaultSubjectId,
+  initialVisibility = "public",
   onSuccess,
 }: UploadDropzoneProps) {
   const router = useRouter();
@@ -42,7 +44,7 @@ export function UploadDropzone({
   const [chapter, setChapter] = useState<string>("");
   const [tagInput, setTagInput] = useState<string>("");
   const [tags, setTags] = useState<string[]>([]);
-  const [submitShared, setSubmitShared] = useState<boolean>(false);
+  const [visibility, setVisibility] = useState<"public" | "private">(initialVisibility);
 
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string>("");
@@ -142,8 +144,8 @@ export function UploadDropzone({
       if (academicYear) formData.append("academicYear", academicYear);
       if (examSession) formData.append("examSession", examSession);
       if (chapter.trim()) formData.append("chapter", chapter.trim());
-      formData.append("visibility", submitShared ? "public" : "private");
-      if (submitShared) formData.append("submitShared", "on");
+      formData.append("visibility", visibility);
+      if (visibility === "public") formData.append("submitShared", "on");
 
       const response = await fetch("/api/upload", {
         method: "POST",
@@ -394,38 +396,63 @@ export function UploadDropzone({
         </div>
 
         {/* Visibility / Sharing Policy */}
-        <div className="p-4 rounded-lg border border-[#E4E8F0] bg-[#FAFAF7] flex items-center justify-between">
-          <div className="flex items-start space-x-3">
-            <div className="p-2 rounded bg-[#EDF2FF] border border-[#2855D9]/20 text-[#2855D9] shrink-0 mt-0.5">
-              {submitShared ? (
-                <Globe className="w-4 h-4" />
-              ) : (
-                <Lock className="w-4 h-4" />
-              )}
-            </div>
-            <div>
-              <div className="text-xs font-semibold text-[#182235]">
-                {submitShared
-                  ? "Submit for Class Library Review"
-                  : "Keep as Personal Private Resource"}
-              </div>
-              <div className="text-[11px] text-[#68748A] mt-0.5 leading-relaxed">
-                {submitShared
-                  ? "Resource will be queued for review before publishing to all classmates."
-                  : "Private to your account only. It will not be visible to other students."}
-              </div>
-            </div>
-          </div>
-
-          <label className="relative inline-flex items-center cursor-pointer shrink-0">
-            <input
-              type="checkbox"
-              checked={submitShared}
-              onChange={(e) => setSubmitShared(e.target.checked)}
-              className="sr-only peer"
-            />
-            <div className="w-9 h-5 bg-stone-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-stone-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#2855D9]"></div>
+        <div className="space-y-2">
+          <label className="block text-xs font-semibold text-[#182235]">
+            Visibilité du document *
           </label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <label
+              className={`flex items-start space-x-3 p-3.5 rounded-xl border cursor-pointer transition-all ${
+                visibility === "public"
+                  ? "border-[#2855D9] bg-[#EDF2FF]/40 ring-1 ring-[#2855D9]"
+                  : "border-[#E4E8F0] bg-[#FAFAF7] hover:border-[#CBD5E1]"
+              }`}
+            >
+              <input
+                type="radio"
+                name="dropzone-visibility"
+                value="public"
+                checked={visibility === "public"}
+                onChange={() => setVisibility("public")}
+                className="mt-0.5 text-[#2855D9] focus:ring-[#2855D9]"
+              />
+              <div>
+                <div className="text-xs font-semibold text-[#182235] flex items-center space-x-1.5">
+                  <Globe className="w-3.5 h-3.5 text-[#2855D9] shrink-0" />
+                  <span>Public (Bibliothèque de classe)</span>
+                </div>
+                <div className="text-[11px] text-[#68748A] mt-0.5 leading-relaxed">
+                  Visible et consultable par tous les étudiants de la promotion IGL4.
+                </div>
+              </div>
+            </label>
+
+            <label
+              className={`flex items-start space-x-3 p-3.5 rounded-xl border cursor-pointer transition-all ${
+                visibility === "private"
+                  ? "border-amber-500 bg-amber-50/40 ring-1 ring-amber-500"
+                  : "border-[#E4E8F0] bg-[#FAFAF7] hover:border-[#CBD5E1]"
+              }`}
+            >
+              <input
+                type="radio"
+                name="dropzone-visibility"
+                value="private"
+                checked={visibility === "private"}
+                onChange={() => setVisibility("private")}
+                className="mt-0.5 text-[#2855D9] focus:ring-[#2855D9]"
+              />
+              <div>
+                <div className="text-xs font-semibold text-[#182235] flex items-center space-x-1.5">
+                  <Lock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                  <span>Privé (Personnel uniquement)</span>
+                </div>
+                <div className="text-[11px] text-[#68748A] mt-0.5 leading-relaxed">
+                  Accessible uniquement sur votre espace personnel.
+                </div>
+              </div>
+            </label>
+          </div>
         </div>
 
         {/* Submit Buttons */}

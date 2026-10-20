@@ -97,6 +97,26 @@ export interface GlobalAnnouncement {
 // Active published global announcements registry
 const ACTIVE_GLOBAL_ANNOUNCEMENTS: GlobalAnnouncement[] = [
   {
+    id: "announcement-v1-3-release",
+    type: "announcement",
+    release_version: "v1.3",
+    title: "VALIDILY-IGL4 v1.3 — SEO Officiel, Sécurité de Compte & Fluidité Maximale",
+    content: `Bienvenue dans la version 1.3 de VALIDILY-IGL4 ! Cette mise à jour apporte des améliorations majeures en matière de visibilité, de sécurité d'accès, et d'expérience utilisateur.
+
+Nouveautés majeures :
+- 🔍 Référencement Google & Découvrabilité : Indexation officielle sur les moteurs de recherche avec balises Schema.org et sitemap académique complet.
+- 🔐 Réinitialisation de Mot de Passe : Flux de récupération sécurisé par email avec jauge de robustesse et protection contre le brute-force.
+- ⚡ Fluidité Optimale du Planning : Suppression instantanée (0ms) des devoirs, résolution de l'affichage des menus d'actions (3 points) et navigation ultra-rapide entre objectifs.
+- 📂 Précision de Visibilité des Documents : Sélection fiable entre ressources Publiques (partagées avec la promotion) et Privées (votre espace personnel).
+- 👑 Privilèges & Sauvegarde VIP : Maintien continu des accès VIP et gestion sécurisée des administrateurs temporaires.
+- 🛡️ Authentification Résiliente : Connexion protégée contre les blocages d'extensions navigateur et fiabilisation des sessions.
+
+Explorez votre espace et profitez d'une révision encore plus fluide ! 🚀`,
+    link: "/planner",
+    created_at: "2026-10-20T18:00:00.000Z",
+    is_active: true,
+  },
+  {
     id: "announcement-v1-2-planner-release",
     type: "announcement",
     release_version: "v1.2",

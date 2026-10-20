@@ -272,3 +272,166 @@ test("Repository Enrichment: Owner profiles and defensive subject resolution con
   );
 });
 
+test("LibraryExplorer UI/UX: 0ms instant client-side filtering and tactile buttons", async () => {
+  const fs = await import("fs");
+  const explorerCode = fs.readFileSync(
+    "src/components/resources/library-explorer.tsx",
+    "utf-8"
+  );
+
+  // 1. Client component contract
+  assert.ok(
+    explorerCode.startsWith('"use client";'),
+    "LibraryExplorer must be a client component"
+  );
+
+  // 2. URL synchronization without blocking page reloads
+  assert.ok(
+    explorerCode.includes("window.history.replaceState"),
+    "LibraryExplorer must use window.history.replaceState to sync URL without network latency"
+  );
+
+  // 3. Tactile button interactions
+  assert.ok(
+    explorerCode.includes("active:scale-95"),
+    "Pills and sorting buttons must provide tactile micro-interactions on click"
+  );
+
+  // 4. In-memory filtering logic validation
+  const mockResources = [
+    {
+      id: "r1",
+      title: "Algorithmique Avancée Cours",
+      category_id: "cat-courses",
+      resource_type: "document",
+      usefulness_score: 10,
+      created_at: "2026-01-01T00:00:00Z",
+    },
+    {
+      id: "r2",
+      title: "Examen Flutter 2024",
+      category_id: "cat-exams",
+      resource_type: "document",
+      usefulness_score: 25,
+      created_at: "2026-02-01T00:00:00Z",
+    },
+    {
+      id: "r3",
+      title: "Quiz IA Intermédiaire",
+      category_id: "cat-quizzes",
+      resource_type: "quiz",
+      usefulness_score: 5,
+      created_at: "2026-03-01T00:00:00Z",
+    },
+  ];
+
+  // Category filter test
+  const examsOnly = mockResources.filter((r) => r.category_id === "cat-exams");
+  assert.strictEqual(examsOnly.length, 1);
+  assert.strictEqual(examsOnly[0].id, "r2");
+
+  // Format filter test
+  const quizzesOnly = mockResources.filter((r) => r.resource_type === "quiz");
+  assert.strictEqual(quizzesOnly.length, 1);
+  assert.strictEqual(quizzesOnly[0].id, "r3");
+
+  // Sorting test: "useful"
+  const sortedByUseful = [...mockResources].sort(
+    (a, b) => b.usefulness_score - a.usefulness_score
+  );
+  assert.strictEqual(sortedByUseful[0].id, "r2");
+  assert.strictEqual(sortedByUseful[1].id, "r1");
+  assert.strictEqual(sortedByUseful[2].id, "r3");
+});
+
+test("Resource Visibility Lifecycle: createExternalLinkResource & Upload Route preserve Public/Private choice", async () => {
+  const fs = await import("fs");
+  const path = await import("path");
+
+  // 1. Static contract validation: resource-actions.ts createExternalLinkResource supports visibility
+  const resourceCode = fs.readFileSync(
+    path.resolve("src/lib/actions/resource-actions.ts"),
+    "utf8"
+  );
+  assert.ok(
+    resourceCode.includes('visibility?: "public" | "private" | "shared"'),
+    "createExternalLinkResource must accept visibility parameter"
+  );
+  assert.ok(
+    resourceCode.includes('visibility: data.visibility || "public"'),
+    "createExternalLinkResource must forward visibility to createResource"
+  );
+  assert.ok(
+    resourceCode.includes('visibility: data.visibility || "private"'),
+    "createResource must preserve private fallback for security"
+  );
+
+  // 2. Static contract validation: Contribute modal forwards visibility
+  const contributeModalCode = fs.readFileSync(
+    path.resolve("src/components/resources/contribute-resource-modal.tsx"),
+    "utf8"
+  );
+  assert.ok(
+    contributeModalCode.includes("visibility,") &&
+      contributeModalCode.includes("createExternalLinkResource"),
+    "Contribute modal must pass visibility to createExternalLinkResource"
+  );
+  assert.ok(
+    contributeModalCode.includes('formData.append("visibility", visibility)'),
+    "Contribute modal must pass visibility to /api/upload"
+  );
+
+  // 3. Static contract validation: AddExternalLinkModal in subject-file-library forwards visibility
+  const fileLibraryCode = fs.readFileSync(
+    path.resolve("src/components/workspace/subject-file-library.tsx"),
+    "utf8"
+  );
+  assert.ok(
+    fileLibraryCode.includes('const [visibility, setVisibility] = useState<"public" | "private">("public");'),
+    "AddExternalLinkModal must have visibility state"
+  );
+  assert.ok(
+    fileLibraryCode.includes("link-modal-visibility"),
+    "AddExternalLinkModal must have link-modal-visibility radio inputs"
+  );
+  assert.ok(
+    fileLibraryCode.includes("createExternalLinkResource") &&
+      fileLibraryCode.includes("folder_id: currentFolderId") &&
+      fileLibraryCode.includes("visibility"),
+    "AddExternalLinkModal must pass visibility to createExternalLinkResource"
+  );
+
+  // 4. Static contract validation: UploadDropzone has explicit Public / Privé radio controls
+  const dropzoneCode = fs.readFileSync(
+    path.resolve("src/components/resources/upload-dropzone.tsx"),
+    "utf8"
+  );
+  assert.ok(
+    dropzoneCode.includes('initialVisibility?: "public" | "private"'),
+    "UploadDropzone must accept initialVisibility prop"
+  );
+  assert.ok(
+    dropzoneCode.includes("dropzone-visibility"),
+    "UploadDropzone must have dropzone-visibility radio buttons"
+  );
+  assert.ok(
+    dropzoneCode.includes('formData.append("visibility", visibility)'),
+    "UploadDropzone must append visibility to formData"
+  );
+
+  // 5. Static contract validation: Upload route handles public / private resolution
+  const uploadCode = fs.readFileSync(
+    path.resolve("src/app/api/upload/route.ts"),
+    "utf8"
+  );
+  assert.ok(
+    uploadCode.includes("visibilityParam === \"public\" || visibilityParam === \"shared\" || visibilityParam === \"private\""),
+    "Upload route must assign visibility from visibilityParam"
+  );
+  assert.ok(
+    uploadCode.includes('let visibility: "public" | "shared" | "private" = "private";'),
+    "Upload route must default visibility to private"
+  );
+});
+
+

@@ -213,6 +213,7 @@ export function ContributeResourceModal({
           if (examSession) formData.append("exam_session", examSession);
           if (targetFolderId) formData.append("chapter", targetFolderId);
           formData.append("visibility", visibility);
+          formData.append("submitShared", visibility === "public" ? "on" : "off");
           tags.forEach((t) => formData.append("tags", t));
 
           const res = await fetch("/api/upload", {
@@ -268,6 +269,7 @@ export function ContributeResourceModal({
             folder_id: targetFolderId,
             description: description.trim() || undefined,
             instructor: instructor.trim() || undefined,
+            visibility,
           });
 
           if (res.success && res.resource) {

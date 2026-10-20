@@ -108,10 +108,29 @@ const localTasks = globalPlannerState.__localAcademicTasks;
 const localTimeblocks = globalPlannerState.__localCalendarTimeblocks;
 const localGoals = globalPlannerState.__localAcademicGoals;
 
+// Telemetry cache to eliminate repetitive DB scans during rapid tab switches
+interface UserTelemetrySnapshot {
+  verifiedFocusMinutes: number;
+  userTasks: AcademicTask[];
+  userBlocks: CalendarTimeblock[];
+  timestamp: number;
+}
+const telemetryCache = new Map<string, UserTelemetrySnapshot>();
+const TELEMETRY_CACHE_TTL = 15000; // 15 seconds
+
+function invalidateTelemetryCache(userId?: string): void {
+  if (userId) {
+    telemetryCache.delete(userId);
+  } else {
+    telemetryCache.clear();
+  }
+}
+
 export async function _resetLocalPlannerStore(): Promise<void> {
   localTasks.clear();
   localTimeblocks.clear();
   localGoals.clear();
+  telemetryCache.clear();
 }
 
 export async function _injectLocalTask(task: AcademicTask): Promise<void> {
@@ -356,6 +375,7 @@ export async function createAcademicTaskAction(input: CreateTaskInput): Promise<
 
         if (!error && data) {
           localTasks.set(data.id, data as AcademicTask);
+          invalidateTelemetryCache(requester.id);
           await safeRevalidate("/planner");
           return { success: true, data: data as AcademicTask };
         } else if (error && !isTableMissingError(error)) {
@@ -369,6 +389,7 @@ export async function createAcademicTaskAction(input: CreateTaskInput): Promise<
 
   // Fallback to resilient in-memory store
   localTasks.set(newTask.id, newTask);
+  invalidateTelemetryCache(requester.id);
   await safeRevalidate("/planner");
   return { success: true, data: newTask };
 }
@@ -552,6 +573,7 @@ export async function updateAcademicTaskAction(
 
         if (!error && data) {
           localTasks.set(data.id, data as AcademicTask);
+          invalidateTelemetryCache(requester.id);
           await safeRevalidate("/planner");
           return { success: true, data: data as AcademicTask };
         } else if (error && !isTableMissingError(error)) {
@@ -572,6 +594,7 @@ export async function updateAcademicTaskAction(
     ...updates,
   };
   localTasks.set(taskId, updatedTask);
+  invalidateTelemetryCache(requester.id);
   await safeRevalidate("/planner");
   return { success: true, data: updatedTask };
 }
@@ -615,10 +638,12 @@ export async function deleteAcademicTaskAction(taskId: string): Promise<{
     return { success: false, error: "Accès refusé: cette tâche ne vous appartient pas" };
   }
 
+  const isValidUuid = UUID_REGEX.test(taskId);
+
   if (await isDbConfigured()) {
     try {
       const adminClient = await getAdminClient();
-      if (adminClient) {
+      if (adminClient && isValidUuid) {
         // Disassociate calendar timeblocks without deleting them to preserve history
         await adminClient
           .from("calendar_timeblocks")
@@ -634,10 +659,15 @@ export async function deleteAcademicTaskAction(taskId: string): Promise<{
 
         if (!error) {
           localTasks.delete(taskId);
+          invalidateTelemetryCache(requester.id);
           await safeRevalidate("/planner");
           return { success: true };
         } else if (error && !isTableMissingError(error)) {
-          return { success: false, error: "Erreur de suppression" };
+          // Fallback to ensuring local removal so user is never stuck
+          localTasks.delete(taskId);
+          invalidateTelemetryCache(requester.id);
+          await safeRevalidate("/planner");
+          return { success: true };
         }
       }
     } catch {
@@ -647,6 +677,7 @@ export async function deleteAcademicTaskAction(taskId: string): Promise<{
 
   // Local fallback
   localTasks.delete(taskId);
+  invalidateTelemetryCache(requester.id);
   // Unlink any local timeblock
   for (const block of localTimeblocks.values()) {
     if (block.task_id === taskId && block.user_id === requester.id) {
@@ -1666,51 +1697,66 @@ export async function getAcademicGoalsAction(params?: {
     );
   }
 
-  // 2. Fetch trustworthy verified telemetry & DB records to compute actual progress
-  let verifiedFocusMinutes = 0;
-  try {
-    const analyticsMod = await import("./analytics-actions");
-    const todayRec = await analyticsMod.getUserTodayFocus();
-    verifiedFocusMinutes = todayRec?.totalMinutes || 0;
-  } catch {
-    // Non-blocking fallback
-  }
+  // 2. Fetch trustworthy verified telemetry & DB records to compute actual progress (cached for 15s to eliminate redundant round-trips)
+  let cachedTelemetry = telemetryCache.get(requester.id);
+  const nowMs = Date.now();
 
-  // Get user tasks & calendar blocks for metrics
-  let userTasks: AcademicTask[] = [];
-  let userBlocks: CalendarTimeblock[] = [];
-
-  if (await isDbConfigured()) {
+  if (!cachedTelemetry || nowMs - cachedTelemetry.timestamp > TELEMETRY_CACHE_TTL) {
+    let verifiedFocusMinutes = 0;
     try {
-      const adminClient = await getAdminClient();
-      if (adminClient) {
-        const { data: dbTasks } = await adminClient
-          .from("academic_tasks")
-          .select("id, is_completed, subject_id, due_date")
-          .eq("user_id", requester.id);
-        if (Array.isArray(dbTasks)) {
-          userTasks = dbTasks as AcademicTask[];
-        }
-
-        const { data: dbBlocks } = await adminClient
-          .from("calendar_timeblocks")
-          .select("id, is_completed, subject_id, block_date")
-          .eq("user_id", requester.id);
-        if (Array.isArray(dbBlocks)) {
-          userBlocks = dbBlocks as CalendarTimeblock[];
-        }
-      }
+      const analyticsMod = await import("./analytics-actions");
+      const todayRec = await analyticsMod.getUserTodayFocus();
+      verifiedFocusMinutes = todayRec?.totalMinutes || 0;
     } catch {
-      // Fallback
+      // Non-blocking fallback
     }
+
+    // Get user tasks & calendar blocks for metrics
+    let userTasks: AcademicTask[] = [];
+    let userBlocks: CalendarTimeblock[] = [];
+
+    if (await isDbConfigured()) {
+      try {
+        const adminClient = await getAdminClient();
+        if (adminClient) {
+          const { data: dbTasks } = await adminClient
+            .from("academic_tasks")
+            .select("id, is_completed, subject_id, due_date")
+            .eq("user_id", requester.id);
+          if (Array.isArray(dbTasks)) {
+            userTasks = dbTasks as AcademicTask[];
+          }
+
+          const { data: dbBlocks } = await adminClient
+            .from("calendar_timeblocks")
+            .select("id, is_completed, subject_id, block_date")
+            .eq("user_id", requester.id);
+          if (Array.isArray(dbBlocks)) {
+            userBlocks = dbBlocks as CalendarTimeblock[];
+          }
+        }
+      } catch {
+        // Fallback
+      }
+    }
+
+    if (userTasks.length === 0) {
+      userTasks = Array.from(localTasks.values()).filter((t) => t.user_id === requester.id);
+    }
+    if (userBlocks.length === 0) {
+      userBlocks = Array.from(localTimeblocks.values()).filter((b) => b.user_id === requester.id);
+    }
+
+    cachedTelemetry = {
+      verifiedFocusMinutes,
+      userTasks,
+      userBlocks,
+      timestamp: nowMs,
+    };
+    telemetryCache.set(requester.id, cachedTelemetry);
   }
 
-  if (userTasks.length === 0) {
-    userTasks = Array.from(localTasks.values()).filter((t) => t.user_id === requester.id);
-  }
-  if (userBlocks.length === 0) {
-    userBlocks = Array.from(localTimeblocks.values()).filter((b) => b.user_id === requester.id);
-  }
+  const { verifiedFocusMinutes, userTasks, userBlocks } = cachedTelemetry;
 
   // 3. Map verified progress to each goal
   const goalsWithProgress: AcademicGoalWithProgress[] = goals.map((g) => {

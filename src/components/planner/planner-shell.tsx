@@ -95,14 +95,20 @@ export function PlannerShell({
     setCurrentDate(newDate);
   };
 
+  // Stable ref for handleRefresh to prevent re-fetching on section tab clicks
+  const handleRefreshRef = useRef(handleRefresh);
+  useEffect(() => {
+    handleRefreshRef.current = handleRefresh;
+  }, [handleRefresh]);
+
   // Only refresh when currentDate changes after initial render (initial data comes from SSR)
   useEffect(() => {
     if (isFirstRender.current) {
       isFirstRender.current = false;
       return;
     }
-    handleRefresh();
-  }, [currentDate, handleRefresh]);
+    handleRefreshRef.current();
+  }, [currentDate]);
 
   // Lazy-load history when switching to history tab if not loaded
   const handleSelectSection = (s: PlannerSection) => {
@@ -118,6 +124,11 @@ export function PlannerShell({
       const map = new Map(updatedTasks.map((t) => [t.id, t]));
       return prev.map((t) => map.get(t.id) || t);
     });
+  }, []);
+
+  // Instant task deletion eviction from parent shell state
+  const handleTaskDelete = useCallback((deletedTaskId: string) => {
+    setTasks((prev) => prev.filter((t) => t.id !== deletedTaskId));
   }, []);
 
   const todayStr = useMemo(() => getLocalTodayDateString(), []);
@@ -304,6 +315,7 @@ export function PlannerShell({
                 onRefresh={handleRefresh}
                 selectedDate={todayStr}
                 onTasksChange={handleTasksChange}
+                onTaskDelete={handleTaskDelete}
               />
             </div>
 
@@ -387,6 +399,7 @@ export function PlannerShell({
               subjects={subjects}
               onRefresh={handleRefresh}
               onTasksChange={handleTasksChange}
+              onTaskDelete={handleTaskDelete}
             />
           </div>
         </div>

@@ -49,6 +49,7 @@ import {
   AlertCircle,
   Plus,
   Globe,
+  Lock,
   HardDrive,
   Layers,
   Settings2,
@@ -1389,6 +1390,7 @@ function AddExternalLinkModal({
   const [description, setDescription] = useState("");
   const [categoryId, setCategoryId] = useState(categories[0]?.id || "");
   const [instructor, setInstructor] = useState("");
+  const [visibility, setVisibility] = useState<"public" | "private">("public");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -1409,6 +1411,7 @@ function AddExternalLinkModal({
       description: description.trim() || undefined,
       instructor: instructor.trim() || undefined,
       folder_id: currentFolderId,
+      visibility,
     });
 
     setIsSubmitting(false);
@@ -1511,6 +1514,61 @@ function AddExternalLinkModal({
                 placeholder="Ex: Dr. Professeur"
                 className="w-full bg-[#FAFAF7] border border-[#E4E8F0] rounded-xl px-3 py-2 text-[#111A2E] focus:outline-none focus:border-[#2855D9]"
               />
+            </div>
+          </div>
+
+          <div>
+            <label className="block font-semibold text-[#111A2E] mb-1.5">
+              Visibilité du lien *
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <label
+                className={`flex items-center space-x-2.5 p-3 rounded-xl border cursor-pointer transition-colors ${
+                  visibility === "public"
+                    ? "border-[#2855D9] bg-[#EDF2FF]/40 ring-1 ring-[#2855D9]"
+                    : "border-[#E4E8F0] bg-[#FAFBFD] hover:border-[#CBD5E1]"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="link-modal-visibility"
+                  value="public"
+                  checked={visibility === "public"}
+                  onChange={() => setVisibility("public")}
+                  className="text-[#2855D9] focus:ring-[#2855D9]"
+                />
+                <div className="flex items-center space-x-1.5">
+                  <Globe className="w-3.5 h-3.5 text-[#2855D9] shrink-0" />
+                  <div>
+                    <div className="text-xs font-semibold text-[#182235]">Public</div>
+                    <div className="text-[10px] text-[#68748A]">Visible par la classe</div>
+                  </div>
+                </div>
+              </label>
+
+              <label
+                className={`flex items-center space-x-2.5 p-3 rounded-xl border cursor-pointer transition-colors ${
+                  visibility === "private"
+                    ? "border-amber-500 bg-amber-50/40 ring-1 ring-amber-500"
+                    : "border-[#E4E8F0] bg-[#FAFBFD] hover:border-[#CBD5E1]"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="link-modal-visibility"
+                  value="private"
+                  checked={visibility === "private"}
+                  onChange={() => setVisibility("private")}
+                  className="text-[#2855D9] focus:ring-[#2855D9]"
+                />
+                <div className="flex items-center space-x-1.5">
+                  <Lock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                  <div>
+                    <div className="text-xs font-semibold text-[#182235]">Privé</div>
+                    <div className="text-[10px] text-[#68748A]">Uniquement pour vous</div>
+                  </div>
+                </div>
+              </label>
             </div>
           </div>
 

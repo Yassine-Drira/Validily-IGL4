@@ -317,6 +317,7 @@ export async function createExternalLinkResource(data: {
   folder_id?: string | null;
   description?: string;
   instructor?: string;
+  visibility?: "public" | "private" | "shared";
 }): Promise<{ success?: boolean; error?: string; resource?: AcademicResource }> {
   try {
     if (!data.url?.trim() || !data.title?.trim() || !data.subject_id) {
@@ -361,6 +362,7 @@ export async function createExternalLinkResource(data: {
       instructor: data.instructor || null,
       chapter: data.folder_id || null,
       tags,
+      visibility: data.visibility || "public",
     });
   } catch (err: any) {
     return { error: err.message || "Échec de l'ajout du lien externe." };

@@ -33,8 +33,12 @@ export async function POST(req: NextRequest) {
     const categoryId = ((formData.get("categoryId") as string | null) || (formData.get("category_id") as string | null))?.trim() || "";
     const title = (formData.get("title") as string | null)?.trim() || "";
     const instructor = (formData.get("instructor") as string | null)?.trim() || null;
-    const visibilityParam = formData.get("visibility") as string | null;
-    const submitShared = formData.get("submitShared") === "on";
+    const rawVisibility = (formData.get("visibility") as string | null)?.trim().toLowerCase() || null;
+    const visibilityParam = rawVisibility === "public" || rawVisibility === "private" || rawVisibility === "shared"
+      ? (rawVisibility as "public" | "private" | "shared")
+      : null;
+    const submitSharedParam = formData.get("submitShared");
+    const submitShared = submitSharedParam === "on" || submitSharedParam === "true";
 
     const folderId = (formData.get("folderId") as string | null) || (formData.get("chapter") as string | null);
 

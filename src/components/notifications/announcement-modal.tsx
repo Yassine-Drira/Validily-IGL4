@@ -15,6 +15,10 @@ import {
   ArrowRight,
   CheckCircle2,
   Calendar,
+  Search,
+  KeyRound,
+  ShieldCheck,
+  Lock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -35,52 +39,52 @@ interface AnnouncementModalProps {
 
 const PILLARS = [
   {
-    icon: Calendar,
-    title: "Planning & Calendrier Interactif",
-    badge: "Emploi du temps",
+    icon: Search,
+    title: "SEO Officiel & Indexation",
+    badge: "Découvrabilité",
     color: "from-blue-500/10 to-indigo-500/10 border-blue-200 text-blue-700",
     iconBg: "bg-blue-100 text-blue-700",
-    desc: "Visualisation de 08:00 à minuit, blocs d'étude continus multi-heures, gestion de conflits d'horaires et ligne temporelle en direct.",
+    desc: "Indexation Google Chrome optimisée avec métadonnées académiques IGL4, sitemap dynamique et conformité Schema.org.",
   },
   {
-    icon: CheckCircle2,
-    title: "To-Do Académique & Sous-Tâches",
-    badge: "Organisation",
+    icon: KeyRound,
+    title: "Sécurité & Récupération",
+    badge: "Protection",
     color: "from-emerald-500/10 to-teal-500/10 border-emerald-200 text-emerald-700",
     iconBg: "bg-emerald-100 text-emerald-700",
-    desc: "Suivez vos devoirs et TDs, découpez-les en sous-tâches, cochez avec réponse optimiste instantanée (< 1ms) et liaison calendrier.",
-  },
-  {
-    icon: Sparkles,
-    title: "Objectifs Personnels & Télémétrie",
-    badge: "Motivation",
-    color: "from-violet-500/10 to-purple-500/10 border-violet-200 text-violet-700",
-    iconBg: "bg-violet-100 text-violet-700",
-    desc: "Fixez vos cibles quotidiennes ou hebdos de temps d'étude ou d'exercices, synchronisées automatiquement avec vos sessions Focus.",
-  },
-  {
-    icon: BookOpen,
-    title: "Ressources & Raccourci NotebookLM",
-    badge: "Analyse IA",
-    color: "from-amber-500/10 to-orange-500/10 border-amber-200 text-amber-700",
-    iconBg: "bg-amber-100 text-amber-700",
-    desc: "Accédez en un clic à Google NotebookLM pour interroger vos supports de cours avec l'IA officielle sans transfert de données privées.",
-  },
-  {
-    icon: Trees,
-    title: "Focus Hub & Bosquet Interactif",
-    badge: "Immersion",
-    color: "from-green-500/10 to-emerald-500/10 border-green-200 text-green-700",
-    iconBg: "bg-green-100 text-green-700",
-    desc: "Déclenchez vos sessions Pomodoro directement depuis vos créneaux et visualisez votre forêt virtuelle sans duplication d'états.",
+    desc: "Nouveau flux de réinitialisation de mot de passe par email avec jauge de robustesse et protection contre le brute-force.",
   },
   {
     icon: Zap,
-    title: "Persistance Supabase & Zéro Quota",
-    badge: "Haute Disponibilité",
+    title: "Planning 0ms & Menu Actions",
+    badge: "Performance",
+    color: "from-violet-500/10 to-purple-500/10 border-violet-200 text-violet-700",
+    iconBg: "bg-violet-100 text-violet-700",
+    desc: "Suppression instantanée 0ms, affichage complet du menu d'actions (3 points) et navigation d'objectifs ultra-fluide.",
+  },
+  {
+    icon: BookOpen,
+    title: "Visibilité Public / Privé",
+    badge: "Partage Précis",
+    color: "from-amber-500/10 to-orange-500/10 border-amber-200 text-amber-700",
+    iconBg: "bg-amber-100 text-amber-700",
+    desc: "Contrôle strict et respecté de la visibilité des cours, TDs et liens externes ajoutés à votre espace ou à la promotion.",
+  },
+  {
+    icon: ShieldCheck,
+    title: "Persistance des Droits VIP",
+    badge: "Gouvernance",
+    color: "from-amber-500/10 to-yellow-500/10 border-amber-200 text-amber-700",
+    iconBg: "bg-amber-100 text-amber-700",
+    desc: "Sauvegarde durable des privilèges VIP après rafraîchissement de page et encadrement des rôles d'administration.",
+  },
+  {
+    icon: Lock,
+    title: "Authentification Résiliente",
+    badge: "Fiabilité",
     color: "from-cyan-500/10 to-blue-500/10 border-cyan-200 text-cyan-700",
     iconBg: "bg-cyan-100 text-cyan-700",
-    desc: "Sécurité Row-Level Security stricte par utilisateur, isolation multi-tenant et mise en cache mémoire fluide sans saturation.",
+    desc: "Exécution des connexions côté serveur pour éliminer tout conflit avec les extensions navigateur et bloqueurs tiers.",
   },
 ];
 
@@ -165,7 +169,7 @@ export function AnnouncementModal({
           {/* Welcome lead */}
           <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-50/70 via-indigo-50/50 to-slate-50 border border-blue-100 text-slate-700 text-xs sm:text-sm leading-relaxed">
             <p className="font-medium">
-              We&apos;re excited to introduce <strong>VALIDILY-IGL4 v1.1</strong>! This update brings improvements designed to make studying, organizing resources, and staying focused easier and more enjoyable.
+              Bienvenue dans <strong>VALIDILY-IGL4 {version}</strong> ! Cette mise à jour apporte des améliorations majeures pour le référencement académique, la sécurité de vos comptes et la fluidité de votre espace de travail quotidien.
             </p>
           </div>
 
