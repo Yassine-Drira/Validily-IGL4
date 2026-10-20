@@ -180,16 +180,13 @@ export function AppHeader({ initialUser }: { initialUser?: HeaderUser | null }) 
               <span className="text-xs font-semibold text-[#182235] hidden sm:inline max-w-[100px] truncate">
                 {user.name}
               </span>
-              {user.isVip && <VipBadge variant="compact" className="hidden md:inline-flex" />}
+              {user.isVip && <VipBadge variant="compact" className="hidden sm:inline-flex" />}
             </button>
 
             {isDropdownOpen && (
               <div className="absolute right-0 mt-2 w-52 bg-white border border-[#E4E8F0] rounded-2xl shadow-xl p-2 z-50 text-xs space-y-1 animate-in fade-in duration-150">
                 <div className="px-3 py-2 border-b border-[#F1F4F9] space-y-1">
-                  <div className="flex items-center justify-between gap-1">
-                    <span className="font-bold text-[#111A2E] truncate">{user.name}</span>
-                    {user.isVip && <VipBadge variant="compact" />}
-                  </div>
+                  <div className="font-bold text-[#111A2E] truncate">{user.name}</div>
                   <div className="text-[11px] text-[#68748A] truncate">{user.email}</div>
                   {user.isTemporaryAdmin && (
                     <span className="inline-block mt-0.5 px-1.5 py-0.5 rounded text-[9px] font-mono bg-emerald-50 text-emerald-800 border border-emerald-200">
