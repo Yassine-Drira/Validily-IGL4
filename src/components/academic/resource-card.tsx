@@ -12,6 +12,7 @@ import {
   BookOpen,
   FileCode,
   Link2,
+  GraduationCap,
 } from "lucide-react";
 
 interface ResourceCardProps {
@@ -23,11 +24,32 @@ export function ResourceCard({ resource, isBookmarked = false }: ResourceCardPro
   const isQuiz = resource.resource_type === "quiz" || resource.mime_type?.includes("quiz") || resource.tags?.includes("quiz");
   const isLink = resource.resource_type === "link" || resource.mime_type?.includes("url") || !!resource.external_url;
 
+  const uploaderName =
+    resource.owner_profile?.display_name?.trim() ||
+    (resource.owner_profile?.role === "admin"
+      ? "Administration"
+      : resource.owner_id === "demo_user"
+      ? "Compte Démo"
+      : "Étudiant IGL4");
+
   return (
     <div className="bg-white border border-[#E4E8F0] hover:border-[#2855D9]/40 hover:shadow-xs rounded-xl p-4 transition-all flex flex-col justify-between group">
       <div>
         <div className="flex items-start justify-between gap-3 mb-2">
           <div className="flex items-center gap-1.5 flex-wrap">
+            {/* Subject Label / Badge */}
+            {resource.subject?.name && (
+              <Link
+                href={`/library?subjectId=${resource.subject.slug || resource.subject.id}`}
+                className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#1E3A8A] bg-[#EEF2FF] hover:bg-[#E0E7FF] px-2 py-0.5 rounded-full border border-[#C7D2FE] transition-colors shadow-2xs group/subject max-w-[150px]"
+                title={`Matière : ${resource.subject.name}`}
+              >
+                <GraduationCap className="w-2.5 h-2.5 text-[#2855D9] shrink-0" />
+                <span className="truncate">{resource.subject.name}</span>
+              </Link>
+            )}
+
+            {/* Category Badge */}
             {resource.category && (
               <CategoryBadge
                 slug={resource.category.slug}
@@ -69,20 +91,38 @@ export function ResourceCard({ resource, isBookmarked = false }: ResourceCardPro
           </p>
         )}
 
-        <div className="flex flex-wrap items-center gap-y-1 gap-x-3 text-[11px] text-[#68748A] font-mono mb-4">
+        {/* Metadata row with Uploader & Subject & Date & Size */}
+        <div className="flex flex-wrap items-center gap-y-1.5 gap-x-2.5 text-[11px] text-[#68748A] font-mono mb-4">
+          <div
+            className="inline-flex items-center space-x-1 text-[#334155] bg-[#F8FAFC] border border-[#E2E8F0] px-1.5 py-0.5 rounded text-[11px] font-sans"
+            title={`Document ajouté par ${uploaderName}`}
+          >
+            <User className="w-3 h-3 text-[#2855D9] shrink-0" />
+            <span className="text-[#64748B]">Par</span>
+            <span className="font-semibold text-[#182235] truncate max-w-[110px]">{uploaderName}</span>
+            {resource.owner_profile?.role === "admin" && (
+              <span className="text-[9px] bg-amber-100 text-amber-800 font-bold px-1 rounded ml-0.5">
+                Staff
+              </span>
+            )}
+          </div>
+
           {resource.instructor && (
-            <div className="flex items-center space-x-1">
-              <User className="w-3 h-3 text-[#68748A]" />
-              <span className="truncate max-w-[120px]">{resource.instructor}</span>
+            <div
+              className="flex items-center space-x-1 text-[#475569]"
+              title={`Enseignant : ${resource.instructor}`}
+            >
+              <BookOpen className="w-3 h-3 text-[#68748A] shrink-0" />
+              <span className="truncate max-w-[110px]">Prof. {resource.instructor}</span>
             </div>
           )}
-          <div className="flex items-center space-x-1">
-            <Calendar className="w-3 h-3 text-[#68748A]" />
+          <div className="flex items-center space-x-1" title={`Date d'ajout : ${formatDate(resource.created_at)}`}>
+            <Calendar className="w-3 h-3 text-[#68748A] shrink-0" />
             <span>{formatDate(resource.created_at)}</span>
           </div>
           {resource.file_size_bytes > 0 && (
-            <div className="flex items-center space-x-1">
-              <FileText className="w-3 h-3 text-[#68748A]" />
+            <div className="flex items-center space-x-1" title={`Taille : ${formatBytes(resource.file_size_bytes)}`}>
+              <FileText className="w-3 h-3 text-[#68748A] shrink-0" />
               <span>{formatBytes(resource.file_size_bytes)}</span>
             </div>
           )}

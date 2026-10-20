@@ -541,6 +541,57 @@ export async function getResources(options?: {
       }
     }
 
+    // Batch enrich owner profiles without N+1 requests
+    const ownerIds = Array.from(
+      new Set(
+        enrichedData
+          .map((r: any) => r.owner_id)
+          .filter((id: any) => typeof id === "string" && id.trim().length > 0)
+      )
+    );
+
+    if (ownerIds.length > 0) {
+      try {
+        const { data: profilesData, error: profError } = await supabase
+          .from("profiles")
+          .select("id, display_name, avatar_url, role")
+          .in("id", ownerIds);
+
+        if (!profError && Array.isArray(profilesData)) {
+          const profileMap = new Map<string, any>();
+          profilesData.forEach((p: any) => {
+            if (p?.id) profileMap.set(p.id, p);
+          });
+          enrichedData.forEach((r: any) => {
+            if (r.owner_id && profileMap.has(r.owner_id)) {
+              r.owner_profile = profileMap.get(r.owner_id);
+            }
+          });
+        }
+      } catch (err) {
+        console.error("Batch profiles query error [getResources]:", err);
+      }
+    }
+
+    // Defensive fallback: If subject is missing on any item, resolve from cached subjects
+    const hasMissingSubject = enrichedData.some((r: any) => !r.subject && r.subject_id);
+    if (hasMissingSubject) {
+      try {
+        const allSubjects = await getSubjects();
+        if (Array.isArray(allSubjects) && allSubjects.length > 0) {
+          const subjectMap = new Map<string, Subject>();
+          allSubjects.forEach((s) => {
+            if (s?.id) subjectMap.set(s.id, s);
+          });
+          enrichedData.forEach((r: any) => {
+            if (!r.subject && r.subject_id && subjectMap.has(r.subject_id)) {
+              r.subject = subjectMap.get(r.subject_id);
+            }
+          });
+        }
+      } catch {}
+    }
+
     // In-memory sort by usefulness or votes or recency
     if (options?.sort === "useful") {
       enrichedData.sort((a: any, b: any) => {
@@ -584,6 +635,31 @@ export async function getResourceById(id: string, userId?: string): Promise<Acad
     }
 
     data.resource_type = inferResourceType(data);
+
+    // Enrich single resource with owner profile
+    if (data.owner_id && !data.owner_profile) {
+      try {
+        const { data: prof } = await supabase
+          .from("profiles")
+          .select("id, display_name, avatar_url, role")
+          .eq("id", data.owner_id)
+          .maybeSingle();
+        if (prof) {
+          data.owner_profile = prof;
+        }
+      } catch {}
+    }
+
+    // Defensive fallback: If subject is missing, resolve by subject_id
+    if (!data.subject && data.subject_id) {
+      try {
+        const allSubjects = await getSubjects();
+        const matched = allSubjects.find((s) => s.id === data.subject_id);
+        if (matched) {
+          data.subject = matched;
+        }
+      } catch {}
+    }
 
     // Enrich single resource with vote summary
     try {

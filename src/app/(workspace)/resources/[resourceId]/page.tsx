@@ -17,6 +17,8 @@ import {
   FileText,
   Lock,
   ShieldAlert,
+  GraduationCap,
+  BookOpen,
 } from "lucide-react";
 
 import { getRequesterUser } from "@/lib/auth/authorization";
@@ -40,6 +42,14 @@ export default async function ResourceDetailPage({
   if (!resource) {
     notFound();
   }
+
+  const uploaderName =
+    resource.owner_profile?.display_name?.trim() ||
+    (resource.owner_profile?.role === "admin"
+      ? "Administration"
+      : resource.owner_id === "demo_user"
+      ? "Compte Démo"
+      : "Étudiant IGL4");
 
   // Strict Access Control: Private resources are only visible to the owner or admin, and shared resources to authorized recipients
   if (resource.visibility === "private" || resource.visibility === "shared") {
@@ -138,59 +148,85 @@ export default async function ResourceDetailPage({
       {/* Resource Title & Action Bar */}
       <div className="bg-white border border-[#E4E8F0] rounded-xl p-6 shadow-xs">
         <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2 mb-2 flex-wrap">
-              {resource.category && (
-                <CategoryBadge
-                  slug={resource.category.slug}
-                  name={resource.category.name}
-                />
-              )}
-              {resource.exam_session && (
-                <span className="text-xs font-mono text-[#68748A] bg-[#F4F6FA] px-2 py-0.5 rounded border border-[#E4E8F0]">
-                  {resource.exam_session} Session
-                </span>
-              )}
-              {resource.chapter && (
-                <span className="text-xs text-[#68748A] font-medium">
-                  {resource.chapter}
-                </span>
-              )}
-            </div>
-
-            <h1 className="text-xl md:text-2xl font-serif font-bold text-[#182235] tracking-tight">
-              {resource.title}
-            </h1>
-
-            {resource.description && (
-              <p className="text-xs md:text-sm text-[#68748A] mt-2 max-w-3xl leading-relaxed">
-                {resource.description}
-              </p>
-            )}
-
-            <div className="flex flex-wrap items-center gap-y-1 gap-x-4 text-xs text-[#68748A] font-mono mt-4">
-              {resource.instructor && (
-                <div className="flex items-center space-x-1.5">
-                  <User className="w-3.5 h-3.5 text-[#68748A]" />
-                  <span>{resource.instructor}</span>
+              <div>
+                <div className="flex items-center gap-2 mb-2 flex-wrap">
+                  {/* Subject Badge */}
+                  {resource.subject && (
+                    <Link
+                      href={`/library?subjectId=${resource.subject.slug || resource.subject.id}`}
+                      className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#1E3A8A] bg-[#EEF2FF] hover:bg-[#E0E7FF] px-2.5 py-0.5 rounded-full border border-[#C7D2FE] transition-colors shadow-2xs"
+                      title={`Matière : ${resource.subject.name}`}
+                    >
+                      <GraduationCap className="w-3.5 h-3.5 text-[#2855D9]" />
+                      <span>{resource.subject.name}</span>
+                    </Link>
+                  )}
+                  {resource.category && (
+                    <CategoryBadge
+                      slug={resource.category.slug}
+                      name={resource.category.name}
+                    />
+                  )}
+                  {resource.exam_session && (
+                    <span className="text-xs font-mono text-[#68748A] bg-[#F4F6FA] px-2 py-0.5 rounded border border-[#E4E8F0]">
+                      {resource.exam_session} Session
+                    </span>
+                  )}
+                  {resource.chapter && (
+                    <span className="text-xs text-[#68748A] font-medium">
+                      {resource.chapter}
+                    </span>
+                  )}
                 </div>
-              )}
-              <div className="flex items-center space-x-1.5">
-                <Calendar className="w-3.5 h-3.5 text-[#68748A]" />
-                <span>Uploaded {formatDate(resource.created_at)}</span>
-              </div>
-              <div className="flex items-center space-x-1.5">
-                <FileText className="w-3.5 h-3.5 text-[#68748A]" />
-                <span className="font-tabular">{formatBytes(resource.file_size_bytes)}</span>
-              </div>
-              <div className="flex items-center space-x-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                <span className="capitalize">{resource.visibility}</span>
-              </div>
-            </div>
-          </div>
 
-          {/* Interactive Bookmark, Revision Status & Download / Redirect */}
+                <h1 className="text-xl md:text-2xl font-serif font-bold text-[#182235] tracking-tight">
+                  {resource.title}
+                </h1>
+
+                {resource.description && (
+                  <p className="text-xs md:text-sm text-[#68748A] mt-2 max-w-3xl leading-relaxed">
+                    {resource.description}
+                  </p>
+                )}
+
+                <div className="flex flex-wrap items-center gap-y-1.5 gap-x-3 text-xs text-[#68748A] font-mono mt-4">
+                  {/* Uploader Label */}
+                  <div
+                    className="inline-flex items-center space-x-1.5 text-[#334155] bg-[#F8FAFC] border border-[#E2E8F0] px-2 py-0.5 rounded text-xs font-sans"
+                    title={`Document ajouté par ${uploaderName}`}
+                  >
+                    <User className="w-3.5 h-3.5 text-[#2855D9] shrink-0" />
+                    <span className="text-[#64748B]">Ajouté par</span>
+                    <span className="font-semibold text-[#182235]">{uploaderName}</span>
+                    {resource.owner_profile?.role === "admin" && (
+                      <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-1.5 py-0.2 rounded ml-0.5">
+                        Staff
+                      </span>
+                    )}
+                  </div>
+
+                  {resource.instructor && (
+                    <div className="flex items-center space-x-1.5 text-[#475569]" title={`Enseignant : ${resource.instructor}`}>
+                      <BookOpen className="w-3.5 h-3.5 text-[#68748A] shrink-0" />
+                      <span>Prof. {resource.instructor}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center space-x-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-[#68748A] shrink-0" />
+                    <span>Uploaded {formatDate(resource.created_at)}</span>
+                  </div>
+                  <div className="flex items-center space-x-1.5">
+                    <FileText className="w-3.5 h-3.5 text-[#68748A] shrink-0" />
+                    <span className="font-tabular">{formatBytes(resource.file_size_bytes)}</span>
+                  </div>
+                  <div className="flex items-center space-x-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                    <span className="capitalize">{resource.visibility}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Interactive Bookmark, Revision Status & Download / Redirect */}
           {(() => {
             const isExternal =
               resource.mime_type?.includes("url") ||

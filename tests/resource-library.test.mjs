@@ -211,3 +211,64 @@ test("Direct Storage Upload Action: createSignedUploadUrlAction contract", async
     "createSignedUploadUrlAction must enforce 50MB boundary"
   );
 });
+
+test("ResourceCard UX: Subject Label & Uploader User Label Contracts", async () => {
+  const fs = await import("fs");
+  const cardCode = fs.readFileSync("src/components/academic/resource-card.tsx", "utf-8");
+
+  // 1. Subject badge contract
+  assert.ok(
+    cardCode.includes("resource.subject?.name") &&
+      cardCode.includes("<GraduationCap") &&
+      cardCode.includes("library?subjectId="),
+    "ResourceCard must render a dedicated Subject badge linking to filtered library"
+  );
+
+  // 2. Uploader user label contract
+  assert.ok(
+    cardCode.includes("uploaderName") &&
+      cardCode.includes("resource.owner_profile?.display_name") &&
+      cardCode.includes("Document ajouté par"),
+    "ResourceCard must compute and display the user who added the document"
+  );
+
+  // 3. Admin / Staff role distinction contract
+  assert.ok(
+    cardCode.includes("Staff") && cardCode.includes("resource.owner_profile?.role === \"admin\""),
+    "ResourceCard must display staff indicator for administration uploads"
+  );
+
+  // 4. Distinction between uploader user and professor instructor
+  assert.ok(
+    cardCode.includes("Prof. {resource.instructor}"),
+    "ResourceCard must distinguish instructor (Prof.) from the uploader user (Par)"
+  );
+});
+
+test("Repository Enrichment: Owner profiles and defensive subject resolution contracts", async () => {
+  const fs = await import("fs");
+  const repoCode = fs.readFileSync("src/lib/supabase/repository.ts", "utf-8");
+
+  // 1. Batch owner profiles fetching without N+1 queries
+  assert.ok(
+    repoCode.includes("const ownerIds = Array.from(") &&
+      repoCode.includes('.from("profiles")') &&
+      repoCode.includes('.in("id", ownerIds)'),
+    "getResources must batch enrich owner profiles using IN query"
+  );
+
+  // 2. Defensive fallback for missing subjects
+  assert.ok(
+    repoCode.includes("hasMissingSubject") &&
+      repoCode.includes("getSubjects()"),
+    "getResources must provide fallback subject resolution from cached subjects"
+  );
+
+  // 3. Single resource enrichment in getResourceById
+  assert.ok(
+    repoCode.includes("data.owner_id && !data.owner_profile") &&
+      repoCode.includes("data.owner_profile = prof"),
+    "getResourceById must enrich owner_profile for single resource lookup"
+  );
+});
+
