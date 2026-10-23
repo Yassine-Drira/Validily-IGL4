@@ -43,14 +43,17 @@ export async function GET(
     return NextResponse.redirect(targetUrl, 303);
   }
 
+  const isInline = req.nextUrl.searchParams.get("inline") === "true";
+
   if (!isSupabaseConfigured()) {
     // Return sample PDF stream or informative message
+    const dispositionType = isInline ? "inline" : "attachment";
     return new NextResponse(
       `%PDF-1.4\n1 0 obj\n<< /Title (${resource.title}) /Creator (Validily Academic Platform) >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF`,
       {
         headers: {
           "Content-Type": "application/pdf",
-          "Content-Disposition": `attachment; filename="${encodeURIComponent(
+          "Content-Disposition": `${dispositionType}; filename="${encodeURIComponent(
             resource.original_filename
           )}"`,
         },
@@ -60,10 +63,14 @@ export async function GET(
 
   const supabase = await createClient();
 
-  // Create short-lived signed URL (60 seconds)
+  // Create short-lived signed URL (300 seconds for comfortable in-app reading)
   const { data, error } = await supabase.storage
     .from("academic-resources")
-    .createSignedUrl(resource.storage_path, 60);
+    .createSignedUrl(
+      resource.storage_path,
+      300,
+      isInline ? undefined : { download: resource.original_filename }
+    );
 
   if (error || !data?.signedUrl) {
     return NextResponse.json(

@@ -131,9 +131,6 @@ export function TimeblockEventCard({
 
         <div className="flex items-center gap-1 shrink-0 text-[10px] text-[#68748A] font-tabular">
           <span>{startStr}</span>
-          {displayNotes && (
-            <span className="text-[10px] opacity-75" title="Note attachée">📝</span>
-          )}
           {subject && (
             <SubjectIcon name={subject.name} slug={subject.slug} className="w-3 h-3 text-current opacity-80" />
           )}
@@ -374,38 +371,28 @@ export function TimeblockEventCard({
             <Clock className="w-3 h-3 opacity-70 shrink-0" />
             <span className="font-semibold">{startStr}</span>
           </div>
-          <div className="flex items-center gap-1 shrink-0">
-            {displayNotes && (
-              <span className="text-[10px] opacity-75" title="Note attachée">📝</span>
-            )}
-            {subject && (
-              <span
-                className={cn(
-                  "inline-flex items-center gap-1 px-1.5 py-0.2 rounded font-semibold text-[9px] border shadow-2xs truncate max-w-[85px]",
-                  theme.badgeBg,
-                  theme.badgeText,
-                  theme.badgeBorder
-                )}
-                title={subject.name}
-              >
-                <SubjectIcon name={subject.name} slug={subject.slug} className="w-2.5 h-2.5 shrink-0" />
-                <span className="truncate">{subject.name}</span>
-              </span>
-            )}
-          </div>
+          {subject && (
+            <span
+              className={cn(
+                "inline-flex items-center gap-1 px-1.5 py-0.2 rounded font-semibold text-[9px] border shadow-2xs truncate max-w-[85px]",
+                theme.badgeBg,
+                theme.badgeText,
+                theme.badgeBorder
+              )}
+              title={subject.name}
+            >
+              <SubjectIcon name={subject.name} slug={subject.slug} className="w-2.5 h-2.5 shrink-0" />
+              <span className="truncate">{subject.name}</span>
+            </span>
+          )}
         </div>
       ) : (
         <div className="flex items-center justify-between gap-1 text-[10px] text-[#68748A] pt-1 mt-auto border-t border-black/5 font-tabular font-medium whitespace-nowrap min-w-0">
-          <div className="flex items-center gap-1 shrink-0">
+          <div className="flex items-center gap-1 shrink-0 min-w-0">
             <Clock className="w-3 h-3 opacity-70 shrink-0" />
             <span className="font-semibold">{startStr} - {endStr}</span>
           </div>
-          <div className="flex items-center gap-1 shrink-0">
-            {displayNotes && (
-              <span className="text-[10px] opacity-75" title="Note attachée (survoler pour lire)">📝</span>
-            )}
-            <span className="opacity-75 font-normal">({duration}m)</span>
-          </div>
+          <span className="opacity-75 font-normal shrink-0">({duration}m)</span>
         </div>
       )}
 

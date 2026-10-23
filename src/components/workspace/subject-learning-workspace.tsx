@@ -1201,7 +1201,7 @@ ${resources.map((r) => `<li><strong>${r.title}</strong> (${r.mime_type}) - ${r.s
                 />
               ) : (
                 <PdfViewer
-                  url={`/api/download/${viewingResource.id}`}
+                  url={`/api/download/${viewingResource.id}?inline=true`}
                   filename={viewingResource.original_filename}
                   title={viewingResource.title}
                   downloadUrl={`/api/download/${viewingResource.id}`}
