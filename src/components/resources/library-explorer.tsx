@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useCallback, useEffect } from "react";
+import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
 import { AcademicResource, ResourceCategory, Subject } from "@/types/database";
 import { ResourceCard } from "@/components/academic/resource-card";
@@ -83,6 +83,54 @@ export function LibraryExplorer({
 
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  // Synchronize state when navigating with new props
+  useEffect(() => {
+    setCategory(initialCategory);
+  }, [initialCategory]);
+
+  useEffect(() => {
+    setType(initialType);
+  }, [initialType]);
+
+  useEffect(() => {
+    setSort(initialSort);
+  }, [initialSort]);
+
+  useEffect(() => {
+    setQ(initialQuery);
+  }, [initialQuery]);
+
+  useEffect(() => {
+    setSubjectId(initialSubjectId);
+  }, [initialSubjectId]);
+
+  // Debounced URL state updater to avoid thrashing window.history.replaceState on fast typing
+  const debounceUrlTimer = useRef<NodeJS.Timeout | null>(null);
+
+  const updateUrlDebounced = useCallback(
+    (
+      newCategory: string,
+      newType: string,
+      newSort: string,
+      newQ: string,
+      newSubId?: string
+    ) => {
+      if (debounceUrlTimer.current) {
+        clearTimeout(debounceUrlTimer.current);
+      }
+      debounceUrlTimer.current = setTimeout(() => {
+        updateUrl(newCategory, newType, newSort, newQ, newSubId);
+      }, 250);
+    },
+    [updateUrl]
+  );
+
+  useEffect(() => {
+    return () => {
+      if (debounceUrlTimer.current) clearTimeout(debounceUrlTimer.current);
+    };
   }, []);
 
   // Matched category object
@@ -212,6 +260,7 @@ export function LibraryExplorer({
   };
 
   const handleClearSearch = () => {
+    if (debounceUrlTimer.current) clearTimeout(debounceUrlTimer.current);
     setQ("");
     updateUrl(category, type, sort, "", subjectId);
   };
@@ -240,7 +289,7 @@ export function LibraryExplorer({
             onChange={(e) => {
               const val = e.target.value;
               setQ(val);
-              updateUrl(category, type, sort, val, subjectId);
+              updateUrlDebounced(category, type, sort, val, subjectId);
             }}
             placeholder="Rechercher par titre, matière, mot-clé ou tag..."
             className="w-full bg-white border border-[#E4E8F0] focus:border-[#2855D9] rounded-xl pl-9 pr-9 py-2 text-xs text-[#111A2E] placeholder:text-[#68748A] outline-none shadow-2xs transition-all"

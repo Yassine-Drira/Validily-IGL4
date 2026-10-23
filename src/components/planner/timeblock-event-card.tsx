@@ -110,7 +110,7 @@ export function TimeblockEventCard({
                 e.stopPropagation();
                 onToggleComplete(block);
               }}
-              className={cn("p-0.5 -m-0.5 text-[#68748A] hover:text-[#059669] shrink-0 transition-colors cursor-pointer", theme.checkboxStroke)}
+              className={cn("p-1 -m-1 min-w-[24px] min-h-[24px] flex items-center justify-center text-[#68748A] hover:text-[#059669] shrink-0 transition-colors cursor-pointer active:scale-90", theme.checkboxStroke)}
               title={isCompleted ? "Marquer non terminé" : "Marquer terminé"}
               aria-label={isCompleted ? "Marquer non terminé" : "Marquer terminé"}
             >
@@ -245,7 +245,7 @@ export function TimeblockEventCard({
                 onToggleComplete(block);
               }}
               className={cn(
-                "p-0.5 -m-0.5 text-[#68748A] hover:text-[#059669] shrink-0 transition-all cursor-pointer rounded-full hover:bg-emerald-50 active:scale-90",
+                "p-1 -m-1 text-[#68748A] hover:text-[#059669] shrink-0 transition-all cursor-pointer rounded-full hover:bg-emerald-50 active:scale-90 min-w-[26px] min-h-[26px] flex items-center justify-center",
                 theme.checkboxStroke
               )}
               title={isCompleted ? "Marquer non terminé" : "Marquer terminé"}
@@ -340,7 +340,7 @@ export function TimeblockEventCard({
                 e.stopPropagation();
                 onDuplicate(block);
               }}
-              className="p-1 text-[#68748A] hover:text-[#2855D9] rounded-md hover:bg-[#F4F6FA] transition-colors"
+              className="min-w-[26px] min-h-[26px] flex items-center justify-center p-1 text-[#68748A] hover:text-[#2855D9] rounded-md hover:bg-[#F4F6FA] transition-colors active:scale-90"
               title="Dupliquer la séance (+1 j)"
               aria-label="Dupliquer la séance"
             >
@@ -354,7 +354,7 @@ export function TimeblockEventCard({
                 e.stopPropagation();
                 onDelete(block.id);
               }}
-              className="p-1 text-[#68748A] hover:text-[#DC2626] rounded-md hover:bg-[#F4F6FA] transition-colors"
+              className="min-w-[26px] min-h-[26px] flex items-center justify-center p-1 text-[#68748A] hover:text-[#DC2626] rounded-md hover:bg-[#F4F6FA] transition-colors active:scale-90"
               title="Supprimer la séance"
               aria-label="Supprimer la séance"
             >

@@ -29,7 +29,7 @@ test("MOBILE-UX-04: library-explorer.tsx features instant 0ms in-memory search b
   const explorerCode = fs.readFileSync(path.resolve(process.cwd(), "src/components/resources/library-explorer.tsx"), "utf-8");
   assert.ok(explorerCode.includes("Instant Search Bar (0ms In-Memory Filter)"), "Must include instant search bar");
   assert.ok(explorerCode.includes("handleClearSearch"), "Must support 1-tap clear button");
-  assert.ok(explorerCode.includes("updateUrl(category, type, sort, val, subjectId)"), "Must synchronize URL state seamlessly");
+  assert.ok(explorerCode.includes("updateUrlDebounced(category, type, sort, val, subjectId)"), "Must synchronize URL state seamlessly with debouncing");
 });
 
 test("MOBILE-UX-05: planner/page.tsx eliminates redundant nested container padding", () => {
@@ -85,4 +85,18 @@ test("MOBILE-UX-12: admin tables enforce touch-scroll for iOS momentum scrolling
   assert.ok(adminVip.includes("overflow-x-auto touch-scroll"), "Admin VIP manager must use touch-scroll on tables");
   assert.ok(adminStudents.includes("overflow-x-auto touch-scroll"), "Admin students view must use touch-scroll on tables");
 });
+
+test("MOBILE-UX-13: library-explorer.tsx debounces URL updates and synchronizes props", () => {
+  const code = fs.readFileSync(path.resolve(process.cwd(), "src/components/resources/library-explorer.tsx"), "utf-8");
+  assert.ok(code.includes("updateUrlDebounced"), "Must debounce URL history replacement");
+  assert.ok(code.includes("setCategory(initialCategory)"), "Must synchronize category prop on navigation");
+  assert.ok(code.includes("setSubjectId(initialSubjectId)"), "Must synchronize subjectId prop on navigation");
+});
+
+test("MOBILE-UX-14: timeblock-event-card.tsx completion checkbox and action buttons have safe touch bounds", () => {
+  const code = fs.readFileSync(path.resolve(process.cwd(), "src/components/planner/timeblock-event-card.tsx"), "utf-8");
+  assert.ok(code.includes("min-w-[26px] min-h-[26px]"), "Checkbox and action buttons must have minimum 26px touch box");
+  assert.ok(code.includes("active:scale-90"), "Must have tactile feedback on tap");
+});
+
 
