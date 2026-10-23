@@ -149,14 +149,14 @@ export function TaskQuickAdd({
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             onFocus={() => setIsExpanded(true)}
-            placeholder="Ajouter une tâche... (ex: 'Rapport Compilation demain 2h !urgent')"
+            placeholder="Ajouter une tâche... (ex: 'TD IA 45m !urgent')"
             className="flex-1 text-sm bg-transparent border-0 outline-none placeholder-[#68748A] text-[#111A2E]"
             disabled={loading}
           />
           <button
             type="submit"
             disabled={loading || !title.trim()}
-            className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-[#2855D9] text-white hover:bg-[#1E42AC] disabled:opacity-50 transition-colors shadow-xs"
+            className="inline-flex items-center justify-center min-w-[36px] min-h-[36px] w-9 h-9 rounded-xl bg-[#2855D9] text-white hover:bg-[#1E42AC] active:scale-90 disabled:opacity-50 transition-all shadow-xs shrink-0 cursor-pointer"
             title="Créer la tâche"
           >
             <Plus className="w-4 h-4" />

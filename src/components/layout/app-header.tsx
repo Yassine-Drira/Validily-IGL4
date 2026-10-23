@@ -117,36 +117,36 @@ export function AppHeader({ initialUser }: { initialUser?: HeaderUser | null }) 
   };
 
   return (
-    <header className="h-14 border-b border-[#E4E8F0] bg-white/95 backdrop-blur-xs px-4 sm:px-6 flex items-center justify-between sticky top-0 z-30 gap-3">
-      {/* Mobile Menu Button */}
+    <header className="h-14 border-b border-[#E4E8F0] bg-white/95 backdrop-blur-xs px-3 sm:px-6 flex items-center justify-between sticky top-0 z-30 gap-2 sm:gap-3">
+      {/* Mobile Menu Button with 40px+ Touch Target */}
       <button
         type="button"
         onClick={toggleMobile}
-        className="md:hidden p-2 -ml-1 text-[#182235] hover:bg-[#F4F6FA] rounded-lg transition-colors cursor-pointer shrink-0"
+        className="md:hidden min-w-[40px] min-h-[40px] flex items-center justify-center p-2 -ml-1 text-[#182235] hover:bg-[#F4F6FA] active:bg-[#EDF2FF] rounded-xl transition-all cursor-pointer shrink-0"
         aria-label="Open navigation sidebar"
       >
         <Menu className="w-5 h-5 text-[#182235]" />
       </button>
 
       {/* Global Search Bar */}
-      <form onSubmit={handleSearch} className="relative flex-1 max-w-md">
+      <form onSubmit={handleSearch} className="relative flex-1 min-w-[100px] max-w-md">
         <Search className="w-4 h-4 text-[#68748A] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
         <input
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Rechercher matières, cours, examens ou fiches..."
+          placeholder="Rechercher cours, matières, fiches..."
           className="w-full bg-[#F4F6FA] border border-[#E4E8F0] rounded-xl pl-9 pr-4 py-1.5 text-xs text-[#182235] placeholder:text-[#68748A] focus:outline-none focus:border-[#2855D9] focus:bg-white transition-all"
         />
       </form>
 
       {/* Right controls */}
-      <div className="flex items-center space-x-2 sm:space-x-3">
+      <div className="flex items-center space-x-1.5 sm:space-x-3 shrink-0">
         {/* Persistent Focus / Pomodoro Timer & Soundscapes */}
         <FocusHeaderWidget />
 
         {/* Upload Resource Button: members upload, visitors redirected to login */}
-        <Link href={user ? "/library?action=upload" : "/login?next=/library?action=upload"}>
+        <Link href={user ? "/library?action=upload" : "/login?next=/library?action=upload"} className="hidden sm:inline-flex shrink-0">
           <Button size="sm" variant="outline" className="text-xs">
             <UploadCloud className="w-3.5 h-3.5 text-[#2855D9]" />
             <span className="hidden md:inline">Ajouter un document</span>
@@ -162,7 +162,7 @@ export function AppHeader({ initialUser }: { initialUser?: HeaderUser | null }) 
             <button
               type="button"
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-              className="flex items-center space-x-2 p-1.5 rounded-xl hover:bg-[#F4F6FA] transition-colors cursor-pointer"
+              className="flex items-center space-x-2 p-1.5 min-h-[40px] rounded-xl hover:bg-[#F4F6FA] active:scale-95 transition-all cursor-pointer"
             >
               <div className="relative">
                 {user.avatarUrl ? (

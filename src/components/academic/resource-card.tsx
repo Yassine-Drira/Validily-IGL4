@@ -139,10 +139,10 @@ export function ResourceCard({ resource, isBookmarked = false }: ResourceCardPro
           size="sm"
         />
 
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-1 sm:space-x-2">
           <Link
             href={`/resources/${resource.id}`}
-            className="text-xs font-semibold text-[#2855D9] hover:text-[#111A2E] flex items-center space-x-1.5 transition-colors"
+            className="text-xs font-semibold text-[#2855D9] hover:text-[#111A2E] flex items-center space-x-1.5 transition-all min-h-[36px] px-2.5 rounded-lg hover:bg-[#EDF2FF] active:scale-95"
           >
             <BookOpen className="w-3.5 h-3.5" />
             <span>Consulter</span>
@@ -152,7 +152,7 @@ export function ResourceCard({ resource, isBookmarked = false }: ResourceCardPro
             <a
               href={`/api/download/${resource.id}`}
               download={resource.original_filename}
-              className="text-[#68748A] hover:text-[#182235] p-1 rounded-lg hover:bg-[#F4F6FA] transition-colors"
+              className="text-[#68748A] hover:text-[#182235] p-2 min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg hover:bg-[#F4F6FA] active:scale-90 transition-all"
               title="Télécharger"
             >
               <Download className="w-3.5 h-3.5" />

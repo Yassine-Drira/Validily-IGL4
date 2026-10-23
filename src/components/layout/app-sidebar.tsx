@@ -18,6 +18,7 @@ import {
   ArrowRight,
   Trees,
   CalendarCheck2,
+  UploadCloud,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -270,6 +271,18 @@ export function AppSidebar({ subjects = [], isAdmin = false }: AppSidebarProps) 
               >
                 <X className="w-5 h-5" />
               </button>
+            </div>
+
+            {/* Mobile Fast Action */}
+            <div className="px-4 py-2.5 bg-white border-b border-[#E4E8F0]">
+              <Link
+                href="/library?action=upload"
+                onClick={closeMobile}
+                className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-white bg-[#2855D9] hover:bg-[#1E42AC] active:scale-95 transition-all shadow-xs"
+              >
+                <UploadCloud className="w-4 h-4" />
+                <span>Ajouter un document</span>
+              </Link>
             </div>
 
             {renderNavContent()}

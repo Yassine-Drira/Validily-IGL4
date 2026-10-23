@@ -15,6 +15,7 @@ import {
   FileText,
   FileCode,
   Link2,
+  Search,
 } from "lucide-react";
 
 interface LibraryExplorerProps {
@@ -229,7 +230,33 @@ export function LibraryExplorer({
   return (
     <div className="space-y-6">
       {/* Search & Filter Bar */}
-      <div className="space-y-3 bg-[#FAFAF7] p-3 rounded-lg border border-[#E4E8F0]">
+      <div className="space-y-3 bg-[#FAFAF7] p-3 rounded-xl border border-[#E4E8F0] shadow-2xs">
+        {/* Instant Search Bar (0ms In-Memory Filter) */}
+        <div className="relative w-full">
+          <Search className="w-4 h-4 text-[#68748A] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <input
+            type="text"
+            value={q}
+            onChange={(e) => {
+              const val = e.target.value;
+              setQ(val);
+              updateUrl(category, type, sort, val, subjectId);
+            }}
+            placeholder="Rechercher par titre, matière, mot-clé ou tag..."
+            className="w-full bg-white border border-[#E4E8F0] focus:border-[#2855D9] rounded-xl pl-9 pr-9 py-2 text-xs text-[#111A2E] placeholder:text-[#68748A] outline-none shadow-2xs transition-all"
+          />
+          {q && (
+            <button
+              type="button"
+              onClick={handleClearSearch}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#68748A] hover:text-[#111A2E] p-1 rounded-md cursor-pointer"
+              title="Effacer la recherche"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+
         {/* Row 1: Category Filter Pills & Active Queries */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2">

@@ -45,7 +45,7 @@ export default async function PlannerPage() {
   const history = historyRes.data;
 
   return (
-    <div className="container max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+    <div className="space-y-6">
       <PlannerShell
         initialTasks={tasks}
         initialTimeblocks={timeblocks}

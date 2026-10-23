@@ -52,13 +52,13 @@ export function CardBookmarkButton({
       type="button"
       onClick={handleToggle}
       disabled={loading}
-      className={`p-1.5 rounded transition-colors cursor-pointer ${
+      className={`min-h-[36px] min-w-[36px] flex items-center justify-center p-1.5 rounded-lg transition-all duration-150 active:scale-90 cursor-pointer ${
         isBookmarked
           ? "text-amber-500 hover:text-amber-600 bg-amber-50"
           : "text-[#68748A] hover:text-[#2855D9] hover:bg-[#EDF2FF]"
       }`}
-      title={isBookmarked ? "Remove bookmark" : "Save to bookmarks"}
-      aria-label={isBookmarked ? "Remove bookmark" : "Save to bookmarks"}
+      title={isBookmarked ? "Supprimer des favoris" : "Ajouter aux favoris"}
+      aria-label={isBookmarked ? "Supprimer des favoris" : "Ajouter aux favoris"}
     >
       <Bookmark
         className={`w-4 h-4 ${isBookmarked ? "fill-amber-500" : ""}`}

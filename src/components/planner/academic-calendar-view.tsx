@@ -1068,8 +1068,8 @@ export function AcademicCalendarView({
 
       {/* 4. Event Create / Edit Dialog with TaskSelector & Interval Adjustment */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-5 border border-[#E4E8F0] shadow-xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-md w-full p-4 sm:p-5 border border-[#E4E8F0] shadow-xl space-y-4 animate-in fade-in zoom-in-95 duration-150 max-h-[92vh] overflow-y-auto [scrollbar-width:thin]">
             <div className="flex items-center justify-between border-b border-[#E4E8F0] pb-3">
               <h3 className="text-base font-bold text-[#111A2E] flex items-center gap-2">
                 <Clock className="w-4 h-4 text-[#2855D9]" />
