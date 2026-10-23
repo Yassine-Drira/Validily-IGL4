@@ -14,6 +14,7 @@ import type {
 } from "@/types/database";
 import {
   getLocalTodayDateString,
+  addDaysToDateString,
   calculateHabitStreaks,
   calculateHabitAnalytics,
   getDayCompletionStatus,
@@ -95,6 +96,7 @@ function isTableMissingError(err: any): boolean {
 const globalHabitsState = globalThis as unknown as {
   __localHabits?: Map<string, Habit>;
   __localHabitCheckins?: Map<string, HabitCheckin>;
+  __habitAnalyticsCache?: Map<string, { data: HabitAnalyticsSummary; expiresAt: number }>;
 };
 
 if (!globalHabitsState.__localHabits) {
@@ -103,10 +105,18 @@ if (!globalHabitsState.__localHabits) {
 if (!globalHabitsState.__localHabitCheckins) {
   globalHabitsState.__localHabitCheckins = new Map();
 }
+if (!globalHabitsState.__habitAnalyticsCache) {
+  globalHabitsState.__habitAnalyticsCache = new Map();
+}
+
+export async function invalidateHabitAnalyticsCache() {
+  globalHabitsState.__habitAnalyticsCache?.clear();
+}
 
 export async function _resetLocalHabitsStore() {
   globalHabitsState.__localHabits?.clear();
   globalHabitsState.__localHabitCheckins?.clear();
+  globalHabitsState.__habitAnalyticsCache?.clear();
 }
 
 /**
@@ -176,6 +186,132 @@ function seedInitialHabitsIfEmpty(userId: string) {
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     },
+    {
+      id: "seed-habit-gym",
+      user_id: userId,
+      name: "going to GYM",
+      description: "Entraînement physique et cardio.",
+      icon: "Heart",
+      category: "health",
+      habit_type: "binary",
+      target_value: 1,
+      unit: "fois",
+      frequency_type: "daily",
+      scheduled_days: [1, 2, 3, 4, 5, 6, 0],
+      preferred_time: "morning",
+      start_date: todayStr,
+      status: "active",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
+    {
+      id: "seed-habit-revision-extra",
+      user_id: userId,
+      name: "Session Révision Active (Pomodoro)",
+      description: "Deuxième bloc de travail approfondi.",
+      icon: "Brain",
+      category: "study",
+      habit_type: "quantitative",
+      target_value: 45,
+      unit: "minutes",
+      frequency_type: "daily",
+      scheduled_days: [1, 2, 3, 4, 5, 6, 0],
+      preferred_time: "afternoon",
+      start_date: todayStr,
+      status: "active",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
+    {
+      id: "seed-habit-hydration",
+      user_id: userId,
+      name: "Hydratation Optimale (2L d'eau)",
+      description: "Boire régulièrement tout au long de la journée.",
+      icon: "Heart",
+      category: "health",
+      habit_type: "quantitative",
+      target_value: 2000,
+      unit: "ml",
+      frequency_type: "daily",
+      scheduled_days: [1, 2, 3, 4, 5, 6, 0],
+      preferred_time: "anytime",
+      start_date: todayStr,
+      status: "active",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
+    {
+      id: "seed-habit-mindfulness",
+      user_id: userId,
+      name: "Méditation & Respiration",
+      description: "Séance de cohérence cardiaque et recentrage.",
+      icon: "Zap",
+      category: "mindfulness",
+      habit_type: "quantitative",
+      target_value: 10,
+      unit: "minutes",
+      frequency_type: "daily",
+      scheduled_days: [1, 2, 3, 4, 5, 6, 0],
+      preferred_time: "morning",
+      start_date: todayStr,
+      status: "active",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
+    {
+      id: "seed-habit-planning",
+      user_id: userId,
+      name: "Revue Hebdomadaire des Objectifs",
+      description: "Planifier les priorités de la semaine à venir.",
+      icon: "Layers",
+      category: "productivity",
+      habit_type: "binary",
+      target_value: 1,
+      unit: "fois",
+      frequency_type: "weekly_count",
+      target_days_per_week: 1,
+      preferred_time: "evening",
+      start_date: todayStr,
+      status: "active",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
+    {
+      id: "seed-habit-disconnect",
+      user_id: userId,
+      name: "Déconnexion Écrans 22h",
+      description: "Éteindre les écrans une heure avant de dormir.",
+      icon: "Clock",
+      category: "routine",
+      habit_type: "binary",
+      target_value: 1,
+      unit: "fois",
+      frequency_type: "daily",
+      scheduled_days: [1, 2, 3, 4, 5, 6, 0],
+      preferred_time: "evening",
+      start_date: todayStr,
+      status: "active",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
+    {
+      id: "seed-habit-coding",
+      user_id: userId,
+      name: "Pratique Algorithmique (LeetCode)",
+      description: "Résolution quotidienne d'un problème d'algorithmique.",
+      icon: "BookOpen",
+      category: "study",
+      habit_type: "binary",
+      target_value: 1,
+      unit: "exercice",
+      frequency_type: "daily",
+      scheduled_days: [1, 2, 3, 4, 5, 6, 0],
+      preferred_time: "morning",
+      start_date: todayStr,
+      status: "active",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
   ];
 
   for (const h of sampleHabits) {
@@ -218,11 +354,13 @@ export async function getHabitsAction(options?: {
         const { data: habitsData, error: habitsError } = await query;
 
         if (!habitsError && habitsData) {
-          // Fetch checkins for this user
+          // Fetch checkins for this user - limited to active + last 2 past months (~70 days) to optimize egress & storage
+          const minDateForRoue = addDaysToDateString(todayStr, -70);
           const { data: checkinsData } = await adminClient
             .from("habit_checkins")
             .select("*")
-            .eq("user_id", user.id);
+            .eq("user_id", user.id)
+            .gte("date", minDateForRoue);
 
           const checkins = checkinsData || [];
           const checkinByHabitAndDate = new Map<string, HabitCheckin>();
@@ -281,8 +419,9 @@ export async function getHabitsAction(options?: {
       (h) => h.user_id === user.id && (statusFilter === "all" || h.status === statusFilter)
     );
 
+    const minDateForRoue = addDaysToDateString(todayStr, -70);
     const userCheckins = Array.from(globalHabitsState.__localHabitCheckins!.values()).filter(
-      (c) => c.user_id === user.id
+      (c) => c.user_id === user.id && c.date >= minDateForRoue
     );
 
     const checkinByHabitAndDate = new Map<string, HabitCheckin>();
@@ -599,6 +738,7 @@ export async function recordCheckinAction(payload: {
           .single();
 
         if (!error && data) {
+          await invalidateHabitAnalyticsCache();
           await safeRevalidate("/habits");
           return { success: true, data };
         }
@@ -606,6 +746,7 @@ export async function recordCheckinAction(payload: {
     }
 
     globalHabitsState.__localHabitCheckins!.set(checkinRecord.id, checkinRecord);
+    await invalidateHabitAnalyticsCache();
     await safeRevalidate("/habits");
     return { success: true, data: checkinRecord };
   } catch (err: any) {
@@ -638,6 +779,7 @@ export async function undoCheckinAction(payload: {
           .eq("user_id", user.id);
 
         if (!error) {
+          await invalidateHabitAnalyticsCache();
           await safeRevalidate("/habits");
           return { success: true };
         }
@@ -646,6 +788,7 @@ export async function undoCheckinAction(payload: {
 
     const checkinKey = `${payload.habitId}_${dateStr}`;
     globalHabitsState.__localHabitCheckins!.delete(checkinKey);
+    await invalidateHabitAnalyticsCache();
     await safeRevalidate("/habits");
     return { success: true };
   } catch (err: any) {
@@ -665,6 +808,13 @@ export async function getHabitAnalyticsAction(
       return { success: false, error: "Non authentifié." };
     }
 
+    const todayStr = anchorDate || getLocalTodayDateString();
+    const cacheKey = `${user.id}_${habitId}_${rangeDays}_${todayStr}`;
+    const cached = globalHabitsState.__habitAnalyticsCache?.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) {
+      return { success: true, data: cached.data };
+    }
+
     let habit: Habit | undefined;
     let checkins: HabitCheckin[] = [];
 
@@ -680,11 +830,14 @@ export async function getHabitAnalyticsAction(
 
         if (hData) {
           habit = hData;
+          // Restrict query to active window + 2 archived months
+          const minDateForAnalytics = addDaysToDateString(todayStr, -70);
           const { data: cData } = await adminClient
             .from("habit_checkins")
             .select("*")
             .eq("habit_id", habitId)
-            .eq("user_id", user.id);
+            .eq("user_id", user.id)
+            .gte("date", minDateForAnalytics);
           checkins = cData || [];
         }
       }
@@ -700,8 +853,16 @@ export async function getHabitAnalyticsAction(
       );
     }
 
-    const todayStr = anchorDate || getLocalTodayDateString();
     const analytics = calculateHabitAnalytics(habit, checkins, rangeDays, todayStr);
+
+    // Cache analytics result: 60s for current month, 10 min for past months (immutable archived data)
+    const isPastMonth = todayStr < getLocalTodayDateString().slice(0, 7);
+    const ttlMs = isPastMonth ? 10 * 60 * 1000 : 60 * 1000;
+    globalHabitsState.__habitAnalyticsCache?.set(cacheKey, {
+      data: analytics,
+      expiresAt: Date.now() + ttlMs,
+    });
+
     return { success: true, data: analytics };
   } catch (err: any) {
     return { success: false, error: err.message || "Erreur lors du calcul analytique." };

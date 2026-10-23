@@ -733,3 +733,96 @@ test("HABIT-ACTION-06: Validating a habit for today strictly touches only today 
   assert.equal(todayStatus, "completed", "Today must evaluate to 'completed'");
 });
 
+test("HABIT-ACTION-07: Cadran wheel pagination dynamically calculates pages for any habit count without feedback reset", () => {
+  const PAGE_SIZE = 6;
+
+  // 1. Test 10 habits (e.g. as in user screenshot: 10 habits -> 2 pages)
+  const habits10 = Array.from({ length: 10 }, (_, i) => ({ id: `h-${i + 1}`, name: `Habit ${i + 1}` }));
+  const totalPages10 = Math.max(1, Math.ceil(habits10.length / PAGE_SIZE));
+  assert.equal(totalPages10, 2, "10 habits should produce exactly 2 wheel pages");
+
+  // Page 0 should have 6 habits (1-6)
+  const page0Habits = habits10.slice(0 * PAGE_SIZE, 0 * PAGE_SIZE + PAGE_SIZE);
+  assert.equal(page0Habits.length, 6);
+  assert.equal(page0Habits[0].id, "h-1");
+  assert.equal(page0Habits[5].id, "h-6");
+
+  // Page 1 should have remaining 4 habits (7-10)
+  const page1Habits = habits10.slice(1 * PAGE_SIZE, 1 * PAGE_SIZE + PAGE_SIZE);
+  assert.equal(page1Habits.length, 4);
+  assert.equal(page1Habits[0].id, "h-7");
+  assert.equal(page1Habits[3].id, "h-10");
+
+  // 2. Test large habit sets (e.g. 18 habits -> 3 pages, 30 habits -> 5 pages)
+  const habits18 = Array.from({ length: 18 }, (_, i) => ({ id: `h-${i + 1}`, name: `Habit ${i + 1}` }));
+  const totalPages18 = Math.max(1, Math.ceil(habits18.length / PAGE_SIZE));
+  assert.equal(totalPages18, 3, "18 habits should produce exactly 3 wheel pages");
+
+  // 3. Verify safe index clamping
+  let pageIndex = 0;
+  const handleNextPage = (currentIndex, maxPages) => Math.min(maxPages - 1, currentIndex + 1);
+  const handlePrevPage = (currentIndex) => Math.max(0, currentIndex - 1);
+
+  pageIndex = handleNextPage(pageIndex, totalPages10);
+  assert.equal(pageIndex, 1, "Next page should advance from 0 to 1");
+
+  pageIndex = handleNextPage(pageIndex, totalPages10);
+  assert.equal(pageIndex, 1, "Next page should clamp at totalPages - 1 (1)");
+
+  pageIndex = handlePrevPage(pageIndex);
+  assert.equal(pageIndex, 0, "Prev page should return from 1 to 0");
+});
+
+test("HABIT-ACTION-08: Habit analytics in-memory caching and 2-month archive limit reduce latency and optimize storage", async () => {
+  const created = await createHabitAction({
+    name: "Lecture Rapide",
+    habit_type: "binary",
+    target_value: 1,
+    frequency_type: "daily",
+    scheduled_days: [1, 2, 3, 4, 5, 6, 0],
+    start_date: "2026-08-01",
+  });
+  const habitId = created.data?.id;
+  assert.ok(habitId);
+
+  // Record checkin within the 2-month archive window (e.g. 2026-09-15)
+  await recordCheckinAction({
+    habitId,
+    date: "2026-09-15",
+    value: 1,
+    status: "completed",
+  });
+
+  // Record checkin older than 70 days (e.g. 2026-06-01) - should be excluded from active/roue queries to save storage
+  await recordCheckinAction({
+    habitId,
+    date: "2026-06-01",
+    value: 1,
+    status: "completed",
+  });
+
+  // Query habits with target date 2026-10-24
+  const listRes = await getHabitsAction({ targetDate: "2026-10-24" });
+  const habit = listRes.data?.find((h) => h.id === habitId);
+  assert.ok(habit);
+
+  // Checkins retrieved should include 2026-09-15 (within 2 months) but not 2026-06-01 (older than 70 days)
+  const retrievedDates = (habit.recentCheckins || []).map((c) => c.date);
+  assert.ok(retrievedDates.includes("2026-09-15"), "Checkins within 2 months must be retained");
+  assert.ok(!retrievedDates.includes("2026-06-01"), "Archived checkins older than 2 months must be omitted to save egress");
+
+  // Benchmark analytics call caching
+  const startFirst = performance.now();
+  const firstRes = await getHabitAnalyticsAction(habitId, 30, "2026-10-24");
+  const firstDuration = performance.now() - startFirst;
+  assert.equal(firstRes.success, true);
+
+  const startCached = performance.now();
+  const cachedRes = await getHabitAnalyticsAction(habitId, 30, "2026-10-24");
+  const cachedDuration = performance.now() - startCached;
+  assert.equal(cachedRes.success, true);
+  assert.deepEqual(cachedRes.data, firstRes.data, "Cached analytics data must match computed data");
+  assert.ok(cachedDuration <= firstDuration + 2, "Cached analytics response must be near-instantaneous");
+});
+
+

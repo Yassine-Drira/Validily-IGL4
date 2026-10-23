@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import type { HabitWithTodayState, DayCompletionStatus, HabitCategory, HabitCheckin } from "@/types/database";
 import { getLocalTodayDateString, addDaysToDateString, getDayCompletionStatus } from "@/lib/habits/habit-engine";
 import {
@@ -667,6 +667,22 @@ export function CircularHabitDial({
 
   const isCurrentMonth = activeMonth === currentMonthStr;
 
+  // Pro caching & archive limit: strictly limited to the last 2 months past
+  const minSelectableMonth = useMemo(() => {
+    return getPreviousMonth(getPreviousMonth(currentMonthStr));
+  }, [currentMonthStr]);
+
+  const canGoPrevMonth = activeMonth > minSelectableMonth;
+
+  // Guard against any out-of-range past or future month
+  useEffect(() => {
+    if (activeMonth < minSelectableMonth) {
+      setActiveMonth(minSelectableMonth);
+    } else if (activeMonth > currentMonthStr) {
+      setActiveMonth(currentMonthStr);
+    }
+  }, [activeMonth, minSelectableMonth, currentMonthStr, setActiveMonth]);
+
   // Determine anchor date for date calculations
   const anchorDate = useMemo(() => {
     if (isCurrentMonth) {
@@ -739,29 +755,55 @@ export function CircularHabitDial({
   // Pagination for single dial view: 6 habits per wheel page maintains optimal radial readability
   const PAGE_SIZE = 6;
   const totalPages = Math.max(1, Math.ceil(filteredHabits.length / PAGE_SIZE));
+  const safePageIndex = Math.min(pageIndex, Math.max(0, totalPages - 1));
 
   // Reset pageIndex when category changes
   useEffect(() => {
     setPageIndex(0);
   }, [selectedCategory]);
 
-  // Automatically switch page if selected habit is outside current page
+  // Track the last user-selected habit ID to avoid page index feedback loops
+  const lastSelectedHabitIdRef = useRef<string | null>(selectedHabitId || null);
+
+  // Automatically switch page if selected habit is changed from the outside / habit list
   useEffect(() => {
-    if (!selectedHabitId) return;
-    const idx = filteredHabits.findIndex((h) => h.id === selectedHabitId);
-    if (idx !== -1) {
-      const targetPage = Math.floor(idx / PAGE_SIZE);
-      if (targetPage !== pageIndex) {
+    if (selectedHabitId && selectedHabitId !== lastSelectedHabitIdRef.current) {
+      lastSelectedHabitIdRef.current = selectedHabitId;
+      const idx = filteredHabits.findIndex((h) => h.id === selectedHabitId);
+      if (idx !== -1) {
+        const targetPage = Math.floor(idx / PAGE_SIZE);
         setPageIndex(targetPage);
       }
     }
-  }, [selectedHabitId, filteredHabits, pageIndex]);
+  }, [selectedHabitId, filteredHabits]);
+
+  // Handle navigation to previous wheel dial page
+  const handlePrevPage = () => {
+    const prev = Math.max(0, safePageIndex - 1);
+    setPageIndex(prev);
+    const targetHabit = filteredHabits[prev * PAGE_SIZE];
+    if (targetHabit && onSelectHabit) {
+      lastSelectedHabitIdRef.current = targetHabit.id;
+      onSelectHabit(targetHabit.id);
+    }
+  };
+
+  // Handle navigation to next wheel dial page
+  const handleNextPage = () => {
+    const next = Math.min(totalPages - 1, safePageIndex + 1);
+    setPageIndex(next);
+    const targetHabit = filteredHabits[next * PAGE_SIZE];
+    if (targetHabit && onSelectHabit) {
+      lastSelectedHabitIdRef.current = targetHabit.id;
+      onSelectHabit(targetHabit.id);
+    }
+  };
 
   // Habits currently visible on the active dial page
   const currentDialHabits = useMemo(() => {
-    const start = pageIndex * PAGE_SIZE;
+    const start = safePageIndex * PAGE_SIZE;
     return filteredHabits.slice(start, start + PAGE_SIZE);
-  }, [filteredHabits, pageIndex]);
+  }, [filteredHabits, safePageIndex]);
 
   // Calculate overall completion count across all filtered habits using exact checkins
   const overallStats = useMemo(() => {
@@ -831,9 +873,22 @@ export function CircularHabitDial({
           <div className="flex items-center gap-1 bg-[#F4F6FA] p-1 rounded-xl border border-[#E4E8F0] text-xs">
             <button
               type="button"
-              onClick={() => setActiveMonth(getPreviousMonth(activeMonth))}
-              className="p-1.5 text-[#68748A] hover:text-[#111A2E] hover:bg-white rounded-lg transition-colors cursor-pointer"
-              title="Mois précédent"
+              onClick={() => {
+                if (canGoPrevMonth) {
+                  setActiveMonth(getPreviousMonth(activeMonth));
+                }
+              }}
+              disabled={!canGoPrevMonth}
+              className={`p-1.5 rounded-lg transition-colors ${
+                !canGoPrevMonth
+                  ? "text-[#CBD5E1] cursor-not-allowed opacity-40"
+                  : "text-[#68748A] hover:text-[#111A2E] hover:bg-white cursor-pointer"
+              }`}
+              title={
+                canGoPrevMonth
+                  ? "Mois précédent"
+                  : "Historique archivé limité aux 2 derniers mois pour préserver les performances"
+              }
             >
               <ChevronLeft className="w-3.5 h-3.5" />
             </button>
@@ -981,16 +1036,16 @@ export function CircularHabitDial({
             {totalPages > 1 && (
               <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto font-mono text-xs">
                 <span className="text-[#68748A] text-[11px]">
-                  Cadran {pageIndex + 1}/{totalPages} ({pageIndex * PAGE_SIZE + 1}–
-                  {Math.min((pageIndex + 1) * PAGE_SIZE, filteredHabits.length)} sur{" "}
+                  Cadran {safePageIndex + 1}/{totalPages} ({safePageIndex * PAGE_SIZE + 1}–
+                  {Math.min((safePageIndex + 1) * PAGE_SIZE, filteredHabits.length)} sur{" "}
                   {filteredHabits.length})
                 </span>
 
                 <div className="flex items-center gap-1">
                   <button
                     type="button"
-                    onClick={() => setPageIndex((p) => Math.max(0, p - 1))}
-                    disabled={pageIndex === 0}
+                    onClick={handlePrevPage}
+                    disabled={safePageIndex === 0}
                     className="p-1.5 rounded-lg border border-[#E4E8F0] bg-white text-[#68748A] hover:text-[#111A2E] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                     aria-label="Cadran précédent"
                   >
@@ -999,8 +1054,8 @@ export function CircularHabitDial({
 
                   <button
                     type="button"
-                    onClick={() => setPageIndex((p) => Math.min(totalPages - 1, p + 1))}
-                    disabled={pageIndex >= totalPages - 1}
+                    onClick={handleNextPage}
+                    disabled={safePageIndex >= totalPages - 1}
                     className="p-1.5 rounded-lg border border-[#E4E8F0] bg-white text-[#68748A] hover:text-[#111A2E] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                     aria-label="Cadran suivant"
                   >
@@ -1015,7 +1070,7 @@ export function CircularHabitDial({
           {currentDialHabits.length > 0 ? (
             <SingleDialRenderer
               habits={currentDialHabits}
-              startIndex={pageIndex * PAGE_SIZE}
+              startIndex={safePageIndex * PAGE_SIZE}
               totalHabitsCount={filteredHabits.length}
               selectedHabitId={selectedHabitId}
               onSelectHabit={onSelectHabit}

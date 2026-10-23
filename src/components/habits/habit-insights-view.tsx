@@ -103,6 +103,21 @@ export function HabitInsightsView({
 
   const isCurrentMonth = selectedMonth === currentMonthStr;
 
+  // Pro caching & archive limit: strictly limited to the last 2 months past
+  const minSelectableMonth = React.useMemo(() => {
+    return getPreviousMonth(getPreviousMonth(currentMonthStr));
+  }, [currentMonthStr]);
+
+  const handleMonthChange = (newMonth: string) => {
+    if (newMonth < minSelectableMonth) {
+      setSelectedMonth(minSelectableMonth);
+    } else if (newMonth > currentMonthStr) {
+      setSelectedMonth(currentMonthStr);
+    } else {
+      setSelectedMonth(newMonth);
+    }
+  };
+
   const anchorDate = React.useMemo(() => {
     if (isCurrentMonth) {
       return todayStr;
@@ -500,7 +515,7 @@ export function HabitInsightsView({
         onSelectHabit={setSelectedHabitId}
         rangeDays={rangeDays}
         selectedMonth={selectedMonth}
-        onMonthChange={setSelectedMonth}
+        onMonthChange={handleMonthChange}
         onRangeDaysChange={setRangeDays}
       />
 
