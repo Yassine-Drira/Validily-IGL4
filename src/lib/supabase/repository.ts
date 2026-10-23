@@ -375,13 +375,16 @@ export async function getResources(options?: {
   categoryId?: string;
   search?: string;
   limit?: number;
+  offset?: number;
+  page?: number;
+  pageSize?: number;
   userId?: string;
   includeAll?: boolean;
   sort?: "useful" | "recent" | "voted";
   resourceType?: string;
   folderId?: string;
 }): Promise<AcademicResource[]> {
-  const cacheKey = `resources_${options?.subjectId || ""}_${options?.categoryId || ""}_${options?.search || ""}_${options?.limit || ""}_${options?.userId || "anon"}_${options?.includeAll || ""}_${options?.sort || "recent"}_${options?.resourceType || "all"}_${options?.folderId || ""}`;
+  const cacheKey = `resources_${options?.subjectId || ""}_${options?.categoryId || ""}_${options?.search || ""}_${options?.limit || ""}_${options?.page || ""}_${options?.pageSize || ""}_${options?.offset ?? ""}_${options?.userId || "anon"}_${options?.includeAll || ""}_${options?.sort || "recent"}_${options?.resourceType || "all"}_${options?.folderId || ""}`;
   const cached = getFromCache<AcademicResource[]>(cacheKey);
   if (cached) return cached;
 
@@ -613,12 +616,77 @@ export async function getResources(options?: {
       );
     }
 
+    // Handle optional pagination slicing if page/pageSize/offset are requested directly
+    if (options?.page || options?.pageSize || options?.offset !== undefined) {
+      const page = Math.max(1, options?.page || 1);
+      const pageSize = Math.min(100, Math.max(1, options?.pageSize || options?.limit || 12));
+      const from = options?.offset !== undefined ? options.offset : (page - 1) * pageSize;
+      enrichedData = enrichedData.slice(from, from + pageSize);
+    }
+
     setToCache(cacheKey, enrichedData, 20000);
     return enrichedData;
   } catch (err) {
     console.error("Failed to query resources from database:", err);
     return [];
   }
+}
+
+export interface PaginatedResourcesResult {
+  resources: AcademicResource[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  hasMore: boolean;
+  startIndex: number;
+  endIndex: number;
+}
+
+export async function getPaginatedResources(options?: {
+  subjectId?: string;
+  categoryId?: string;
+  search?: string;
+  page?: number;
+  pageSize?: number;
+  userId?: string;
+  includeAll?: boolean;
+  sort?: "useful" | "recent" | "voted";
+  resourceType?: string;
+  folderId?: string;
+}): Promise<PaginatedResourcesResult> {
+  const page = Math.max(1, options?.page || 1);
+  const pageSize = Math.min(100, Math.max(1, options?.pageSize || 12));
+
+  // Retrieve matching resources with in-memory caching and enrichment
+  const allResources = await getResources({
+    subjectId: options?.subjectId,
+    categoryId: options?.categoryId,
+    search: options?.search,
+    userId: options?.userId,
+    includeAll: options?.includeAll,
+    sort: options?.sort,
+    resourceType: options?.resourceType,
+    folderId: options?.folderId,
+  });
+
+  const totalCount = allResources.length;
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const startIndex = (safePage - 1) * pageSize;
+  const endIndex = Math.min(startIndex + pageSize, totalCount);
+  const resources = allResources.slice(startIndex, endIndex);
+
+  return {
+    resources,
+    totalCount,
+    page: safePage,
+    pageSize,
+    totalPages,
+    hasMore: safePage < totalPages,
+    startIndex: totalCount > 0 ? startIndex + 1 : 0,
+    endIndex,
+  };
 }
 
 export async function getResourceById(id: string, userId?: string): Promise<AcademicResource | null> {

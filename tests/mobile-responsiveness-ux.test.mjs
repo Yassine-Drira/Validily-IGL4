@@ -29,7 +29,7 @@ test("MOBILE-UX-04: library-explorer.tsx features instant 0ms in-memory search b
   const explorerCode = fs.readFileSync(path.resolve(process.cwd(), "src/components/resources/library-explorer.tsx"), "utf-8");
   assert.ok(explorerCode.includes("Instant Search Bar (0ms In-Memory Filter)"), "Must include instant search bar");
   assert.ok(explorerCode.includes("handleClearSearch"), "Must support 1-tap clear button");
-  assert.ok(explorerCode.includes("updateUrlDebounced(category, type, sort, val, subjectId)"), "Must synchronize URL state seamlessly with debouncing");
+  assert.ok(explorerCode.includes("updateUrlDebounced(category, type, sort, val, subjectId"), "Must synchronize URL state seamlessly with debouncing");
 });
 
 test("MOBILE-UX-05: planner/page.tsx eliminates redundant nested container padding", () => {
@@ -98,5 +98,26 @@ test("MOBILE-UX-14: timeblock-event-card.tsx completion checkbox and action butt
   assert.ok(code.includes("min-w-[26px] min-h-[26px]"), "Checkbox and action buttons must have minimum 26px touch box");
   assert.ok(code.includes("active:scale-90"), "Must have tactile feedback on tap");
 });
+
+test("MOBILE-UX-15: library-explorer.tsx renders pagination with page size selector and touch targets", () => {
+  const code = fs.readFileSync(path.resolve(process.cwd(), "src/components/resources/library-explorer.tsx"), "utf-8");
+  assert.ok(code.includes("pagedResources"), "Must slice filteredResources into pagedResources");
+  assert.ok(code.includes("Pagination des ressources"), "Must render accessible pagination navigation");
+  assert.ok(code.includes("handlePageChange"), "Must support direct and incremental page navigation");
+  assert.ok(code.includes("handlePageSizeChange"), "Must support configurable page size selector");
+  assert.ok(code.includes("min-h-[36px]"), "Pagination buttons must meet 36px touch target");
+});
+
+test("MOBILE-UX-16: repository.ts exports getPaginatedResources with range slicing and pagination metadata", async () => {
+  const repo = await import("../src/lib/supabase/repository.ts");
+  assert.ok(typeof repo.getPaginatedResources === "function", "Must export getPaginatedResources function");
+  const result = await repo.getPaginatedResources({ page: 1, pageSize: 6 });
+  assert.ok(Array.isArray(result.resources), "Must return resources array");
+  assert.strictEqual(typeof result.totalCount, "number", "Must return numeric totalCount");
+  assert.strictEqual(typeof result.totalPages, "number", "Must return numeric totalPages");
+  assert.strictEqual(typeof result.hasMore, "boolean", "Must return boolean hasMore");
+  assert.ok(result.resources.length <= 6, "Must respect pageSize boundary");
+});
+
 
 

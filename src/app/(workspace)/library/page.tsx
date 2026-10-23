@@ -26,11 +26,13 @@ interface LibraryPageProps {
     sort?: "useful" | "recent" | "voted";
     type?: string;
     visibility?: string;
+    page?: string;
+    pageSize?: string;
   }>;
 }
 
 export default async function LibraryPage({ searchParams }: LibraryPageProps) {
-  const { action, subjectId, categoryId, category, q, uploaded, sort = "useful", type = "all", visibility } = await searchParams;
+  const { action, subjectId, categoryId, category, q, uploaded, sort = "useful", type = "all", visibility, page = "1", pageSize = "12" } = await searchParams;
   const requester = await getRequesterUser();
 
   if (action === "upload" && !requester) {
@@ -77,6 +79,8 @@ export default async function LibraryPage({ searchParams }: LibraryPageProps) {
     if (q) current.q = q;
     if (sort && sort !== "useful") current.sort = sort;
     if (type && type !== "all") current.type = type;
+    if (page && page !== "1") current.page = page;
+    if (pageSize && pageSize !== "12") current.pageSize = pageSize;
 
     Object.entries(params).forEach(([k, v]) => {
       if (v === undefined || v === "" || v === "all") {
@@ -172,6 +176,8 @@ export default async function LibraryPage({ searchParams }: LibraryPageProps) {
         initialSort={(sort as "useful" | "recent" | "voted") || "useful"}
         initialQuery={q || ""}
         initialSubjectId={subjectId}
+        initialPage={parseInt(page || "1", 10) || 1}
+        initialPageSize={parseInt(pageSize || "12", 10) || 12}
       />
     </div>
   );

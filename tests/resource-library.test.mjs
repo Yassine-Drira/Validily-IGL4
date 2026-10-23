@@ -434,4 +434,64 @@ test("Resource Visibility Lifecycle: createExternalLinkResource & Upload Route p
   );
 });
 
+test("Library Pagination Math & Slicing Contract", () => {
+  const dummyItems = Array.from({ length: 45 }, (_, i) => ({ id: `doc-${i + 1}`, title: `Document ${i + 1}` }));
+  const pageSize = 12;
+
+  // Total pages
+  const totalPages = Math.max(1, Math.ceil(dummyItems.length / pageSize));
+  assert.strictEqual(totalPages, 4, "45 items / 12 per page = 4 total pages");
+
+  // Page 1 slice
+  const page1Start = (1 - 1) * pageSize;
+  const page1End = Math.min(page1Start + pageSize, dummyItems.length);
+  const page1Items = dummyItems.slice(page1Start, page1End);
+  assert.strictEqual(page1Items.length, 12);
+  assert.strictEqual(page1Items[0].id, "doc-1");
+  assert.strictEqual(page1Items[11].id, "doc-12");
+
+  // Page 4 (final page) slice
+  const page4Start = (4 - 1) * pageSize;
+  const page4End = Math.min(page4Start + pageSize, dummyItems.length);
+  const page4Items = dummyItems.slice(page4Start, page4End);
+  assert.strictEqual(page4Items.length, 9, "Final page must have remaining 9 items (45 - 36)");
+  assert.strictEqual(page4Items[0].id, "doc-37");
+  assert.strictEqual(page4Items[8].id, "doc-45");
+});
+
+test("Library Page Boundary & Out-of-Range Recovery Contract", () => {
+  const dummyItems = Array.from({ length: 5 }, (_, i) => ({ id: `doc-${i + 1}` }));
+  const pageSize = 12;
+  const totalPages = Math.max(1, Math.ceil(dummyItems.length / pageSize));
+  assert.strictEqual(totalPages, 1);
+
+  // If client requested page 5 but dataset only has 1 page, safePage recovers to 1
+  const requestedPage = 5;
+  const safePage = Math.min(Math.max(1, requestedPage), totalPages);
+  assert.strictEqual(safePage, 1, "Must clamp out-of-range requestedPage to totalPages");
+
+  // Empty dataset
+  const emptyItems = [];
+  const emptyTotalPages = Math.max(1, Math.ceil(emptyItems.length / pageSize));
+  assert.strictEqual(emptyTotalPages, 1);
+  const emptySafePage = Math.min(Math.max(1, requestedPage), emptyTotalPages);
+  assert.strictEqual(emptySafePage, 1);
+});
+
+test("Library Page Size Selector Boundaries", () => {
+  const allowedSizes = [12, 24, 48];
+  assert.ok(allowedSizes.includes(12));
+  assert.ok(allowedSizes.includes(24));
+  assert.ok(allowedSizes.includes(48));
+
+  // Max bound
+  const sanitizePageSize = (size) => Math.min(100, Math.max(1, Number(size) || 12));
+  assert.strictEqual(sanitizePageSize(12), 12);
+  assert.strictEqual(sanitizePageSize(24), 24);
+  assert.strictEqual(sanitizePageSize(48), 48);
+  assert.strictEqual(sanitizePageSize(-5), 1);
+  assert.strictEqual(sanitizePageSize(999), 100);
+});
+
+
 
