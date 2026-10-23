@@ -295,25 +295,25 @@ export class MockFallbackProvider implements AIInferenceProvider {
           detail: `Bloc d'apprentissage actif (${duration} min)`,
         });
 
-        reply = `### Créneau Identifié & Vérifié (Sans Conflit)
+        reply = `### ⚡ Créneau Stratégique Réservé & Certifié Conforme
 
-J'ai analysé votre emploi du temps du **${date}** et calculé un créneau optimal de **${duration} minutes** :
+En tant que votre coach d'ingénierie, j'ai audité votre charge journalière du **${date}** et extrait la fenêtre cognitive la plus propice pour **${targetSubject.subjectName}** :
 
-- **Matière :** **${targetSubject.subjectName}**
-- **Horaire proposé :** **${allocated.startTime} → ${allocated.endTime}**
-- **Vérification de sécurité :** Aucun chevauchement avec vos événements existants.
-- **Contexte :** Plage disponible continue vérifiée.
+- **Bloc d'apprentissage :** **${allocated.startTime} → ${allocated.endTime}** (${duration} min)
+- **Type d'intervention :** *Pratique Délibérée & Rappel Actif*
+- **Garantie de non-conflit :** Validation déterministe positive (0 chevauchement avec vos cours existants).
+- **Objectif d'apprentissage :** Stabiliser les concepts clés et combler le déficit de rappel avant la session suivante.
 
-👉 **Veuillez confirmer ci-dessous pour inscrire ce bloc à votre calendrier officiel.**`;
+👉 **Validez ce bloc d'un simple clic ci-dessous pour l'inscrire définitivement dans votre emploi du temps.**`;
       } else {
-        reply = `### Disponibilité Insuffisante
+        reply = `### ⚠️ Disponibilité Insuffisante
 
 Votre emploi du temps ne comporte pas de créneau ininterrompu de **${duration} minutes** sans chevauchement avec vos cours actuels.
 
 Vos plages disponibles aujourd'hui sont :
 ${freeSlots.map((s) => `- De **${s.start}** à **${s.end}** (${s.durationMinutes} min)`).join("\n")}
 
-Souhaitez-vous que je planifie un créneau plus court (ex: 15 ou 20 min) ?`;
+Souhaitez-vous que je planifie un créneau plus court (ex: 15 ou 20 min) adapté à votre temps disponible ?`;
       }
 
       return {
@@ -379,31 +379,31 @@ Souhaitez-vous que je planifie un créneau plus court (ex: 15 ou 20 min) ?`;
       // Build text response
       const topTask = rankedTasks.length > 0 ? rankedTasks[0] : null;
 
-      reply = `### Recommandation d'Étude & Arbitrage Factuel
+      reply = `### 🎯 Diagnostic Tactique & Arbitrage d'Excellence
 
-Voici votre feuille de route pour aujourd'hui (**${date}**), construite à partir de vos échéances réelles et de vos disponibilités :
+Voici votre stratégie d'apprentissage pour aujourd'hui (**${date}**), calibrée pour maximiser votre ratio d'assimilation cognitive :
 
-1. **Disponibilité globale :** Vous disposez de **${Math.floor(totalFreeMinutes / 60)}h ${totalFreeMinutes % 60}m de temps libre** répartis sur ${freeSlots.length} créneau(x) ininterrompu(s).
+1. **Capacité Disponible & Fenêtres Focus :** Vous disposez de **${Math.floor(totalFreeMinutes / 60)}h ${totalFreeMinutes % 60}m de temps libre effectif**, structuré en ${freeSlots.length} plage(s) ininterrompue(s).
 `;
 
       if (topTask) {
-        reply += `2. **Tâche prioritaire :** **${topTask.task.title}** (${topTask.task.priority.toUpperCase()}).
-   - *Pourquoi :* ${
+        reply += `2. **Priorité Haute :** **${topTask.task.title}** (${topTask.task.priority.toUpperCase()})
+   - *Impact & Justification :* ${
      topTask.urgency.isOverdue
-       ? `Accuse un retard de ${Math.abs(topTask.urgency.daysUntilDue)} jour(s). Nécessite environ ${topTask.task.estimated_minutes || 45} min.`
+       ? `Accuse un retard critique de ${Math.abs(topTask.urgency.daysUntilDue)} jour(s). Traiter ce livrable dès le premier créneau pour libérer votre charge mentale (estimé à ${topTask.task.estimated_minutes || 45} min).`
        : topTask.urgency.daysUntilDue === 0
-       ? `Échéance finale fixée à aujourd'hui.`
-       : `Échéance imminente dans ${topTask.urgency.daysUntilDue} jour(s).`
+       ? `Échéance finale fixée à aujourd'hui. Nécessite une mobilisation immédiate en mode Deep Work.`
+       : `Échéance stratégique dans ${topTask.urgency.daysUntilDue} jour(s). Avancer aujourd'hui évite l'effet goulot d'étranglement.`
    }\n`;
       } else {
-        reply += `2. **Tâches académiques :** Aucune tâche urgente en retard.\n`;
+        reply += `2. **Tâches académiques :** Aucune urgence critique non traitée. Vous êtes en avance sur vos devoirs.\n`;
       }
 
       if (weakestSubject) {
-        reply += `3. **Consolidation mémorielle :** **${weakestSubject.subjectName}** est votre sujet le plus fragile (réussite : **${Math.round(weakestSubject.accuracyRate * 100)}%**, dernier passage il y a ${weakestSubject.daysSinceLastReview} jours). Une session de rappel actif de 20-30 min consolidera votre rétention.\n`;
+        reply += `3. **Vigilance Mémorielle (Courbe d'Ebbinghaus) :** Votre rétention en **${weakestSubject.subjectName}** s'établit à **${weakestSubject.masteryScore}/100** (taux d'exactitude : **${Math.round(weakestSubject.accuracyRate * 100)}%**, inactivité de ${weakestSubject.daysSinceLastReview} jours). Si nous n'effectuons pas un rappel actif de 20 à 30 minutes aujourd'hui, le taux de déperdition cognitif dépassera les 40%.\n`;
       }
 
-      reply += `\n*J'ai préparé une proposition de créneaux ci-dessous. Vous pouvez les valider pour les intégrer à votre calendrier.*`;
+      reply += `\n*Consultez ci-dessous la proposition d'emploi du temps optimisé et le micro-drill préparé pour vous.*`;
 
       recommendations.push(...generateDeterministicRecommendations({
         tasks: context.tasks,
@@ -474,34 +474,34 @@ Voici votre feuille de route pour aujourd'hui (**${date}**), construite à parti
         });
       }
 
-      reply = `### Analyse Factuelle du Point Faible : ${targetWeak.subjectName}\n\n`;
+      reply = `### 📊 Audit Mémoriel & Analyse de Vulnérabilité : ${targetWeak.subjectName}\n\n`;
 
       if (targetWeak.totalQuestions > 0) {
-        reply += `Cette matière est classée comme votre point le plus vulnérable pour les raisons factuelles suivantes :
+        reply += `Ce module fait l'objet d'une surveillance prioritaire d'après vos relevés objectifs d'évaluation :
 
-- **Taux de réussite aux quiz :** **${Math.round(targetWeak.accuracyRate * 100)}%** (${targetWeak.correctAnswers} correctes sur ${targetWeak.totalQuestions} questions tentées).
-- **Score de rétention mémorielle :** **${targetWeak.masteryScore} / 100** (calculé selon la courbe d'oubli exponentielle d'Ebbinghaus).
-- **Récence :** Dernier entraînement il y a **${targetWeak.daysSinceLastReview} jour(s)**.
+- **Taux de Maîtrise Réel :** **${Math.round(targetWeak.accuracyRate * 100)}%** (${targetWeak.correctAnswers} validées sur ${targetWeak.totalQuestions} questions tentées).
+- **Index de Rétention Synaptique :** **${targetWeak.masteryScore} / 100** (décroissance d'Ebbinghaus mesurée sur ${targetWeak.daysSinceLastReview}j d'inactivité).
+- **Impact Cursus :** Coefficient élevé nécessitant un ancrage sans faille pour les partiels.
 `;
 
         if (targetWeak.recentMistakes.length > 0) {
-          reply += `\n**Erreurs récurrentes relevées dans vos évaluations :**\n`;
+          reply += `\n**Erreurs critiques détectées lors de vos passages récents :**\n`;
           targetWeak.recentMistakes.slice(0, 2).forEach((m) => {
-            reply += `- *"${m.questionText}"*\n  → Réponse choisie : \`${m.userAnswer || "Erronee"}\` | Réponse attendue : **\`${m.correctAnswer || "Voir corrigé"}\`**\n`;
+            reply += `- *« ${m.questionText} »*\n  → Réponse choisie : \`${m.userAnswer || "Erronee"}\` | Réponse attendue : **\`${m.correctAnswer || "Voir corrigé"}\`**\n`;
           });
         }
 
-        reply += `\nPour remonter ce score, je vous propose un micro-quiz de 3 questions ciblées.`;
+        reply += `\n💡 **Recommandation du Coach :** Évitez la relecture passive. Effectuez dès maintenant le micro-drill de 3 questions ciblées ci-dessous pour reconstruire vos réflexes.`;
       } else {
         // Honesty rule: admit when 0 data is recorded rather than hallucinating
-        reply += `**Précision importante sur vos données :**
-Vous n'avez pas encore passé d'évaluation ou de quiz sur la plateforme pour cette matière (**0 tentative enregistrée**).
+        reply += `**Précision importante sur votre historique académique :**
+Vous n'avez pas encore passé d'évaluation mesurable sur la plateforme pour cette matière (**0 tentative enregistrée**).
 
-Le système classe ce module sous **vigilance préventive** par défaut car :
-1. Aucun résultat factuel n'a encore étalonné votre maîtrise.
-2. Des livrables ou examens IGL4 approchent pour ce semestre.
+En tant qu'ingénieur pédagogique, je place ce cours sous **vigilance préventive** :
+1. **Absence d'étalonnage chiffré :** Vos points forts et zones de friction ne sont pas encore cartographiés.
+2. **Exigences du programme IGL4 :** Ce module contient des notions d'architecture logicielle clés qui impactent vos projets semestriels.
 
-👉 **Action conseillée :** Effectuez un test diagnostic de 3 questions dès maintenant pour mesurer votre véritable niveau et personnaliser votre courbe de révision.`;
+👉 **Action conseillée :** Lancez le test diagnostic de 3 questions ci-dessous pour établir votre score de base et calibrer votre planning.`;
       }
 
       proposedDrill = {

@@ -108,9 +108,41 @@ body {
   }
 }
 
-/* Smooth mobile touch scrolling */
+/* Smooth mobile touch scrolling & Luxury Glassmorphism Utilities */
 @layer utilities {
   .touch-scroll {
     -webkit-overflow-scrolling: touch;
+  }
+
+  .luxury-glass {
+    background: rgba(15, 23, 42, 0.68);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.45), inset 0 1px 1px 0 rgba(255, 255, 255, 0.08);
+  }
+
+  .luxury-card {
+    background: rgba(30, 41, 59, 0.45);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.3);
+  }
+
+  .glow-indigo-sm {
+    box-shadow: 0 0 20px -3px rgba(99, 102, 241, 0.25);
+  }
+
+  .glow-indigo-md {
+    box-shadow: 0 0 35px -5px rgba(99, 102, 241, 0.35);
+  }
+
+  .glow-emerald-sm {
+    box-shadow: 0 0 20px -3px rgba(16, 185, 129, 0.25);
+  }
+
+  .glow-amber-sm {
+    box-shadow: 0 0 20px -3px rgba(245, 158, 11, 0.25);
   }
 }

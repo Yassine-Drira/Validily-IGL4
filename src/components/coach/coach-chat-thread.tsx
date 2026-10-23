@@ -19,6 +19,9 @@ import {
   Zap,
   Info,
   ExternalLink,
+  Flame,
+  CheckCheck,
+  TrendingUp,
 } from "lucide-react";
 import type {
   ChatMessage,
@@ -64,40 +67,54 @@ export function CoachChatThread({
   const [blockError, setBlockError] = useState<{ id: string; msg: string } | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Auto-scroll on new message
+  // Auto-scroll inside container only on new message without moving the window
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTo({
+        top: scrollContainerRef.current.scrollHeight,
+        behavior: "smooth",
+      });
+    }
   }, [messages, isLoading]);
 
-  // Suggested starter prompts based on actual context
+  // Suggested starter prompts with luxury cards
   const suggestedPrompts = [
     {
       title: "Que dois-je étudier aujourd'hui, et pourquoi ?",
-      desc: "Analyse d'urgence des tâches, créneaux libres et arbitrage",
+      desc: "Arbitrage stratégique basé sur vos échéances, charge mentale et créneaux libres",
       icon: Sparkles,
-      color: "from-indigo-500/20 to-purple-500/20 text-indigo-400 border-indigo-500/30",
+      gradient: "from-indigo-500/20 via-purple-500/10 to-transparent",
+      accent: "text-indigo-300",
+      border: "border-indigo-500/30 hover:border-indigo-400/60",
     },
     {
       title: "Pourquoi considères-tu cela comme mon point faible ?",
       desc: weakestSubjectName
-        ? `Justification chiffrée des résultats en ${weakestSubjectName}`
-        : "Justification factuelle basée sur vos évaluations",
+        ? `Audit mémoriel chiffré des résultats en ${weakestSubjectName}`
+        : "Diagnostic factuel selon la courbe d'oubli d'Ebbinghaus",
       icon: Brain,
-      color: "from-amber-500/20 to-orange-500/20 text-amber-400 border-amber-500/30",
+      gradient: "from-amber-500/20 via-orange-500/10 to-transparent",
+      accent: "text-amber-300",
+      border: "border-amber-500/30 hover:border-amber-400/60",
     },
     {
       title: "Planifie une révision de 30 minutes sur mon sujet le plus fragile.",
-      desc: "Allocation d'un créneau sans conflit sur votre temps disponible",
+      desc: "Allocation d'un créneau certifié sans chevauchement sur votre temps disponible",
       icon: Calendar,
-      color: "from-emerald-500/20 to-teal-500/20 text-emerald-400 border-emerald-500/30",
+      gradient: "from-emerald-500/20 via-teal-500/10 to-transparent",
+      accent: "text-emerald-300",
+      border: "border-emerald-500/30 hover:border-emerald-400/60",
     },
     {
       title: "Fais-moi réviser mes erreurs récurrentes.",
-      desc: "Micro-drill ciblé sur vos erreurs passées",
+      desc: "Micro-drill adaptatif de 3 questions pour stabiliser vos ancrages réflexes",
       icon: Zap,
-      color: "from-sky-500/20 to-blue-500/20 text-sky-400 border-sky-500/30",
+      gradient: "from-cyan-500/20 via-blue-500/10 to-transparent",
+      accent: "text-cyan-300",
+      border: "border-cyan-500/30 hover:border-cyan-400/60",
     },
   ];
 
@@ -122,7 +139,6 @@ export function CoachChatThread({
     setIsLoading(true);
 
     try {
-      // Map to server action payload
       const historyPayload = newHistory.map((m) => ({
         role: m.role as "user" | "assistant",
         content: m.content,
@@ -149,10 +165,9 @@ export function CoachChatThread({
       setMessages((prev) => [...prev, assistantMessage]);
     } catch (err: any) {
       console.error("Chat error:", err);
-      setError(err.message || "Erreur lors de la communication avec le Coach.");
+      setError(err.message || "Erreur de liaison avec le Coach.");
     } finally {
       setIsLoading(false);
-      // Refocus textarea on desktop
       if (typeof window !== "undefined" && window.innerWidth > 768) {
         setTimeout(() => textareaRef.current?.focus(), 100);
       }
@@ -169,7 +184,7 @@ export function CoachChatThread({
         setAppliedBlocks((prev) => new Set(prev).add(block.tempId));
         onRefreshContext();
       } else {
-        setBlockError({ id: block.tempId, msg: res.error || "Impossible d'appliquer ce créneau." });
+        setBlockError({ id: block.tempId, msg: res.error || "Impossible d'inscrire ce créneau." });
       }
     } catch (err: any) {
       setBlockError({ id: block.tempId, msg: err.message || "Erreur lors de l'application." });
@@ -187,75 +202,90 @@ export function CoachChatThread({
   };
 
   return (
-    <div className="flex flex-col h-[750px] bg-[#0f172a]/95 backdrop-blur-md rounded-2xl border border-slate-800 shadow-2xl overflow-hidden">
-      {/* Thread Header */}
-      <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/60">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-white shadow-lg shadow-indigo-500/25">
-            <Sparkles className="w-5 h-5" />
+    <div className="flex flex-col h-[780px] luxury-glass rounded-3xl border border-white/10 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.7)] backdrop-blur-2xl relative overflow-hidden">
+      {/* Ambient background glows */}
+      <div className="absolute top-0 right-1/4 w-96 h-96 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-10 left-10 w-80 h-80 bg-purple-600/10 rounded-full blur-3xl pointer-events-none" />
+
+      {/* Thread Header - Executive Cockpit Bar */}
+      <div className="px-6 py-4 border-b border-white/[0.07] flex items-center justify-between bg-slate-950/40 backdrop-blur-xl relative z-10">
+        <div className="flex items-center gap-3.5">
+          <div className="relative">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-500 via-indigo-600 to-purple-600 flex items-center justify-center text-white shadow-lg shadow-indigo-500/30 ring-1 ring-white/20">
+              <Sparkles className="w-5 h-5" />
+            </div>
+            <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 ring-2 ring-slate-950 flex items-center justify-center">
+              <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+            </span>
           </div>
+
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-sm font-bold text-slate-100">Coach IA & Tuteur Personnel</h2>
-              <span className="px-2 py-0.5 text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded-full flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                Grounded RAG
+              <h2 className="text-sm font-bold tracking-tight text-white">Maestro AI</h2>
+              <span className="text-[10px] font-semibold tracking-wider uppercase px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-300 border border-indigo-500/30">
+                Architecte Pédagogique
               </span>
             </div>
             <p className="text-xs text-slate-400">
-              Guidé par vos devoirs réels, créneaux d'emploi du temps et historique d'évaluations
+              Conseiller stratégique certifié • Synthèse en temps réel de votre cursus IGL4
             </p>
           </div>
         </div>
 
-        {/* Quick Context Summary Badges */}
-        <div className="hidden sm:flex items-center gap-2 text-xs">
-          <span className="px-2.5 py-1 rounded-lg bg-slate-800/80 border border-slate-700/60 text-slate-300 flex items-center gap-1.5">
+        {/* Live Context Indicators */}
+        <div className="hidden sm:flex items-center gap-2.5">
+          <div className="px-3 py-1.5 rounded-xl bg-slate-900/60 border border-white/[0.08] text-slate-300 text-xs flex items-center gap-2 shadow-sm backdrop-blur-md">
             <Clock className="w-3.5 h-3.5 text-indigo-400" />
-            <span>{Math.floor(availableMinutes / 60)}h{availableMinutes % 60}m libres</span>
-          </span>
-          <span className="px-2.5 py-1 rounded-lg bg-slate-800/80 border border-slate-700/60 text-slate-300 flex items-center gap-1.5">
+            <span className="font-tabular font-medium">
+              {Math.floor(availableMinutes / 60)}h{availableMinutes % 60}m disponibles
+            </span>
+          </div>
+
+          <div className="px-3 py-1.5 rounded-xl bg-slate-900/60 border border-white/[0.08] text-slate-300 text-xs flex items-center gap-2 shadow-sm backdrop-blur-md">
             <BookOpen className="w-3.5 h-3.5 text-emerald-400" />
-            <span>{activeTasksCount} tâche(s)</span>
-          </span>
+            <span className="font-tabular font-medium">{activeTasksCount} devoirs</span>
+          </div>
         </div>
       </div>
 
       {/* Messages Scroll Area */}
-      <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
-        {/* Empty / Welcome State */}
+      <div
+        ref={scrollContainerRef}
+        className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-6 relative z-10 touch-scroll"
+      >
+        {/* Empty / Welcome State with Luxury Aesthetics */}
         {messages.length === 0 && (
-          <div className="max-w-2xl mx-auto py-6 space-y-6 animate-fadeIn">
-            <div className="text-center space-y-2">
-              <div className="inline-flex w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 items-center justify-center text-indigo-400 mb-2">
-                <Sparkles className="w-6 h-6" />
+          <div className="max-w-2xl mx-auto py-4 space-y-6 animate-fadeIn">
+            <div className="text-center space-y-3">
+              <div className="inline-flex p-3 rounded-3xl bg-gradient-to-br from-indigo-500/20 via-purple-500/10 to-transparent border border-indigo-500/30 shadow-[0_0_30px_rgba(99,102,241,0.2)] text-indigo-300 mb-1">
+                <Sparkles className="w-7 h-7" />
               </div>
-              <h3 className="text-lg font-bold text-slate-100">
-                Bonjour ! Que pouvons-nous optimiser aujourd'hui ?
+              <h3 className="text-xl font-extrabold tracking-tight text-white">
+                Prêt pour votre prochaine session d'excellence ?
               </h3>
-              <p className="text-xs text-slate-400 leading-relaxed max-w-lg mx-auto">
-                Je suis directement connecté à votre emploi du temps universitaire, vos devoirs à rendre et vos résultats de quiz pour vous conseiller en toute transparence.
+              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-lg mx-auto">
+                Je suis directement synchronisé avec votre emploi du temps universitaire, vos devoirs à rendre et vos résultats d'évaluations pour arbitrer vos priorités sans aucune complaisance.
               </p>
             </div>
 
-            {/* Starter Prompt Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+            {/* Suggested Starter Prompt Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
               {suggestedPrompts.map((prompt, idx) => {
                 const IconComponent = prompt.icon;
                 return (
                   <button
                     key={idx}
                     onClick={() => handleSendMessage(prompt.title)}
-                    className={`p-3.5 rounded-xl border text-left bg-gradient-to-br ${prompt.color} hover:brightness-125 transition-all duration-200 flex flex-col justify-between group cursor-pointer shadow-sm`}
+                    className={`p-4 rounded-2xl border text-left bg-gradient-to-br ${prompt.gradient} ${prompt.border} bg-slate-900/50 backdrop-blur-md hover:bg-slate-800/60 hover:scale-[1.01] transition-all duration-200 flex flex-col justify-between group cursor-pointer shadow-lg`}
                   >
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <span className="p-1.5 rounded-lg bg-slate-900/40 text-current">
+                    <div className="flex items-start justify-between gap-2 mb-3">
+                      <span className={`p-2 rounded-xl bg-slate-950/60 border border-white/10 ${prompt.accent}`}>
                         <IconComponent className="w-4 h-4" />
                       </span>
-                      <ArrowRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 -translate-x-1 group-hover:translate-x-0 transition-all text-slate-300" />
+                      <ArrowRight className="w-4 h-4 opacity-0 group-hover:opacity-100 -translate-x-1 group-hover:translate-x-0 transition-all text-white" />
                     </div>
                     <div>
-                      <p className="text-xs font-semibold text-slate-100 group-hover:text-indigo-200 transition-colors">
+                      <p className="text-xs sm:text-sm font-bold text-white group-hover:text-indigo-200 transition-colors">
                         {prompt.title}
                       </p>
                       <p className="text-[11px] text-slate-400 mt-1 leading-snug">
@@ -268,81 +298,86 @@ export function CoachChatThread({
             </div>
 
             {/* Context Verification Card */}
-            <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 text-slate-300 text-xs flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2.5">
-                <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span>
-                  Données d'authentification vérifiées : <strong>{freeSlotsCount} créneau(x) libre(s)</strong> aujourd'hui, <strong>{activeTasksCount} devoir(s)</strong> en cours.
-                </span>
+            <div className="p-4 rounded-2xl bg-slate-950/60 border border-white/[0.08] text-slate-300 text-xs flex items-center justify-between gap-4 backdrop-blur-md">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0">
+                  <ShieldCheck className="w-4 h-4" />
+                </div>
+                <div>
+                  <span className="font-semibold text-white">Données académiques certifiées</span>
+                  <p className="text-[11px] text-slate-400">
+                    {freeSlotsCount} créneau(x) libre(s) aujourd'hui • {activeTasksCount} devoir(s) en cours de suivi
+                  </p>
+                </div>
               </div>
               <button
                 onClick={onRefreshContext}
-                className="text-[11px] font-medium text-indigo-400 hover:text-indigo-300 hover:underline shrink-0"
+                className="px-3 py-1.5 rounded-lg bg-white/[0.06] hover:bg-white/[0.1] text-[11px] font-semibold text-indigo-300 transition-colors shrink-0"
               >
-                Actualiser
+                Actualiser le contexte
               </button>
             </div>
           </div>
         )}
 
-        {/* Message History */}
+        {/* Message Thread */}
         {messages.map((message) => {
           const isUser = message.role === "user";
 
           return (
             <div
               key={message.id}
-              className={`flex flex-col ${isUser ? "items-end" : "items-start"} space-y-2`}
+              className={`flex flex-col ${isUser ? "items-end" : "items-start"} space-y-2 animate-fadeIn`}
             >
-              {/* Message Header */}
-              <div className="flex items-center gap-2 px-1">
-                <span className="text-[11px] font-semibold text-slate-400">
-                  {isUser ? "Vous" : "Coach IA"}
+              {/* Message Label */}
+              <div className="flex items-center gap-2 px-1 text-[11px]">
+                <span className="font-semibold text-slate-400">
+                  {isUser ? "Vous" : "Maestro AI"}
                 </span>
-                <span className="text-[10px] text-slate-500">{message.timestamp}</span>
+                <span className="text-slate-600 font-tabular">• {message.timestamp}</span>
               </div>
 
               {/* Message Bubble */}
               <div
-                className={`max-w-[90%] sm:max-w-[80%] rounded-2xl p-4 text-xs sm:text-sm leading-relaxed ${
+                className={`max-w-[92%] sm:max-w-[85%] rounded-3xl p-5 text-xs sm:text-sm leading-relaxed transition-all ${
                   isUser
-                    ? "bg-indigo-600 text-white rounded-tr-none shadow-lg shadow-indigo-600/20"
-                    : "bg-slate-900/90 text-slate-200 border border-slate-800 rounded-tl-none shadow-md"
+                    ? "bg-gradient-to-r from-indigo-600 via-indigo-600 to-purple-600 text-white rounded-tr-sm shadow-[0_8px_25px_rgba(79,70,229,0.3)] border border-white/20"
+                    : "luxury-card text-slate-200 rounded-tl-sm border border-white/[0.08] shadow-2xl backdrop-blur-2xl"
                 }`}
               >
-                {/* Markdown text parser */}
+                {/* Formatted Content */}
                 <FormattedMessage content={message.content} />
 
-                {/* Evidence Citations Section */}
+                {/* Evidence Citations Bar */}
                 {message.citations && message.citations.length > 0 && (
-                  <div className="mt-4 pt-3 border-t border-slate-800/80 space-y-2">
-                    <div className="flex items-center gap-1.5 text-[11px] font-semibold text-indigo-400">
-                      <ShieldCheck className="w-3.5 h-3.5" />
-                      <span>Sources & Données Réelles Utilisées :</span>
+                  <div className="mt-4 pt-3.5 border-t border-white/[0.08] space-y-2">
+                    <div className="flex items-center gap-2 text-[11px] font-bold text-indigo-300">
+                      <ShieldCheck className="w-3.5 h-3.5 text-indigo-400" />
+                      <span className="uppercase tracking-wider">Données & Preuves Réelles :</span>
                     </div>
-                    <div className="flex flex-wrap gap-1.5">
+                    <div className="flex flex-wrap gap-2">
                       {message.citations.map((cite, cIdx) => (
                         <div
                           key={cIdx}
                           title={cite.detail}
-                          className="px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700/60 text-[11px] text-slate-300 flex items-center gap-1.5 shadow-sm"
+                          className="px-3 py-1.5 rounded-xl bg-slate-950/70 border border-white/10 text-[11px] text-slate-200 flex items-center gap-2 shadow-sm"
                         >
-                          {cite.type === "task" && <BookOpen className="w-3 h-3 text-sky-400" />}
-                          {cite.type === "availability" && <Clock className="w-3 h-3 text-emerald-400" />}
-                          {cite.type === "assessment" && <Brain className="w-3 h-3 text-amber-400" />}
-                          {cite.type === "mistake" && <AlertTriangle className="w-3 h-3 text-rose-400" />}
-                          {cite.type === "calendar" && <Calendar className="w-3 h-3 text-indigo-400" />}
-                          <span className="font-medium text-slate-200">{cite.label}</span>
-                          <span className="text-slate-500 hidden sm:inline">• {cite.detail}</span>
+                          {cite.type === "task" && <BookOpen className="w-3.5 h-3.5 text-sky-400 shrink-0" />}
+                          {cite.type === "availability" && <Clock className="w-3.5 h-3.5 text-emerald-400 shrink-0" />}
+                          {cite.type === "assessment" && <Brain className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
+                          {cite.type === "mistake" && <AlertTriangle className="w-3.5 h-3.5 text-rose-400 shrink-0" />}
+                          {cite.type === "calendar" && <Calendar className="w-3.5 h-3.5 text-indigo-400 shrink-0" />}
+                          <span className="font-semibold text-white">{cite.label}</span>
+                          <span className="text-slate-400 hidden sm:inline">• {cite.detail}</span>
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
 
-                {/* Inline Proposed Schedule Block Card */}
+                {/* Inline Proposed Schedule Timeblock Card */}
                 {message.proposedSchedule && message.proposedSchedule.length > 0 && (
-                  <div className="mt-4 space-y-2">
+                  <div className="mt-5 space-y-3">
                     {message.proposedSchedule.map((block) => {
                       const isApplied = appliedBlocks.has(block.tempId);
                       const isApplying = applyingBlockId === block.tempId;
@@ -351,56 +386,60 @@ export function CoachChatThread({
                       return (
                         <div
                           key={block.tempId}
-                          className="p-3.5 rounded-xl bg-slate-950/80 border border-indigo-500/30 shadow-lg space-y-2.5"
+                          className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-indigo-950/40 via-slate-950/70 to-slate-900/60 border border-indigo-500/40 shadow-[0_8px_30px_rgba(0,0,0,0.5)] space-y-3 relative overflow-hidden"
                         >
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="space-y-0.5">
-                              <div className="flex items-center gap-1.5">
-                                <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <span className="px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/40">
                                   Créneau Proposé
                                 </span>
-                                <span className="text-[11px] text-slate-400 font-medium">
+                                <span className="text-xs font-tabular font-bold text-slate-300">
                                   {block.date} • {block.startTime} → {block.endTime}
                                 </span>
                               </div>
-                              <h4 className="text-xs font-bold text-slate-100">{block.title}</h4>
+                              <h4 className="text-sm font-extrabold text-white tracking-tight">
+                                {block.title}
+                              </h4>
                             </div>
 
-                            <span className="text-[11px] font-semibold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 flex items-center gap-1">
-                              <ShieldCheck className="w-3 h-3" />
-                              Sans conflit
+                            <span className="self-start sm:self-auto text-[11px] font-bold text-emerald-300 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/30 flex items-center gap-1.5 shadow-sm">
+                              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                              Sans conflit d'agenda
                             </span>
                           </div>
 
-                          <p className="text-[11px] text-slate-400">{block.rationale}</p>
+                          <p className="text-[11px] text-slate-300 leading-relaxed">
+                            {block.rationale}
+                          </p>
 
                           {hasError && (
-                            <p className="text-[11px] text-rose-400 bg-rose-500/10 p-2 rounded border border-rose-500/20">
+                            <p className="text-[11px] text-rose-300 bg-rose-500/10 p-2.5 rounded-xl border border-rose-500/30">
                               {blockError.msg}
                             </p>
                           )}
 
-                          <div className="pt-1 flex items-center gap-2">
+                          <div className="pt-2 flex flex-wrap items-center gap-3">
                             {isApplied ? (
-                              <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-400 bg-emerald-950/40 border border-emerald-500/30 px-3 py-1.5 rounded-lg">
-                                <Check className="w-4 h-4" />
-                                <span>Ajouté avec succès à votre emploi du temps !</span>
+                              <div className="flex items-center gap-2 text-xs font-bold text-emerald-300 bg-emerald-950/60 border border-emerald-500/40 px-4 py-2.5 rounded-xl shadow-lg">
+                                <CheckCheck className="w-4 h-4 text-emerald-400" />
+                                <span>Inscrit avec succès à votre emploi du temps !</span>
                               </div>
                             ) : (
                               <button
                                 onClick={() => handleConfirmBlock(block)}
                                 disabled={isApplying}
-                                className="px-3.5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs transition-colors flex items-center gap-1.5 shadow-md shadow-indigo-600/30 disabled:opacity-50 cursor-pointer"
+                                className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-emerald-600 hover:brightness-110 text-white font-bold text-xs transition-all flex items-center gap-2 shadow-lg shadow-indigo-600/30 disabled:opacity-50 cursor-pointer"
                               >
                                 {isApplying ? (
                                   <>
-                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                    <span>Vérification & Ajout...</span>
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    <span>Vérification & Inscription...</span>
                                   </>
                                 ) : (
                                   <>
-                                    <Check className="w-3.5 h-3.5" />
-                                    <span>Confirmer et ajouter au planning</span>
+                                    <Check className="w-4 h-4" />
+                                    <span>Confirmer et inscrire à l'agenda</span>
                                   </>
                                 )}
                               </button>
@@ -408,9 +447,9 @@ export function CoachChatThread({
 
                             <button
                               onClick={onOpenScheduleModal}
-                              className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-xs transition-colors"
+                              className="px-3.5 py-2.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-white font-medium text-xs transition-colors border border-white/10"
                             >
-                              Voir l'agenda complet
+                              Comparer avec le calendrier
                             </button>
                           </div>
                         </div>
@@ -421,41 +460,48 @@ export function CoachChatThread({
 
                 {/* Inline Proposed Drill Card */}
                 {message.proposedDrill && (
-                  <div className="mt-4 p-3.5 rounded-xl bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/30 space-y-2">
+                  <div className="mt-5 p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-amber-950/30 via-slate-950/70 to-orange-950/30 border border-amber-500/40 shadow-xl space-y-3">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Brain className="w-4 h-4 text-amber-400" />
-                        <span className="text-xs font-bold text-amber-200">
-                          Micro-Drill Recommandé ({message.proposedDrill.questionCount} questions)
-                        </span>
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-300">
+                          <Brain className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <span className="text-xs sm:text-sm font-extrabold text-amber-100">
+                            Micro-Drill Adaptatif ({message.proposedDrill.questionCount} questions)
+                          </span>
+                          <p className="text-[10px] text-amber-400 font-medium">
+                            Discipline ciblée : {message.proposedDrill.subjectName}
+                          </p>
+                        </div>
                       </div>
-                      <span className="text-[10px] text-amber-400/80 font-medium">
-                        Matière : {message.proposedDrill.subjectName}
+                      <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/30">
+                        ~3 minutes
                       </span>
                     </div>
 
-                    <p className="text-[11px] text-slate-300">
-                      {message.proposedDrill.reason || "Ciblé sur vos erreurs pour consolider votre mémoire."}
+                    <p className="text-[11px] text-slate-300 leading-relaxed">
+                      {message.proposedDrill.reason || "Ciblé sur vos erreurs pour consolider votre mémoire à long terme."}
                     </p>
 
                     <button
                       onClick={() => onStartDrill(message.proposedDrill?.subjectId)}
-                      className="mt-1 px-3.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-semibold text-xs transition-colors flex items-center gap-1.5 shadow-md shadow-amber-600/20 cursor-pointer"
+                      className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:brightness-110 text-white font-bold text-xs transition-all flex items-center gap-2 shadow-lg shadow-amber-600/30 cursor-pointer"
                     >
-                      <Zap className="w-3.5 h-3.5" />
-                      <span>Lancer le micro-quiz maintenant</span>
+                      <Zap className="w-4 h-4" />
+                      <span>Lancer le micro-drill maintenant</span>
                     </button>
                   </div>
                 )}
 
                 {/* Telemetry info */}
                 {message.telemetry && (
-                  <div className="mt-3 text-[10px] text-slate-500 flex items-center gap-2">
-                    <span>
+                  <div className="mt-3.5 text-[10px] text-slate-500 flex items-center gap-2">
+                    <span className="font-tabular">
                       Généré en {message.telemetry.latencyMs}ms ({message.telemetry.provider})
                     </span>
                     {message.telemetry.isFallback && (
-                      <span className="text-amber-500/80">• Mode résilient déterministe</span>
+                      <span className="text-amber-400/90">• Mode déterministe certifié</span>
                     )}
                   </div>
                 )}
@@ -464,31 +510,31 @@ export function CoachChatThread({
           );
         })}
 
-        {/* Loading Indicator */}
+        {/* Loading Indicator with Luxury Shimmer */}
         {isLoading && (
-          <div className="flex items-start gap-2 animate-fadeIn">
-            <div className="w-8 h-8 rounded-xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
+          <div className="flex items-start gap-3 animate-fadeIn">
+            <div className="w-9 h-9 rounded-2xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shadow-lg shadow-indigo-600/20">
               <Loader2 className="w-4 h-4 animate-spin" />
             </div>
-            <div className="p-3.5 rounded-2xl rounded-tl-none bg-slate-900 border border-slate-800 text-xs text-slate-400 flex items-center gap-2">
-              <Sparkles className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />
-              <span>Le Coach analyse votre emploi du temps et vos performances...</span>
+            <div className="p-4 rounded-3xl rounded-tl-sm luxury-card border border-white/10 text-xs text-slate-300 flex items-center gap-2.5">
+              <Sparkles className="w-4 h-4 text-indigo-400 animate-pulse" />
+              <span>Maestro AI analyse vos données académiques en temps réel...</span>
             </div>
           </div>
         )}
 
         {/* Error Banner */}
         {error && (
-          <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
+          <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
               <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
               <span>{error}</span>
             </div>
             <button
               onClick={() => handleSendMessage()}
-              className="px-2.5 py-1 rounded bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 font-semibold text-[11px] flex items-center gap-1"
+              className="px-3 py-1.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 font-bold text-xs flex items-center gap-1.5 transition-colors"
             >
-              <RotateCcw className="w-3 h-3" />
+              <RotateCcw className="w-3.5 h-3.5" />
               <span>Réessayer</span>
             </button>
           </div>
@@ -499,7 +545,7 @@ export function CoachChatThread({
 
       {/* Quick Prompts Bar (when chat has messages) */}
       {messages.length > 0 && (
-        <div className="px-4 py-2 border-t border-slate-800/80 bg-slate-900/40 flex items-center gap-2 overflow-x-auto no-scrollbar">
+        <div className="px-6 py-2.5 border-t border-white/[0.06] bg-slate-950/60 backdrop-blur-md flex items-center gap-2 overflow-x-auto touch-scroll">
           <span className="text-[10px] uppercase font-bold text-slate-500 shrink-0 flex items-center gap-1">
             <Sparkles className="w-3 h-3 text-indigo-400" />
             Suggestions :
@@ -509,7 +555,7 @@ export function CoachChatThread({
               key={idx}
               onClick={() => handleSendMessage(p.title)}
               disabled={isLoading}
-              className="px-2.5 py-1 rounded-full bg-slate-800/80 hover:bg-indigo-600/20 hover:border-indigo-500/40 border border-slate-700/60 text-[11px] text-slate-300 whitespace-nowrap transition-colors disabled:opacity-50 cursor-pointer"
+              className="px-3 py-1 rounded-full bg-slate-900/90 hover:bg-indigo-600/30 hover:border-indigo-500/50 border border-white/[0.08] text-[11px] text-slate-300 whitespace-nowrap transition-all disabled:opacity-50 cursor-pointer shadow-sm"
             >
               {p.title}
             </button>
@@ -517,24 +563,24 @@ export function CoachChatThread({
         </div>
       )}
 
-      {/* Composer Input Area */}
-      <div className="p-3 sm:p-4 border-t border-slate-800 bg-slate-900/90">
-        <div className="relative flex items-center gap-2">
+      {/* Composer Input Area with Luxury Glass Styling */}
+      <div className="p-4 sm:p-5 border-t border-white/[0.08] bg-slate-950/80 backdrop-blur-xl relative z-10">
+        <div className="relative flex items-center gap-2 focus-within:ring-2 focus-within:ring-indigo-500/30 rounded-2xl transition-all">
           <textarea
             ref={textareaRef}
             rows={1}
             value={inputMessage}
             onChange={(e) => setInputMessage(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Posez une question sur vos révisions, créneaux ou points faibles... (Entrée pour envoyer)"
+            placeholder="Posez une question sur vos devoirs, créneaux ou points faibles... (Entrée pour envoyer)"
             disabled={isLoading}
-            className="w-full resize-none rounded-xl bg-slate-950 border border-slate-800 px-4 py-3 text-xs sm:text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors disabled:opacity-50 pr-12 min-h-[46px] max-h-[120px]"
+            className="w-full resize-none rounded-2xl bg-slate-900/90 border border-white/10 px-5 py-3.5 text-xs sm:text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-indigo-500/60 transition-all disabled:opacity-50 pr-14 min-h-[50px] max-h-[140px] shadow-inner"
           />
 
           <button
             onClick={() => handleSendMessage()}
             disabled={!inputMessage.trim() || isLoading}
-            className="absolute right-2 px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-medium transition-colors disabled:opacity-30 disabled:hover:bg-indigo-600 cursor-pointer shadow-md shadow-indigo-600/20"
+            className="absolute right-2.5 px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:brightness-110 text-white font-bold transition-all disabled:opacity-30 disabled:hover:brightness-100 cursor-pointer shadow-lg shadow-indigo-600/30"
             title="Envoyer le message"
           >
             {isLoading ? (
@@ -544,9 +590,14 @@ export function CoachChatThread({
             )}
           </button>
         </div>
-        <div className="flex items-center justify-between mt-2 px-1 text-[10px] text-slate-500">
-          <span>Touche <strong>Entrée</strong> pour envoyer • <strong>Maj+Entrée</strong> pour sauter une ligne</span>
-          <span className="hidden sm:inline">Réponses fondées sur vos données académiques réelles</span>
+
+        <div className="flex items-center justify-between mt-2.5 px-2 text-[10px] text-slate-500 font-medium">
+          <span>
+            Touche <strong className="text-slate-400">Entrée</strong> pour envoyer • <strong className="text-slate-400">Maj+Entrée</strong> pour nouvelle ligne
+          </span>
+          <span className="hidden sm:inline text-indigo-400/80">
+            ✓ Réponses déterministes vérifiées sur vos bases de données
+          </span>
         </div>
       </div>
     </div>
@@ -554,25 +605,24 @@ export function CoachChatThread({
 }
 
 /**
- * Lightweight, safe Markdown renderer for Coach answers
+ * Safe, high-end Markdown & Typography Renderer for Coach answers
  */
 function FormattedMessage({ content }: { content: string }) {
   const lines = content.split("\n");
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2.5">
       {lines.map((line, idx) => {
         const trimmed = line.trim();
 
-        // Empty line
         if (!trimmed) {
-          return <div key={idx} className="h-1" />;
+          return <div key={idx} className="h-1.5" />;
         }
 
         // H3 Header
         if (line.startsWith("### ")) {
           return (
-            <h3 key={idx} className="text-sm font-bold text-indigo-300 mt-2 mb-1">
+            <h3 key={idx} className="text-sm font-extrabold text-indigo-200 mt-3 mb-1 tracking-tight flex items-center gap-1.5">
               {line.replace("### ", "")}
             </h3>
           );
@@ -581,7 +631,7 @@ function FormattedMessage({ content }: { content: string }) {
         // H2 Header
         if (line.startsWith("## ")) {
           return (
-            <h2 key={idx} className="text-base font-bold text-indigo-200 mt-2 mb-1">
+            <h2 key={idx} className="text-base font-extrabold text-white mt-3 mb-1 tracking-tight">
               {line.replace("## ", "")}
             </h2>
           );
@@ -590,22 +640,22 @@ function FormattedMessage({ content }: { content: string }) {
         // Bullet point
         if (line.startsWith("- ") || line.startsWith("* ")) {
           return (
-            <div key={idx} className="flex items-start gap-2 ml-2">
-              <span className="text-indigo-400 mt-1">•</span>
-              <span className="flex-1">
+            <div key={idx} className="flex items-start gap-2.5 ml-2">
+              <span className="text-indigo-400 mt-1 text-xs">•</span>
+              <span className="flex-1 text-slate-300">
                 <InlineFormatting text={line.slice(2)} />
               </span>
             </div>
           );
         }
 
-        // Numbered list item (e.g. "1. ")
+        // Numbered list item
         const numMatch = line.match(/^(\d+)\.\s+(.*)$/);
         if (numMatch) {
           return (
-            <div key={idx} className="flex items-start gap-2 ml-1">
-              <span className="font-semibold text-indigo-400 min-w-[16px]">{numMatch[1]}.</span>
-              <span className="flex-1">
+            <div key={idx} className="flex items-start gap-2.5 ml-1">
+              <span className="font-bold text-indigo-400 min-w-[18px] font-tabular">{numMatch[1]}.</span>
+              <span className="flex-1 text-slate-300">
                 <InlineFormatting text={numMatch[2]} />
               </span>
             </div>
@@ -614,7 +664,7 @@ function FormattedMessage({ content }: { content: string }) {
 
         // Regular paragraph
         return (
-          <p key={idx}>
+          <p key={idx} className="text-slate-200">
             <InlineFormatting text={line} />
           </p>
         );
@@ -627,7 +677,6 @@ function FormattedMessage({ content }: { content: string }) {
  * Parses bold (**text**), inline code (`code`), and italics (*text*)
  */
 function InlineFormatting({ text }: { text: string }) {
-  // Split on bold, code, and links
   const parts = text.split(/(\*\*.*?\*\*|`.*?`|\*.*?\*)/g);
 
   return (
@@ -635,7 +684,7 @@ function InlineFormatting({ text }: { text: string }) {
       {parts.map((part, i) => {
         if (part.startsWith("**") && part.endsWith("**")) {
           return (
-            <strong key={i} className="font-bold text-slate-100">
+            <strong key={i} className="font-bold text-white">
               {part.slice(2, -2)}
             </strong>
           );
@@ -644,7 +693,7 @@ function InlineFormatting({ text }: { text: string }) {
           return (
             <code
               key={i}
-              className="px-1.5 py-0.5 rounded bg-slate-800 text-indigo-300 font-mono text-[11px]"
+              className="px-1.5 py-0.5 rounded-md bg-slate-950 border border-white/10 text-indigo-300 font-mono text-[11px]"
             >
               {part.slice(1, -1)}
             </code>
