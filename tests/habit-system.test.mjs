@@ -248,6 +248,278 @@ test("HABIT-CALC-05: calculateHabitAnalytics computes recoveryRate, weekday rate
   assert(observedDiags.length >= 1);
 });
 
+test("HABIT-CALC-EXAMPLE-A: Daily habit: 10 eligible scheduled occurrences, user completes 7 -> 70% completion rate", () => {
+  const habit = {
+    id: "h-ex-a",
+    user_id: "u1",
+    name: "Daily Coding",
+    habit_type: "binary",
+    target_value: 1,
+    unit: "fois",
+    frequency_type: "daily",
+    scheduled_days: [0, 1, 2, 3, 4, 5, 6],
+    preferred_time: "morning",
+    start_date: "2026-10-01",
+    status: "active",
+    created_at: "2026-10-01T08:00:00Z",
+    updated_at: "2026-10-01T08:00:00Z",
+  };
+
+  // 10 days: Oct 1 to Oct 10. Completed 7 days.
+  const checkins = [
+    { id: "1", habit_id: "h-ex-a", user_id: "u1", date: "2026-10-01", value: 1, status: "completed", created_at: "", updated_at: "" },
+    { id: "2", habit_id: "h-ex-a", user_id: "u1", date: "2026-10-02", value: 1, status: "completed", created_at: "", updated_at: "" },
+    { id: "3", habit_id: "h-ex-a", user_id: "u1", date: "2026-10-03", value: 1, status: "completed", created_at: "", updated_at: "" },
+    { id: "4", habit_id: "h-ex-a", user_id: "u1", date: "2026-10-05", value: 1, status: "completed", created_at: "", updated_at: "" },
+    { id: "5", habit_id: "h-ex-a", user_id: "u1", date: "2026-10-07", value: 1, status: "completed", created_at: "", updated_at: "" },
+    { id: "6", habit_id: "h-ex-a", user_id: "u1", date: "2026-10-08", value: 1, status: "completed", created_at: "", updated_at: "" },
+    { id: "7", habit_id: "h-ex-a", user_id: "u1", date: "2026-10-10", value: 1, status: "completed", created_at: "", updated_at: "" },
+  ];
+
+  const analytics = calculateHabitAnalytics(habit, checkins, 10, "2026-10-10");
+  assert.equal(analytics.totalEligibleDays, 10);
+  assert.equal(analytics.completedDays, 7);
+  assert.equal(analytics.completionRate, 70); // Must be 70%, not 100%!
+});
+
+test("HABIT-CALC-EXAMPLE-B: Weekly target: 3 sessions/week, user completes 2 in a full week -> target attainment 67%", () => {
+  const habit = {
+    id: "h-ex-b",
+    user_id: "u1",
+    name: "Gym Workout",
+    habit_type: "binary",
+    target_value: 1,
+    unit: "fois",
+    frequency_type: "weekly_count",
+    target_days_per_week: 3,
+    scheduled_days: [0, 1, 2, 3, 4, 5, 6],
+    preferred_time: "evening",
+    start_date: "2026-10-05", // Monday
+    status: "active",
+    created_at: "2026-10-05T08:00:00Z",
+    updated_at: "2026-10-05T08:00:00Z",
+  };
+
+  // Full week Oct 5 (Mon) to Oct 11 (Sun). User completes 2 sessions (Oct 6, Oct 8).
+  const checkins = [
+    { id: "1", habit_id: "h-ex-b", user_id: "u1", date: "2026-10-06", value: 1, status: "completed", created_at: "", updated_at: "" },
+    { id: "2", habit_id: "h-ex-b", user_id: "u1", date: "2026-10-08", value: 1, status: "completed", created_at: "", updated_at: "" },
+  ];
+
+  const analytics = calculateHabitAnalytics(habit, checkins, 7, "2026-10-11");
+  assert.equal(analytics.completedDays, 2);
+  assert(analytics.weeklyTargetAttainment);
+  assert.equal(analytics.weeklyTargetAttainment.targetDaysPerWeek, 3);
+  assert.equal(analytics.weeklyTargetAttainment.completedThisWeek, 2);
+  // Target attainment = 2/3 (66.7%)
+  const expectedAttainment = Math.round((2 / 3) * 100);
+  assert.equal(expectedAttainment, 67);
+});
+
+test("HABIT-CALC-EXAMPLE-C: Quantitative habit: targets 60 study minutes, user records 25 minutes -> 42% progress, 35 min remaining", () => {
+  const habit = {
+    id: "h-ex-c",
+    user_id: "u1",
+    name: "Deep Math Study",
+    habit_type: "quantitative",
+    target_value: 60,
+    unit: "minutes",
+    frequency_type: "daily",
+    scheduled_days: [0, 1, 2, 3, 4, 5, 6],
+    preferred_time: "morning",
+    start_date: "2026-10-10",
+    status: "active",
+    created_at: "2026-10-10T08:00:00Z",
+    updated_at: "2026-10-10T08:00:00Z",
+  };
+
+  // 1 day (Oct 10). User records 25 minutes (partial progress).
+  const checkins = [
+    { id: "1", habit_id: "h-ex-c", user_id: "u1", date: "2026-10-10", value: 25, status: "partial", created_at: "", updated_at: "" },
+  ];
+
+  const analytics = calculateHabitAnalytics(habit, checkins, 1, "2026-10-10");
+  assert(analytics.quantitativeProgress);
+  assert.equal(analytics.quantitativeProgress.totalLogged, 25);
+  assert.equal(analytics.quantitativeProgress.totalTarget, 60);
+  assert.equal(analytics.quantitativeProgress.remaining, 35);
+  assert.equal(analytics.quantitativeProgress.progressPercentage, 42); // 25/60 = 41.67% -> 42%
+  assert.equal(analytics.quantitativeProgress.isComplete, false); // Not 100% just because checkin exists!
+});
+
+test("HABIT-CALC-EXAMPLE-D: Pending occurrence: daily habit scheduled for today -> pending, not missed", () => {
+  const habit = {
+    id: "h-ex-d",
+    user_id: "u1",
+    name: "Evening Reading",
+    habit_type: "binary",
+    target_value: 1,
+    unit: "fois",
+    frequency_type: "daily",
+    scheduled_days: [0, 1, 2, 3, 4, 5, 6],
+    preferred_time: "evening",
+    start_date: "2026-10-01",
+    status: "active",
+    created_at: "2026-10-01T08:00:00Z",
+    updated_at: "2026-10-01T08:00:00Z",
+  };
+
+  const todayStr = "2026-10-23";
+  const status = getDayCompletionStatus(habit, undefined, todayStr, todayStr);
+  assert.equal(status, "pending");
+
+  // In analytics, today pending does not count as a missed failure
+  const analytics = calculateHabitAnalytics(habit, [], 1, todayStr);
+  assert.equal(analytics.pendingDays, 1);
+  assert.equal(analytics.missedDays, 0);
+});
+
+test("HABIT-CALC-EXAMPLE-E: Insufficient data: new habit has no history -> honest null recovery and baseline state", () => {
+  const habit = {
+    id: "h-ex-e",
+    user_id: "u1",
+    name: "New Journaling Habit",
+    habit_type: "binary",
+    target_value: 1,
+    unit: "fois",
+    frequency_type: "daily",
+    scheduled_days: [0, 1, 2, 3, 4, 5, 6],
+    preferred_time: "morning",
+    start_date: "2026-10-23",
+    status: "active",
+    created_at: "2026-10-23T08:00:00Z",
+    updated_at: "2026-10-23T08:00:00Z",
+  };
+
+  // Only created today with 1 checkin
+  const checkins = [
+    { id: "1", habit_id: "h-ex-e", user_id: "u1", date: "2026-10-23", value: 1, status: "completed", created_at: "", updated_at: "" },
+  ];
+
+  const analytics = calculateHabitAnalytics(habit, checkins, 30, "2026-10-23");
+  assert.equal(analytics.isNewHabit, true);
+  assert.equal(analytics.observationDays, 1);
+  assert.equal(analytics.hasRecoveryData, false);
+  assert.equal(analytics.recoveryRate, null); // Must be null, NOT fake 100% or fake 0%!
+  assert.equal(analytics.hasPreviousPeriodBaseline, false);
+  assert.equal(analytics.trendComparedToPreviousPeriod, null);
+});
+
+test("HABIT-CALC-EXAMPLE-F: Paused habit: 7 inactive paused days do not lower eligible completion rate or break streak", () => {
+  const habit = {
+    id: "h-ex-f",
+    user_id: "u1",
+    name: "Paused Habit During Exams",
+    habit_type: "binary",
+    target_value: 1,
+    unit: "fois",
+    frequency_type: "daily",
+    scheduled_days: [0, 1, 2, 3, 4, 5, 6],
+    preferred_time: "morning",
+    start_date: "2026-10-01",
+    status: "paused",
+    paused_at: "2026-10-04T00:00:00Z",
+    paused_until: "2026-10-10T23:59:59Z",
+    created_at: "2026-10-01T08:00:00Z",
+    updated_at: "2026-10-04T08:00:00Z",
+  };
+
+  // Oct 1, 2, 3 completed. Oct 4 to Oct 10 paused.
+  const checkins = [
+    { id: "1", habit_id: "h-ex-f", user_id: "u1", date: "2026-10-01", value: 1, status: "completed", created_at: "", updated_at: "" },
+    { id: "2", habit_id: "h-ex-f", user_id: "u1", date: "2026-10-02", value: 1, status: "completed", created_at: "", updated_at: "" },
+    { id: "3", habit_id: "h-ex-f", user_id: "u1", date: "2026-10-03", value: 1, status: "completed", created_at: "", updated_at: "" },
+  ];
+
+  // Oct 5 during pause is not eligible
+  assert.equal(isHabitEligibleOnDate(habit, "2026-10-05", "2026-10-10"), false);
+
+  const analytics = calculateHabitAnalytics(habit, checkins, 10, "2026-10-10");
+  assert.equal(analytics.completedDays, 3);
+  assert.equal(analytics.missedDays, 0); // Paused days must NOT be counted as missed!
+  assert.equal(analytics.completionRate, 100);
+});
+
+test("HABIT-CALC-EXAMPLE-G: Previous-period comparison: Current 8/10 (80%), Previous 4/10 (40%) -> +40 percentage points", () => {
+  const habit = {
+    id: "h-ex-g",
+    user_id: "u1",
+    name: "Comparison Habit",
+    habit_type: "binary",
+    target_value: 1,
+    unit: "fois",
+    frequency_type: "daily",
+    scheduled_days: [0, 1, 2, 3, 4, 5, 6],
+    preferred_time: "morning",
+    start_date: "2026-09-01",
+    status: "active",
+    created_at: "2026-09-01T08:00:00Z",
+    updated_at: "2026-09-01T08:00:00Z",
+  };
+
+  // 10-day period: Oct 11 to Oct 20.
+  // Current period (Oct 11 to Oct 20): 8 completions.
+  // Previous period (Oct 1 to Oct 10): 4 completions.
+  const checkins = [
+    // Previous period (4 completions)
+    { id: "p1", habit_id: "h-ex-g", user_id: "u1", date: "2026-10-01", value: 1, status: "completed", created_at: "", updated_at: "" },
+    { id: "p2", habit_id: "h-ex-g", user_id: "u1", date: "2026-10-02", value: 1, status: "completed", created_at: "", updated_at: "" },
+    { id: "p3", habit_id: "h-ex-g", user_id: "u1", date: "2026-10-03", value: 1, status: "completed", created_at: "", updated_at: "" },
+    { id: "p4", habit_id: "h-ex-g", user_id: "u1", date: "2026-10-04", value: 1, status: "completed", created_at: "", updated_at: "" },
+    // Current period (8 completions)
+    { id: "c1", habit_id: "h-ex-g", user_id: "u1", date: "2026-10-11", value: 1, status: "completed", created_at: "", updated_at: "" },
+    { id: "c2", habit_id: "h-ex-g", user_id: "u1", date: "2026-10-12", value: 1, status: "completed", created_at: "", updated_at: "" },
+    { id: "c3", habit_id: "h-ex-g", user_id: "u1", date: "2026-10-13", value: 1, status: "completed", created_at: "", updated_at: "" },
+    { id: "c4", habit_id: "h-ex-g", user_id: "u1", date: "2026-10-14", value: 1, status: "completed", created_at: "", updated_at: "" },
+    { id: "c5", habit_id: "h-ex-g", user_id: "u1", date: "2026-10-15", value: 1, status: "completed", created_at: "", updated_at: "" },
+    { id: "c6", habit_id: "h-ex-g", user_id: "u1", date: "2026-10-16", value: 1, status: "completed", created_at: "", updated_at: "" },
+    { id: "c7", habit_id: "h-ex-g", user_id: "u1", date: "2026-10-17", value: 1, status: "completed", created_at: "", updated_at: "" },
+    { id: "c8", habit_id: "h-ex-g", user_id: "u1", date: "2026-10-20", value: 1, status: "completed", created_at: "", updated_at: "" },
+  ];
+
+  // Window: Oct 11 to Oct 20 (10 days). 8 completed, 2 missed (Oct 18, 19). Oct 20 completed today.
+  // Completion rate: 8/10 = 80%.
+  // Previous period (Oct 1 to Oct 10, 10 days): 4 completed, 6 missed -> 4/10 = 40%.
+  // Trend = 80 - 40 = +40 percentage points!
+  const analytics = calculateHabitAnalytics(habit, checkins, 10, "2026-10-20");
+  assert.equal(analytics.completionRate, 80);
+  assert.equal(analytics.previousPeriodRate, 40);
+  assert.equal(analytics.trendComparedToPreviousPeriod, 40); // Exactly +40 percentage points!
+  assert.equal(analytics.hasPreviousPeriodBaseline, true);
+});
+
+test("HABIT-CALC-EXAMPLE-H: Unscheduled day: Habit scheduled Mon/Wed/Fri, Tuesday passes -> not missed, preserves streak", () => {
+  const habit = {
+    id: "h-ex-h",
+    user_id: "u1",
+    name: "MWF Habit",
+    habit_type: "binary",
+    target_value: 1,
+    unit: "fois",
+    frequency_type: "specific_days",
+    scheduled_days: [1, 3, 5], // Mon, Wed, Fri
+    preferred_time: "morning",
+    start_date: "2026-10-05", // Monday
+    status: "active",
+    created_at: "2026-10-05T08:00:00Z",
+    updated_at: "2026-10-05T08:00:00Z",
+  };
+
+  // Mon Oct 5 (completed), Tue Oct 6 (unscheduled - no checkin), Wed Oct 7 (completed)
+  const checkins = [
+    { id: "1", habit_id: "h-ex-h", user_id: "u1", date: "2026-10-05", value: 1, status: "completed", created_at: "", updated_at: "" },
+    { id: "2", habit_id: "h-ex-h", user_id: "u1", date: "2026-10-07", value: 1, status: "completed", created_at: "", updated_at: "" },
+  ];
+
+  // Tuesday Oct 6 must be not_scheduled, NOT missed
+  assert.equal(getDayCompletionStatus(habit, undefined, "2026-10-06", "2026-10-07"), "not_scheduled");
+
+  const streaks = calculateHabitStreaks(habit, checkins, "2026-10-07");
+  // Streak is 2 consecutive scheduled sessions (Monday + Wednesday). Tuesday did NOT break it!
+  assert.equal(streaks.currentStreak, 2);
+  assert.equal(streaks.longestStreak, 2);
+});
+
 test("HABIT-ACTION-01: createHabitAction enforces validation, persists habit, and supports retrieval", async () => {
   // Empty title rejected
   const invalidRes = await createHabitAction({ name: "   " });

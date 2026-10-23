@@ -1,7 +1,7 @@
 /**
  * VALIDILY-IGL4 — Habit & Personal Productivity Intelligence Engine
  * Pure mathematical calculations for streaks, completion rates, weekly progress,
- * and data-grounded consistency diagnostics.
+ * quantitative volume, and data-grounded consistency diagnostics.
  */
 
 import type {
@@ -11,6 +11,8 @@ import type {
   HabitDiagnostic,
   DayCompletionStatus,
   HabitPreferredTime,
+  HabitWeeklyTargetAttainment,
+  HabitQuantitativeProgress,
 } from "@/types/database";
 
 export function getLocalTodayDateString(date: Date = new Date()): string {
@@ -59,7 +61,16 @@ export function isHabitEligibleOnDate(
     }
   }
 
-  // Frequency check
+  // During active pause: not eligible (paused dates do not count as missed failures)
+  if (habit.status === "paused") {
+    const pauseStart = habit.paused_at ? habit.paused_at.slice(0, 10) : habit.updated_at.slice(0, 10);
+    const pauseEnd = habit.paused_until ? habit.paused_until.slice(0, 10) : todayStr;
+    if (dateStr >= pauseStart && dateStr <= pauseEnd) {
+      return false;
+    }
+  }
+
+  // Frequency check: specific days of week
   if (habit.frequency_type === "specific_days") {
     const d = parseDateString(dateStr);
     const dayOfWeek = d.getDay(); // 0=Sunday, 1=Monday ... 6=Saturday
@@ -137,7 +148,6 @@ export function calculateHabitStreaks(
   }
 
   // Daily or specific_days streak calculation
-  // Collect all eligible dates from start_date up to today
   if (todayStr < habit.start_date) {
     return { currentStreak: 0, longestStreak: 0 };
   }
@@ -169,7 +179,7 @@ export function calculateHabitStreaks(
         longestStreak = tempStreak;
       }
     } else if (status === "skipped") {
-      // Neutral day: maintains current streak without incrementing or resetting
+      // Neutral grace: maintains streak without incrementing or resetting
       continue;
     } else if (status === "pending" && dStr === todayStr) {
       // Today is still pending: do not break prior streak
@@ -189,10 +199,10 @@ export function calculateHabitStreaks(
     if (status === "completed") {
       currentStreak++;
     } else if (status === "skipped") {
-      // neutral
+      // neutral grace
       continue;
     } else if (status === "pending" && dStr === todayStr) {
-      // Today is pending, check previous eligible day
+      // Today is pending, inspect previous eligible day
       continue;
     } else {
       break;
@@ -211,7 +221,6 @@ function calculateWeeklyTargetStreaks(
   todayStr: string
 ): { currentStreak: number; longestStreak: number } {
   const targetDays = habit.target_days_per_week || 3;
-  // Group checkins by calendar week (Monday to Sunday)
   const completionsPerWeek = new Map<string, number>();
 
   for (const [dateStr, checkin] of checkinMap.entries()) {
@@ -223,7 +232,6 @@ function calculateWeeklyTargetStreaks(
     }
   }
 
-  // Generate sequence of weeks from start_date to today
   const weeks: string[] = [];
   let curr = habit.start_date;
   const currentWeek = getWeekKey(todayStr);
@@ -274,14 +282,14 @@ function calculateWeeklyTargetStreaks(
 export function getWeekKey(dateStr: string): string {
   const d = parseDateString(dateStr);
   const day = d.getDay();
-  // Set to Monday of this week
+  // Set to Monday of this week (ISO 8601 standard)
   const diff = d.getDate() - day + (day === 0 ? -6 : 1);
   const monday = new Date(d.setDate(diff));
   return formatDateString(monday);
 }
 
 /**
- * Generate comprehensive analytics and grounded diagnostics
+ * Generate comprehensive, mathematically rigorous habit analytics & diagnostics
  */
 export function calculateHabitAnalytics(
   habit: Habit,
@@ -299,11 +307,18 @@ export function calculateHabitAnalytics(
   const startDate = addDaysToDateString(todayStr, -(rangeDays - 1));
   const effectiveStart = startDate > habit.start_date ? startDate : habit.start_date;
 
+  const dStart = parseDateString(effectiveStart);
+  const dToday = parseDateString(todayStr);
+  const observationDays = Math.max(1, Math.round((dToday.getTime() - dStart.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+  const isNewHabit = observationDays < 3;
+
   let totalEligibleDays = 0;
   let completedDays = 0;
   let partiallyCompletedDays = 0;
   let skippedDays = 0;
   let missedDays = 0;
+  let pendingDays = 0;
+  let totalLoggedValue = 0;
 
   const weekdayCompleted: Record<number, number> = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
   const weekdayEligible: Record<number, number> = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
@@ -322,6 +337,10 @@ export function calculateHabitAnalytics(
       const checkin = checkinMap.get(curr);
       const status = getDayCompletionStatus(habit, checkin, curr, todayStr);
 
+      if (checkin && checkin.value > 0) {
+        totalLoggedValue += checkin.value;
+      }
+
       if (status === "completed") {
         completedDays++;
         weekdayCompleted[dayOfWeek] = (weekdayCompleted[dayOfWeek] || 0) + 1;
@@ -329,6 +348,8 @@ export function calculateHabitAnalytics(
         partiallyCompletedDays++;
       } else if (status === "skipped") {
         skippedDays++;
+      } else if (status === "pending") {
+        pendingDays++;
       } else if (status === "missed") {
         missedDays++;
       }
@@ -336,9 +357,111 @@ export function calculateHabitAnalytics(
     curr = addDaysToDateString(curr, 1);
   }
 
-  // Completion rate (completed / eligible)
-  const completionRate =
-    totalEligibleDays > 0 ? Math.round((completedDays / totalEligibleDays) * 100) : 0;
+  // Evaluated days: settled opportunities (completed, partial, skipped, missed)
+  // If today is pending, it does NOT penalize evaluated completion rate as a missed day!
+  const evaluatedDays = completedDays + partiallyCompletedDays + skippedDays + missedDays;
+  const activeOpportunities = Math.max(0, evaluatedDays - skippedDays);
+
+  // Scheduled Completion Rate
+  let completionRate = 0;
+  if (activeOpportunities > 0) {
+    completionRate = Math.round((completedDays / activeOpportunities) * 100);
+  } else if (evaluatedDays > 0 && completedDays > 0) {
+    completionRate = 100;
+  } else {
+    completionRate = 0;
+  }
+
+  // Transparent Consistency Score (gives 50% credit for partial progress)
+  const consistencyScore =
+    activeOpportunities > 0
+      ? Math.min(
+          100,
+          Math.round(
+            ((completedDays + (partiallyCompletedDays * 0.5)) / activeOpportunities) * 100
+          )
+        )
+      : 0;
+
+  // Quantitative target progress (for quantitative habits)
+  let quantitativeProgress: HabitQuantitativeProgress | null = null;
+  if (habit.habit_type === "quantitative") {
+    const totalTarget = habit.target_value * Math.max(1, activeOpportunities);
+    const remaining = Math.max(0, totalTarget - totalLoggedValue);
+    const progressPercentage =
+      totalTarget > 0 ? Math.min(100, Math.round((totalLoggedValue / totalTarget) * 100)) : 0;
+    const isComplete = totalLoggedValue >= totalTarget;
+
+    quantitativeProgress = {
+      totalLogged: totalLoggedValue,
+      totalTarget,
+      remaining,
+      unit: habit.unit,
+      progressPercentage,
+      isComplete,
+    };
+  }
+
+  // Weekly target attainment (for weekly_count habits)
+  let weeklyTargetAttainment: HabitWeeklyTargetAttainment | null = null;
+  if (habit.frequency_type === "weekly_count") {
+    const targetPerWeek = habit.target_days_per_week || 3;
+    const currentWeekKey = getWeekKey(todayStr);
+
+    const weekMap = new Map<string, number>();
+    for (const [dStr, c] of checkinMap.entries()) {
+      if (dStr >= effectiveStart && dStr <= todayStr) {
+        if (c.status === "completed" || (habit.habit_type === "quantitative" && c.value >= habit.target_value)) {
+          const wKey = getWeekKey(dStr);
+          weekMap.set(wKey, (weekMap.get(wKey) || 0) + 1);
+        }
+      }
+    }
+
+    const weeks: string[] = [];
+    let wCurr = effectiveStart;
+    while (wCurr <= todayStr) {
+      const wk = getWeekKey(wCurr);
+      if (!weeks.includes(wk)) weeks.push(wk);
+      wCurr = addDaysToDateString(wCurr, 7);
+    }
+
+    let weeksObserved = 0;
+    let weeksMet = 0;
+    const completedThisWeek = weekMap.get(currentWeekKey) || 0;
+    const isCurrentWeekMet = completedThisWeek >= targetPerWeek;
+
+    for (const wk of weeks) {
+      const cnt = weekMap.get(wk) || 0;
+      if (wk === currentWeekKey) {
+        if (isCurrentWeekMet) {
+          weeksObserved++;
+          weeksMet++;
+        }
+      } else {
+        weeksObserved++;
+        if (cnt >= targetPerWeek) {
+          weeksMet++;
+        }
+      }
+    }
+
+    const attainmentRate =
+      weeksObserved > 0
+        ? Math.min(100, Math.round((weeksMet / weeksObserved) * 100))
+        : isCurrentWeekMet
+        ? 100
+        : 0;
+
+    weeklyTargetAttainment = {
+      targetDaysPerWeek: targetPerWeek,
+      completedThisWeek,
+      isCurrentWeekMet,
+      weeksObserved,
+      weeksMet,
+      attainmentRate,
+    };
+  }
 
   // Weekday breakdown percentages
   const weekdayRates: Record<number, number> = {};
@@ -370,12 +493,12 @@ export function calculateHabitAnalytics(
     }
   }
 
-  const recoveryRate =
-    missedEligibleOccurrences > 0
-      ? Math.round((recoveredOccurrences / missedEligibleOccurrences) * 100)
-      : 100;
+  const hasRecoveryData = missedEligibleOccurrences > 0;
+  const recoveryRate = hasRecoveryData
+    ? Math.round((recoveredOccurrences / missedEligibleOccurrences) * 100)
+    : null;
 
-  // Previous period comparison for trend
+  // Previous period comparison for sustainable progress trend
   const prevPeriodStart = addDaysToDateString(effectiveStart, -rangeDays);
   const prevPeriodEnd = addDaysToDateString(effectiveStart, -1);
   let prevEligible = 0;
@@ -392,8 +515,14 @@ export function calculateHabitAnalytics(
     pCurr = addDaysToDateString(pCurr, 1);
   }
 
-  const prevRate = prevEligible > 0 ? Math.round((prevCompleted / prevEligible) * 100) : 0;
-  const trendComparedToPreviousPeriod = totalEligibleDays > 0 && prevEligible > 0 ? completionRate - prevRate : 0;
+  const hasPreviousPeriodBaseline = prevEligible > 0;
+  const previousPeriodRate = hasPreviousPeriodBaseline
+    ? Math.round((prevCompleted / prevEligible) * 100)
+    : null;
+  const trendComparedToPreviousPeriod =
+    hasPreviousPeriodBaseline && previousPeriodRate !== null
+      ? completionRate - previousPeriodRate
+      : null;
 
   // Streaks
   const { currentStreak, longestStreak } = calculateHabitStreaks(habit, checkins, todayStr);
@@ -402,15 +531,24 @@ export function calculateHabitAnalytics(
   const diagnostics = generateDiagnostics({
     habit,
     totalEligibleDays,
+    evaluatedDays,
     completedDays,
     missedDays,
     completionRate,
     trendComparedToPreviousPeriod,
+    hasPreviousPeriodBaseline,
     weekdayRates,
     weekdayEligible,
     weekdayCompleted,
     recoveryRate,
+    hasRecoveryData,
+    recoveredOccurrences,
+    missedEligibleOccurrences,
     currentStreak,
+    isNewHabit,
+    observationDays,
+    weeklyTargetAttainment,
+    quantitativeProgress,
   });
 
   return {
@@ -420,12 +558,24 @@ export function calculateHabitAnalytics(
     partiallyCompletedDays,
     skippedDays,
     missedDays,
+    pendingDays,
+    evaluatedDays,
     completionRate,
     currentStreak,
     longestStreak,
     recoveryRate,
+    hasRecoveryData,
+    recoveryNumerator: recoveredOccurrences,
+    recoveryDenominator: missedEligibleOccurrences,
+    consistencyScore,
     weekdayRates,
     trendComparedToPreviousPeriod,
+    hasPreviousPeriodBaseline,
+    previousPeriodRate,
+    observationDays,
+    isNewHabit,
+    weeklyTargetAttainment,
+    quantitativeProgress,
     diagnostics,
   };
 }
@@ -435,48 +585,66 @@ const WEEKDAY_NAMES_FR = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Ve
 interface DiagnosticContext {
   habit: Habit;
   totalEligibleDays: number;
+  evaluatedDays: number;
   completedDays: number;
   missedDays: number;
   completionRate: number;
-  trendComparedToPreviousPeriod: number;
+  trendComparedToPreviousPeriod: number | null;
+  hasPreviousPeriodBaseline: boolean;
   weekdayRates: Record<number, number>;
   weekdayEligible: Record<number, number>;
   weekdayCompleted: Record<number, number>;
-  recoveryRate: number;
+  recoveryRate: number | null;
+  hasRecoveryData: boolean;
+  recoveredOccurrences: number;
+  missedEligibleOccurrences: number;
   currentStreak: number;
+  isNewHabit: boolean;
+  observationDays: number;
+  weeklyTargetAttainment: HabitWeeklyTargetAttainment | null;
+  quantitativeProgress: HabitQuantitativeProgress | null;
 }
 
 /**
  * Strict separation:
  * 1. OBSERVED: directly grounded in mathematical records.
- * 2. POSSIBLE EXPLANATION: hypothesis.
- * 3. SUGGESTED ADJUSTMENT: concrete micro-experiment.
+ * 2. POSSIBLE EXPLANATION: behavioral hypothesis.
+ * 3. SUGGESTED ADJUSTMENT: concrete actionable micro-experiment.
  */
 function generateDiagnostics(ctx: DiagnosticContext): HabitDiagnostic[] {
   const {
     habit,
     totalEligibleDays,
+    evaluatedDays,
     completedDays,
     missedDays,
     completionRate,
     trendComparedToPreviousPeriod,
+    hasPreviousPeriodBaseline,
     weekdayRates,
     weekdayEligible,
     weekdayCompleted,
     recoveryRate,
+    hasRecoveryData,
+    recoveredOccurrences,
+    missedEligibleOccurrences,
+    isNewHabit,
+    observationDays,
+    weeklyTargetAttainment,
+    quantitativeProgress,
   } = ctx;
 
   const results: HabitDiagnostic[] = [];
 
-  // Minimum threshold: need at least 3 eligible days for observations
-  if (totalEligibleDays < 3) {
+  // Minimum threshold: need at least 3 evaluated days for observations
+  if (isNewHabit || evaluatedDays < 3) {
     results.push({
       id: `diag-fresh-${habit.id}`,
       habitId: habit.id,
       habitName: habit.name,
       type: "observed",
       title: "Historique en cours de constitution",
-      description: `Seulement ${totalEligibleDays} jour(s) programmé(s) jusqu'ici. Les observations comportementales s'activeront après 3 sessions.`,
+      description: `Seulement ${observationDays} jour(s) d'observation jusqu'ici. Les observations comportementales approfondies s'activeront après 3 sessions.`,
       metricLabel: "Progression",
       metricValue: `${completedDays}/${totalEligibleDays}`,
       actionable: false,
@@ -485,7 +653,7 @@ function generateDiagnostics(ctx: DiagnosticContext): HabitDiagnostic[] {
   }
 
   // 1. Trend Analysis
-  if (trendComparedToPreviousPeriod !== 0) {
+  if (hasPreviousPeriodBaseline && trendComparedToPreviousPeriod !== null && trendComparedToPreviousPeriod !== 0) {
     if (trendComparedToPreviousPeriod > 0) {
       results.push({
         id: `diag-trend-up-${habit.id}`,
@@ -493,9 +661,9 @@ function generateDiagnostics(ctx: DiagnosticContext): HabitDiagnostic[] {
         habitName: habit.name,
         type: "observed",
         title: "Tendance positive confirmée",
-        description: `Taux d'accomplissement en hausse de +${trendComparedToPreviousPeriod}% par rapport à la période précédente (${completionRate}% actuel vs ${completionRate - trendComparedToPreviousPeriod}%).`,
+        description: `Taux d'accomplissement en hausse de +${trendComparedToPreviousPeriod} points par rapport à la période précédente (${completionRate}% actuel).`,
         metricLabel: "Progression",
-        metricValue: `+${trendComparedToPreviousPeriod}%`,
+        metricValue: `+${trendComparedToPreviousPeriod} pts`,
         actionable: false,
       });
     } else if (trendComparedToPreviousPeriod <= -15) {
@@ -505,20 +673,19 @@ function generateDiagnostics(ctx: DiagnosticContext): HabitDiagnostic[] {
         habitName: habit.name,
         type: "observed",
         title: "Baisse de régularité observée",
-        description: `Le taux a fléchi de ${trendComparedToPreviousPeriod}% sur la période récente (${completionRate}% actuel).`,
+        description: `Le taux a fléchi de ${trendComparedToPreviousPeriod} points par rapport à la période de référence (${completionRate}% actuel).`,
         metricLabel: "Écart",
-        metricValue: `${trendComparedToPreviousPeriod}%`,
+        metricValue: `${trendComparedToPreviousPeriod} pts`,
         actionable: false,
       });
 
-      // Pair with Explanation & Suggested adjustment
       results.push({
         id: `diag-exp-down-${habit.id}`,
         habitId: habit.id,
         habitName: habit.name,
         type: "explanation",
         title: "Hypothèse de friction d'engagement",
-        description: `Une friction temporelle ou une charge concurrente peut rendre le seuil actuel (${habit.target_value} ${habit.unit}) difficile à tenir chaque jour.`,
+        description: `Une friction temporelle ou une surcharge académique peut rendre le seuil actuel (${habit.target_value} ${habit.unit}) difficile à tenir chaque jour.`,
         actionable: false,
       });
 
@@ -539,7 +706,37 @@ function generateDiagnostics(ctx: DiagnosticContext): HabitDiagnostic[] {
     }
   }
 
-  // 2. Day-of-Week Discrepancy Analysis
+  // 2. Weekly Target Insights
+  if (weeklyTargetAttainment) {
+    results.push({
+      id: `diag-weekly-target-${habit.id}`,
+      habitId: habit.id,
+      habitName: habit.name,
+      type: "observed",
+      title: "Atteinte des objectifs hebdomadaires",
+      description: `Objectif de ${weeklyTargetAttainment.targetDaysPerWeek} sessions/semaine atteint sur ${weeklyTargetAttainment.weeksMet} des ${weeklyTargetAttainment.weeksObserved} semaines observées (${weeklyTargetAttainment.attainmentRate}%).`,
+      metricLabel: "Semaines réussies",
+      metricValue: `${weeklyTargetAttainment.weeksMet}/${weeklyTargetAttainment.weeksObserved}`,
+      actionable: false,
+    });
+  }
+
+  // 3. Quantitative Progress Insights
+  if (quantitativeProgress && quantitativeProgress.totalTarget > 0) {
+    results.push({
+      id: `diag-quant-${habit.id}`,
+      habitId: habit.id,
+      habitName: habit.name,
+      type: "observed",
+      title: `Volume total de travail réalisé`,
+      description: `Vous avez validé ${quantitativeProgress.totalLogged} ${quantitativeProgress.unit} sur une cible cumulée de ${quantitativeProgress.totalTarget} ${quantitativeProgress.unit} (${quantitativeProgress.progressPercentage}%).`,
+      metricLabel: "Volume",
+      metricValue: `${quantitativeProgress.progressPercentage}%`,
+      actionable: false,
+    });
+  }
+
+  // 4. Day-of-Week Discrepancy Analysis
   let bestDay = -1;
   let worstDay = -1;
   let maxRate = -1;
@@ -617,16 +814,16 @@ function generateDiagnostics(ctx: DiagnosticContext): HabitDiagnostic[] {
     });
   }
 
-  // 3. Recovery Resilience
-  if (missedDays > 0) {
-    if (recoveryRate >= 75) {
+  // 5. Recovery Resilience
+  if (hasRecoveryData && recoveryRate !== null) {
+    if (recoveryRate >= 66) {
       results.push({
         id: `diag-recovery-${habit.id}`,
         habitId: habit.id,
         habitName: habit.name,
         type: "observed",
-        title: "Forte capacité de rebond",
-        description: `Après une session manquée, vous reprenez immédiatement le rythme dans ${recoveryRate}% des cas. La constance ne requiert pas la perfection.`,
+        title: "Forte capacité de rebond après interruption",
+        description: `Après une session manquée, vous avez repris le rythme dès l'opportunité suivante dans ${recoveredOccurrences} cas sur ${missedEligibleOccurrences} (${recoveryRate}%).`,
         metricLabel: "Rebond",
         metricValue: `${recoveryRate}%`,
         actionable: false,
@@ -634,7 +831,7 @@ function generateDiagnostics(ctx: DiagnosticContext): HabitDiagnostic[] {
     }
   }
 
-  // 4. Goal Alignment Check
+  // 6. Goal Alignment Check
   if (!habit.goal_id) {
     results.push({
       id: `diag-goal-${habit.id}`,

@@ -16,6 +16,8 @@ import {
   Layers,
   Info,
   Lock,
+  BarChart3,
+  Target,
 } from "lucide-react";
 import type {
   HabitWithTodayState,
@@ -146,6 +148,9 @@ export function HabitInsightsView({
     return best;
   }, [analytics]);
 
+  const isWeeklyTargetHabit = activeHabit?.frequency_type === "weekly_count";
+  const isQuantitativeHabit = activeHabit?.habit_type === "quantitative";
+
   return (
     <div className="space-y-6">
       {/* 1. Compact Editorial Header & Controls Bar */}
@@ -160,9 +165,18 @@ export function HabitInsightsView({
               <span>Données privées & chiffrées</span>
             </span>
           </div>
-          <h2 className="text-lg font-bold text-[#111A2E] tracking-tight mt-0.5">
-            Cadran & Statistiques de Régularité
-          </h2>
+          <div className="flex items-baseline gap-3 mt-0.5">
+            <h2 className="text-lg font-bold text-[#111A2E] tracking-tight">
+              Cadran & Statistiques de Régularité
+            </h2>
+            {analytics && (
+              <span className="text-[11px] font-mono text-[#68748A]">
+                {analytics.isNewHabit
+                  ? `(Ligne de base : ${analytics.observationDays}j)`
+                  : `(${analytics.observationDays}j réels observés)`}
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Filters: Habit Dropdown & Segmented Period Controls */}
@@ -202,10 +216,10 @@ export function HabitInsightsView({
         </div>
       </div>
 
-      {/* 2. Unified KPI Horizontal Strip (No redundant identical boxes) */}
+      {/* 2. Unified KPI Horizontal Strip (Mathematical, Dynamic, Honest) */}
       <div className="bg-[#FFFFFF] border border-[#E4E8F0] rounded-2xl shadow-xs overflow-hidden">
         <div className="grid grid-cols-2 lg:grid-cols-4 divide-y lg:divide-y-0 lg:divide-x divide-[#E4E8F0]">
-          {/* KPI 1: Completion Rate (with mini circular SVG arc) */}
+          {/* KPI 1: Scheduled Completion Rate (Taux de Régularité) */}
           <div className="p-5 flex items-center justify-between gap-4">
             <div>
               <span className="text-[10px] font-mono font-bold tracking-wider uppercase text-[#68748A] block">
@@ -215,34 +229,41 @@ export function HabitInsightsView({
                 <span className="text-3xl font-extrabold text-[#111A2E] font-tabular">
                   {analytics ? `${analytics.completionRate}%` : "—"}
                 </span>
-                {analytics && analytics.trendComparedToPreviousPeriod !== 0 && (
+
+                {/* Trend versus previous period (percentage points) */}
+                {analytics && analytics.hasPreviousPeriodBaseline && analytics.trendComparedToPreviousPeriod !== null && (
                   <span
                     className={`text-[11px] font-mono font-bold flex items-center ${
                       analytics.trendComparedToPreviousPeriod > 0
                         ? "text-[#059669]"
-                        : "text-[#DC2626]"
+                        : analytics.trendComparedToPreviousPeriod < 0
+                        ? "text-[#DC2626]"
+                        : "text-[#68748A]"
                     }`}
+                    title={`Évolution de ${analytics.trendComparedToPreviousPeriod > 0 ? "+" : ""}${analytics.trendComparedToPreviousPeriod} points par rapport à la période précédente`}
                   >
                     {analytics.trendComparedToPreviousPeriod > 0 ? (
                       <TrendingUp className="w-3 h-3 mr-0.5" />
-                    ) : (
+                    ) : analytics.trendComparedToPreviousPeriod < 0 ? (
                       <TrendingDown className="w-3 h-3 mr-0.5" />
-                    )}
+                    ) : null}
                     <span>
                       {analytics.trendComparedToPreviousPeriod > 0 ? "+" : ""}
-                      {analytics.trendComparedToPreviousPeriod}%
+                      {analytics.trendComparedToPreviousPeriod} pts
                     </span>
                   </span>
                 )}
               </div>
               <p className="text-[11px] text-[#68748A] mt-0.5">
                 {analytics
-                  ? `${analytics.completedDays} sur ${analytics.totalEligibleDays} sessions prévues`
+                  ? analytics.isNewHabit
+                    ? `${analytics.completedDays}/${analytics.evaluatedDays} validés (ligne de base)`
+                    : `${analytics.completedDays} sur ${analytics.evaluatedDays} opportunités évaluées`
                   : "Calcul..."}
               </p>
             </div>
 
-            {/* Subtle Mini SVG Ring */}
+            {/* Restrained Mini SVG Ring */}
             <div className="w-11 h-11 shrink-0 relative flex items-center justify-center">
               <svg viewBox="0 0 36 36" className="w-11 h-11 -rotate-90">
                 <path
@@ -265,7 +286,7 @@ export function HabitInsightsView({
             </div>
           </div>
 
-          {/* KPI 2: Current & Longest Streak */}
+          {/* KPI 2: Recurrence-Aware Streak */}
           <div className="p-5 flex flex-col justify-center">
             <span className="text-[10px] font-mono font-bold tracking-wider uppercase text-[#68748A] block">
               Série Active
@@ -273,47 +294,98 @@ export function HabitInsightsView({
             <div className="flex items-baseline gap-2 mt-1">
               <span className="text-3xl font-extrabold text-[#D97706] font-tabular flex items-center gap-1">
                 <Flame className="w-6 h-6 fill-current inline" />
-                <span>{analytics ? analytics.currentStreak : 0} j</span>
+                <span>
+                  {analytics ? analytics.currentStreak : 0}{" "}
+                  {isWeeklyTargetHabit ? "sem." : "j"}
+                </span>
               </span>
               <span className="text-xs text-[#68748A] font-mono">
-                / max {analytics?.longestStreak || 0} j
+                / max {analytics?.longestStreak || 0} {isWeeklyTargetHabit ? "sem." : "j"}
               </span>
             </div>
             <p className="text-[11px] text-[#68748A] mt-0.5">
-              Jours consécutifs sans rupture de rythme
+              {isWeeklyTargetHabit
+                ? "Semaines consécutives avec cible atteinte"
+                : "Jours consécutifs sans rupture de rythme"}
             </p>
           </div>
 
-          {/* KPI 3: Capacité de Rebond */}
+          {/* KPI 3: Capacité de Rebond (Honest Null & Baseline States) */}
           <div className="p-5 flex flex-col justify-center">
             <span className="text-[10px] font-mono font-bold tracking-wider uppercase text-[#68748A] block">
               Capacité de Rebond
             </span>
             <div className="flex items-baseline gap-2 mt-1">
               <span className="text-3xl font-extrabold text-[#059669] font-tabular">
-                {analytics ? `${analytics.recoveryRate}%` : "—"}
+                {analytics?.hasRecoveryData && analytics.recoveryRate !== null
+                  ? `${analytics.recoveryRate}%`
+                  : analytics && analytics.missedDays === 0
+                  ? "100%"
+                  : "—"}
               </span>
               <ShieldCheck className="w-4 h-4 text-[#059669]" />
             </div>
             <p className="text-[11px] text-[#68748A] mt-0.5">
-              Reprise immédiate le jour suivant un manquement
+              {analytics?.hasRecoveryData
+                ? `${analytics.recoveryNumerator}/${analytics.recoveryDenominator} reprises après coupure`
+                : analytics && analytics.missedDays === 0
+                ? "Assiduité sans faute (0 interruption)"
+                : "Historique de rupture insuffisant"}
             </p>
           </div>
 
-          {/* KPI 4: Volume d'Effort */}
+          {/* KPI 4: Contextual Dynamic Metric (Target Attainment vs Volume vs Consistency) */}
           <div className="p-5 flex flex-col justify-center">
-            <span className="text-[10px] font-mono font-bold tracking-wider uppercase text-[#68748A] block">
-              Volume Validé
-            </span>
-            <div className="flex items-baseline gap-2 mt-1">
-              <span className="text-3xl font-extrabold text-[#111A2E] font-tabular">
-                {analytics ? analytics.completedDays : 0}
-              </span>
-              <span className="text-xs text-[#68748A] font-semibold">sessions</span>
-            </div>
-            <p className="text-[11px] text-[#68748A] mt-0.5">
-              Sur la fenêtre sélectionnée ({rangeDays} jours)
-            </p>
+            {isQuantitativeHabit && analytics?.quantitativeProgress ? (
+              <>
+                <span className="text-[10px] font-mono font-bold tracking-wider uppercase text-[#68748A] block">
+                  Volume Réalisé
+                </span>
+                <div className="flex items-baseline gap-2 mt-1">
+                  <span className="text-3xl font-extrabold text-[#111A2E] font-tabular">
+                    {analytics.quantitativeProgress.totalLogged}
+                  </span>
+                  <span className="text-xs text-[#68748A] font-mono">
+                    / {analytics.quantitativeProgress.totalTarget} {analytics.quantitativeProgress.unit}
+                  </span>
+                </div>
+                <p className="text-[11px] text-[#68748A] mt-0.5">
+                  {analytics.quantitativeProgress.progressPercentage}% de la cible cumulée
+                </p>
+              </>
+            ) : isWeeklyTargetHabit && analytics?.weeklyTargetAttainment ? (
+              <>
+                <span className="text-[10px] font-mono font-bold tracking-wider uppercase text-[#68748A] block">
+                  Cible Hebdomadaire
+                </span>
+                <div className="flex items-baseline gap-2 mt-1">
+                  <span className="text-3xl font-extrabold text-[#2855D9] font-tabular">
+                    {analytics.weeklyTargetAttainment.completedThisWeek}
+                  </span>
+                  <span className="text-xs text-[#68748A] font-mono">
+                    / {analytics.weeklyTargetAttainment.targetDaysPerWeek} sessions
+                  </span>
+                </div>
+                <p className="text-[11px] text-[#68748A] mt-0.5">
+                  {analytics.weeklyTargetAttainment.weeksMet}/{analytics.weeklyTargetAttainment.weeksObserved} sem. atteintes ({analytics.weeklyTargetAttainment.attainmentRate}%)
+                </p>
+              </>
+            ) : (
+              <>
+                <span className="text-[10px] font-mono font-bold tracking-wider uppercase text-[#68748A] block">
+                  Indice de Constance
+                </span>
+                <div className="flex items-baseline gap-2 mt-1">
+                  <span className="text-3xl font-extrabold text-[#111A2E] font-tabular">
+                    {analytics ? `${analytics.consistencyScore}%` : "—"}
+                  </span>
+                  <Target className="w-4 h-4 text-[#2855D9]" />
+                </div>
+                <p className="text-[11px] text-[#68748A] mt-0.5">
+                  {analytics ? `${analytics.completedDays} sessions sur ${analytics.observationDays}j` : "Calcul..."}
+                </p>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -326,7 +398,7 @@ export function HabitInsightsView({
         rangeDays={rangeDays}
       />
 
-      {/* 4. Transformed Weekday Consistency Visualization (7 Ultra-Fine Pillar Tracks) */}
+      {/* 4. Weekday Consistency Visualization (7 Compact Pillars with Non-Scheduled Handling) */}
       {analytics && (
         <div className="bg-[#FFFFFF] border border-[#E4E8F0] rounded-2xl p-6 shadow-xs space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -350,52 +422,71 @@ export function HabitInsightsView({
           <div className="pt-2">
             <div className="grid grid-cols-7 gap-3 sm:gap-6 max-w-2xl mx-auto items-end py-4">
               {WEEKDAY_LOCALE_ORDER.map(({ index: dayIdx, label, fullName }) => {
+                const isScheduled =
+                  activeHabit.frequency_type !== "specific_days" ||
+                  activeHabit.scheduled_days.includes(dayIdx);
+
                 const rate = analytics.weekdayRates[dayIdx] || 0;
-                const isStrongest = dayIdx === strongestDayIndex;
-                const isZero = rate === 0;
+                const isStrongest = dayIdx === strongestDayIndex && isScheduled;
 
                 return (
                   <div
                     key={dayIdx}
                     className="group flex flex-col items-center gap-2 relative"
-                    title={`${fullName} : ${rate}% de complétion`}
+                    title={
+                      isScheduled
+                        ? `${fullName} : ${rate}% de complétion`
+                        : `${fullName} : Jour non programmé`
+                    }
                   >
                     {/* Tooltip on Hover */}
-                    <span className="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-7 text-[10px] font-mono font-bold bg-[#111A2E] text-white px-1.5 py-0.5 rounded shadow-sm pointer-events-none z-10">
-                      {rate}%
+                    <span className="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-7 text-[10px] font-mono font-bold bg-[#111A2E] text-white px-1.5 py-0.5 rounded shadow-sm pointer-events-none z-10 whitespace-nowrap">
+                      {isScheduled ? `${rate}%` : "Repos"}
                     </span>
 
                     {/* Fine 6px Vertical Pillar Track */}
                     <div className="w-2 sm:w-2.5 h-28 bg-[#F4F6FA] rounded-full flex flex-col justify-end p-0.5 overflow-hidden border border-[#E4E8F0]">
-                      <div
-                        className={`w-full rounded-full transition-all duration-700 ease-out ${
-                          isStrongest
-                            ? "bg-gradient-to-t from-[#059669] to-[#10B981]"
-                            : rate > 50
-                            ? "bg-gradient-to-t from-[#2855D9] to-[#4776F2]"
-                            : rate > 0
-                            ? "bg-gradient-to-t from-[#D97706] to-[#F59E0B]"
-                            : "bg-transparent"
-                        }`}
-                        style={{ height: `${Math.max(0, rate)}%` }}
-                      />
+                      {isScheduled ? (
+                        <div
+                          className={`w-full rounded-full transition-all duration-700 ease-out ${
+                            isStrongest
+                              ? "bg-gradient-to-t from-[#059669] to-[#10B981]"
+                              : rate > 50
+                              ? "bg-gradient-to-t from-[#2855D9] to-[#4776F2]"
+                              : rate > 0
+                              ? "bg-gradient-to-t from-[#D97706] to-[#F59E0B]"
+                              : "bg-transparent"
+                          }`}
+                          style={{ height: `${Math.max(0, rate)}%` }}
+                        />
+                      ) : (
+                        <div className="w-full h-1 bg-[#CBD5E1] rounded-full self-center my-auto" />
+                      )}
                     </div>
 
                     {/* Day Label */}
                     <div className="text-center">
                       <span
                         className={`text-[11px] font-mono font-bold block ${
-                          isStrongest ? "text-[#059669]" : "text-[#182235]"
+                          !isScheduled
+                            ? "text-[#A0AEC0]"
+                            : isStrongest
+                            ? "text-[#059669]"
+                            : "text-[#182235]"
                         }`}
                       >
                         {label}
                       </span>
                       <span
                         className={`text-[10px] font-mono font-tabular ${
-                          isZero ? "text-[#A0AEC0]" : "text-[#68748A]"
+                          !isScheduled
+                            ? "text-[#CBD5E1]"
+                            : rate === 0
+                            ? "text-[#A0AEC0]"
+                            : "text-[#68748A]"
                         }`}
                       >
-                        {rate}%
+                        {isScheduled ? `${rate}%` : "—"}
                       </span>
                     </div>
                   </div>
@@ -418,71 +509,75 @@ export function HabitInsightsView({
           </p>
         </div>
 
-        {analytics && analytics.diagnostics.length === 0 ? (
-          <p className="text-xs text-[#68748A] py-4 text-center">
-            Historique insuffisant pour établir un diagnostic comportemental fiable. Continuez d'enregistrer vos sessions.
-          </p>
-        ) : (
-          <div className="space-y-3 pt-1">
-            {analytics?.diagnostics.map((diag) => {
-              const isObserved = diag.type === "observed";
-              const isExplanation = diag.type === "explanation";
-              const isAdjustment = diag.type === "adjustment";
+        <div className="space-y-3">
+          {analytics?.diagnostics.map((diag) => {
+            const isObserved = diag.type === "observed";
+            const isAdjustment = diag.type === "adjustment";
+            const isExplanation = diag.type === "explanation";
 
-              return (
-                <div
-                  key={diag.id}
-                  className="bg-white border border-[#E4E8F0] hover:border-[#D8DFEB] rounded-xl p-4 transition-all shadow-xs"
-                >
-                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`text-[9px] font-mono font-bold uppercase px-2 py-0.5 rounded ${
-                            isObserved
-                              ? "bg-[#ECFDF5] text-[#059669] border border-[#A7F3D0]"
-                              : isExplanation
-                              ? "bg-[#FEF3C7] text-[#D97706] border border-[#FDE68A]"
-                              : "bg-[#EDF2FF] text-[#2855D9] border border-[#BFDBFE]"
-                          }`}
-                        >
-                          {isObserved
-                            ? "Fait Observé"
-                            : isExplanation
-                            ? "Hypothèse Comportementale"
-                            : "Ajustement Conseillé"}
-                        </span>
-                        <h4 className="text-xs font-bold text-[#111A2E]">
-                          {diag.title}
-                        </h4>
-                      </div>
-                      <p className="text-xs text-[#68748A] leading-relaxed">
-                        {diag.description}
-                      </p>
+            return (
+              <div
+                key={diag.id}
+                className={`p-4 rounded-xl border transition-all ${
+                  isObserved
+                    ? "bg-[#FAFAF7] border-[#E4E8F0]"
+                    : isAdjustment
+                    ? "bg-[#EDF2FF]/60 border-[#2855D9]/20"
+                    : "bg-[#FFFFFF] border-[#E4E8F0]"
+                }`}
+              >
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`text-[9px] font-bold font-mono uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                          isObserved
+                            ? "bg-[#ECFDF5] text-[#059669] border border-[#A7F3D0]"
+                            : isAdjustment
+                            ? "bg-[#2855D9] text-white"
+                            : "bg-[#F4F6FA] text-[#68748A] border border-[#E4E8F0]"
+                        }`}
+                      >
+                        {isObserved
+                          ? "Fait Observé"
+                          : isAdjustment
+                          ? "Ajustement Recommandé"
+                          : "Hypothèse"}
+                      </span>
+                      <h4 className="text-xs font-bold text-[#111A2E]">
+                        {diag.title}
+                      </h4>
                     </div>
+                    <p className="text-xs text-[#68748A] leading-relaxed">
+                      {diag.description}
+                    </p>
+                  </div>
 
-                    {diag.actionable && (
+                  {/* Actions & Metrics */}
+                  <div className="flex items-center gap-3 shrink-0">
+                    {diag.metricValue && (
+                      <span className="text-xs font-mono font-bold text-[#111A2E] bg-white px-2.5 py-1 rounded-lg border border-[#E4E8F0]">
+                        {diag.metricValue}
+                      </span>
+                    )}
+
+                    {isAdjustment && diag.actionable && (
                       <button
+                        type="button"
                         onClick={() => handleApplyAdjustment(diag)}
                         disabled={applyingDiagId === diag.id}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-[#2855D9] hover:bg-[#1E40AF] rounded-lg transition-colors cursor-pointer shrink-0 w-fit"
+                        className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-[#2855D9] hover:bg-[#1E42AC] active:scale-95 transition-all shadow-xs cursor-pointer flex items-center gap-1.5 shrink-0"
                       >
-                        {applyingDiagId === diag.id ? (
-                          <span>Application...</span>
-                        ) : (
-                          <>
-                            <span>Appliquer</span>
-                            <ArrowRight className="w-3.5 h-3.5" />
-                          </>
-                        )}
+                        <span>Appliquer</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
                       </button>
                     )}
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        )}
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

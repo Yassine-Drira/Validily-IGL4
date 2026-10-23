@@ -558,6 +558,8 @@ export interface Habit {
   created_at: string;
   updated_at: string;
   archived_at?: string | null;
+  paused_at?: string | null;
+  paused_until?: string | null;
   goal?: AcademicGoal;
 }
 
@@ -596,6 +598,24 @@ export interface HabitDiagnostic {
   actionPayload?: any;
 }
 
+export interface HabitWeeklyTargetAttainment {
+  targetDaysPerWeek: number;
+  completedThisWeek: number;
+  isCurrentWeekMet: boolean;
+  weeksObserved: number;
+  weeksMet: number;
+  attainmentRate: number; // 0 - 100 percentage
+}
+
+export interface HabitQuantitativeProgress {
+  totalLogged: number;
+  totalTarget: number;
+  remaining: number;
+  unit: string;
+  progressPercentage: number;
+  isComplete: boolean;
+}
+
 export interface HabitAnalyticsSummary {
   habitId: string;
   totalEligibleDays: number;
@@ -603,13 +623,25 @@ export interface HabitAnalyticsSummary {
   partiallyCompletedDays: number;
   skippedDays: number;
   missedDays: number;
-  completionRate: number; // 0 - 100 percentage
+  pendingDays: number;
+  evaluatedDays: number; // completed + partial + skipped + missed
+  completionRate: number; // 0 - 100 percentage (scheduled completion rate)
   currentStreak: number;
   longestStreak: number;
-  recoveryRate: number; // percentage of times user bounced back after a missed day
+  recoveryRate: number | null; // percentage of times user bounced back after a missed day (null if no missed day to recover from)
+  hasRecoveryData: boolean;
+  recoveryNumerator: number;
+  recoveryDenominator: number;
+  consistencyScore: number; // transparent consistency rate
   weekdayRates: Record<number, number>; // 0 to 6 -> percentage
   timeOfDayRates?: Record<HabitPreferredTime, number>;
-  trendComparedToPreviousPeriod: number; // delta percentage e.g. +12 or -5
+  trendComparedToPreviousPeriod: number | null; // delta percentage points e.g. +12 or -5, null if no baseline
+  hasPreviousPeriodBaseline: boolean;
+  previousPeriodRate: number | null;
+  observationDays: number; // actual days elapsed since habit.start_date within range
+  isNewHabit: boolean;
+  weeklyTargetAttainment?: HabitWeeklyTargetAttainment | null;
+  quantitativeProgress?: HabitQuantitativeProgress | null;
   diagnostics: HabitDiagnostic[];
 }
 
