@@ -15,14 +15,14 @@ import type { Subject } from "@/types/database";
 
 export class GroqProvider implements AIInferenceProvider {
   readonly id = "groq-llama";
-  readonly name = "Groq Cloud (Llama 3.1 Instant)";
+  readonly name = "Groq Cloud (GPT-OSS 120B)";
 
   private apiKey: string;
   private model: string;
 
   constructor() {
     this.apiKey = process.env.GROQ_API_KEY || "";
-    this.model = process.env.GROQ_MODEL || "llama-3.1-8b-instant";
+    this.model = process.env.GROQ_MODEL || "openai/gpt-oss-120b";
   }
 
   isConfigured(): boolean {
@@ -243,65 +243,85 @@ Respond ONLY with a JSON object of this format:
     }
 
     const { messages, context, date } = request;
-    const systemPrompt = `You are an expert academic coach and tutor for INSAT IGL4 software engineering students.
-You have access to the student's REAL academic state:
-- Active tasks: ${JSON.stringify(context.tasks.slice(0, 10).map((t: any) => ({ id: t.id, title: t.title, priority: t.priority, due_date: t.due_date })))}
-- Available free slots today (${date}): ${JSON.stringify(context.freeSlots)}
-- Weak subjects & mastery scores: ${JSON.stringify(context.masteryList.slice(0, 5).map((m: any) => ({ name: m.subjectName, accuracy: m.accuracyRate, score: m.masteryScore, attempts: m.totalAttempts })))}
+    const systemPrompt = `You are Maestro AI, an elite academic advisor, cognitive strategist, and software engineering tutor for INSAT IGL4 university students.
+You respond with high pedagogical intelligence, executive clarity, and deep technical authority in French (or the language asked by the student).
 
-CRITICAL GROUNDING RULES:
-1. ONLY refer to the student's real tasks and subjects above. NEVER invent tasks or deadlines.
-2. If asked about weak topics, cite their real quiz accuracy and attempts. If 0 attempts exist, honestly state that no quiz has been taken yet.
-3. If asked to schedule a slot, select an available free slot from freeSlots and propose it.
-4. Respond ONLY with a JSON object:
+You have full real-time access to the student's authorized academic records:
+- Target Date: ${date}
+- Active tasks: ${JSON.stringify(context.tasks.slice(0, 10).map((t: any) => ({ id: t.id, title: t.title, priority: t.priority, due_date: t.due_date, estimated_minutes: t.estimated_minutes })))}
+- Available free slots today (${date}): ${JSON.stringify(context.freeSlots)}
+- Weak subjects & mastery scores: ${JSON.stringify(context.masteryList.slice(0, 8).map((m: any) => ({ id: m.subjectId, name: m.subjectName, accuracy: m.accuracyRate, score: m.masteryScore, attempts: m.totalAttempts, daysSinceLastReview: m.daysSinceLastReview })))}
+
+BEHAVIORAL DIRECTIVES:
+1. Academic Intelligence: If the student asks conceptual, technical, or revision questions (e.g. algorithms, Kubernetes, software architecture, study strategies, exam prep), provide rich, expert, clear, high-level engineering explanations with structured formatting and examples.
+2. Grounded Strategy: If asked what to study today or how to organize, prioritize based on real urgency and free time slots. Cite real evidence badges.
+3. Weakness Analysis: If asked about weak topics, cite factual accuracy and attempts. If 0 attempts exist, honestly explain that no evaluation has been recorded yet and propose a diagnostic drill.
+4. Action Proposals:
+   - If user asks to schedule a study slot: pick a valid, non-overlapping slot from freeSlots and populate "proposedSchedule" array with:
+     { "tempId": "prop-1", "taskId": "task id or null", "subjectId": "subject id or null", "title": "Revision title", "date": "${date}", "startTime": "HH:MM", "endTime": "HH:MM", "durationMinutes": 30, "rationale": "Reason", "category": "drill" }
+   - If user asks for a quiz/drill or needs practice: populate "proposedDrill" with:
+     { "subjectId": "subject id", "subjectName": "subject name", "questionCount": 3, "reason": "Targeted active recall" }
+
+Respond ONLY with a valid JSON object matching this schema:
 {
-  "reply": "Clear, grounded markdown answer with bullet points and evidence",
-  "citations": [ { "type": "task"|"calendar"|"assessment", "id": "id", "label": "label", "detail": "detail" } ],
+  "reply": "Rich markdown response in French (with headers ###, bullet points, bold key terms, and code snippets when helpful)",
+  "citations": [ { "type": "task"|"calendar"|"assessment"|"availability", "id": "real-id", "label": "Title", "detail": "Factual info" } ],
   "recommendations": [],
   "proposedSchedule": [],
   "proposedDrill": null
 }`;
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 9000);
+    const modelsToTry = [this.model, "qwen/qwen3.8-27b", "openai/gpt-oss-120b"];
 
-    try {
-      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${this.apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: this.model,
-          messages: [
-            { role: "system", content: systemPrompt },
-            ...messages.slice(-6).map((m: any) => ({ role: m.role, content: m.content })),
-          ],
-          response_format: { type: "json_object" },
-          temperature: 0.3,
-          max_tokens: 1500,
-        }),
-        signal: controller.signal,
-      });
+    for (const currentModel of modelsToTry) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 12000);
 
-      if (!res.ok) throw new Error(`Groq API error ${res.status}`);
+      try {
+        const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${this.apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: currentModel,
+            messages: [
+              { role: "system", content: systemPrompt },
+              ...messages.slice(-6).map((m: any) => ({ role: m.role, content: m.content })),
+            ],
+            response_format: { type: "json_object" },
+            temperature: 0.3,
+            max_tokens: 2000,
+          }),
+          signal: controller.signal,
+        });
 
-      const json = await res.json();
-      const content = json.choices?.[0]?.message?.content;
-      const parsed = JSON.parse(content || "{}");
+        if (!res.ok) {
+          console.warn(`Groq model ${currentModel} returned ${res.status}. Trying fallback model...`);
+          continue;
+        }
 
-      return {
-        reply: parsed.reply || "Analyse terminée.",
-        citations: Array.isArray(parsed.citations) ? parsed.citations : [],
-        recommendations: Array.isArray(parsed.recommendations) ? parsed.recommendations : [],
-        proposedSchedule: Array.isArray(parsed.proposedSchedule) ? parsed.proposedSchedule : [],
-        proposedDrill: parsed.proposedDrill || null,
-        tokensUsed: json.usage?.total_tokens || 0,
-      };
-    } finally {
-      clearTimeout(timeout);
+        const json = await res.json();
+        const content = json.choices?.[0]?.message?.content;
+        const parsed = JSON.parse(content || "{}");
+
+        return {
+          reply: parsed.reply || "Analyse terminée.",
+          citations: Array.isArray(parsed.citations) ? parsed.citations : [],
+          recommendations: Array.isArray(parsed.recommendations) ? parsed.recommendations : [],
+          proposedSchedule: Array.isArray(parsed.proposedSchedule) ? parsed.proposedSchedule : [],
+          proposedDrill: parsed.proposedDrill || null,
+          tokensUsed: json.usage?.total_tokens || 0,
+        };
+      } catch (err: any) {
+        console.warn(`Groq model ${currentModel} attempt failed: ${err.message}`);
+      } finally {
+        clearTimeout(timeout);
+      }
     }
+
+    throw new Error("All Groq models failed.");
   }
 }
 
