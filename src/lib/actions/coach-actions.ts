@@ -360,6 +360,7 @@ export async function sendCoachChatMessageAction(
           existingBlocks: context.existingBlocks,
           masteryList: context.masteryList,
           freeSlots: context.freeSlots,
+          habits: context.habits,
         },
       },
       context.subjects

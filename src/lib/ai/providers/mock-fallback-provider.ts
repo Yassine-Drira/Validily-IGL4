@@ -25,7 +25,7 @@ import {
   calculateTaskUrgency,
   allocateSpecificSlot,
 } from "../planning-engine.ts";
-import type { Subject } from "@/types/database";
+import type { Subject, HabitWithTodayState } from "@/types/database";
 
 export class MockFallbackProvider implements AIInferenceProvider {
   readonly id = "local-deterministic-rules";
@@ -561,6 +561,63 @@ Cliquez sur le bouton ci-dessous pour lancer la session.`;
           questionCount: 3,
           reason: "Entraînement actif demandé",
         },
+        tokensUsed: 0,
+      };
+    }
+
+    // -------------------------------------------------------------------------
+    // 4b. INTENT: Habit & Consistency Guidance ("Pourquoi suis-je irrégulier ?", "Mes habitudes")
+    // -------------------------------------------------------------------------
+    const isHabitIntent =
+      query.includes("habitude") ||
+      query.includes("habit") ||
+      query.includes("inconsistan") ||
+      query.includes("irrégul") ||
+      query.includes("routine") ||
+      query.includes("constan") ||
+      query.includes("discipline");
+
+    if (isHabitIntent) {
+      const userHabits = context.habits || [];
+      if (userHabits.length > 0) {
+        const completedToday = userHabits.filter((h: HabitWithTodayState) => h.todayStatus === "completed");
+        const pendingToday = userHabits.filter((h: HabitWithTodayState) => h.todayStatus === "pending");
+        const bestStreakHabit = [...userHabits].sort((a: HabitWithTodayState, b: HabitWithTodayState) => b.currentStreak - a.currentStreak)[0];
+
+        citations.push({
+          type: "task",
+          id: "habits-summary",
+          label: "Module Habitudes & Routine",
+          detail: `${completedToday.length}/${userHabits.length} habitudes complétées aujourd'hui`,
+        });
+
+        reply = `### 🧭 Diagnostic de Constance & Habitudes Personnelles
+
+En analysant vos relevés réels de régularité pour aujourd'hui (**${date}**) :
+
+- **Bilan du jour :** Vous avez validé **${completedToday.length} sur ${userHabits.length} habitude(s)** prévue(s).
+${bestStreakHabit && bestStreakHabit.currentStreak > 0 ? `- **Meilleure série active :** **${bestStreakHabit.name}** avec **${bestStreakHabit.currentStreak} jour(s)** consécutifs validés !` : ""}
+
+**Recommandations comportementales factuelles :**
+${pendingToday.length > 0 ? pendingToday.map((h: HabitWithTodayState) => `- **${h.name}** : En attente pour aujourd'hui (${h.preferred_time === "morning" ? "Matin" : h.preferred_time === "afternoon" ? "Après-midi" : "Soirée"}).`).join("\n") : "Toutes vos routines de la journée sont déjà accomplies !"}
+
+💡 **Conseil du Coach :** La constance durable ne repose pas sur une motivation volatile, mais sur un rituel déclencheur stable. Vous pouvez ajuster vos créneaux ou vos cibles directement dans l'onglet **Habitudes**.`;
+      } else {
+        reply = `### 🧭 Module Habitudes & Routine
+
+Vous n'avez pas encore configuré d'habitudes actives. Pour construire une discipline de travail pérenne :
+
+1. Rendez-vous dans la section **Habitudes** du menu.
+2. Définissez une petite habitude reproductible (ex: 30 min de révision active chaque matin).
+3. Connectez-la à un de vos objectifs académiques pour suivre votre régularité objective.`;
+      }
+
+      return {
+        reply,
+        citations,
+        recommendations: [],
+        proposedSchedule: [],
+        proposedDrill: null,
         tokensUsed: 0,
       };
     }

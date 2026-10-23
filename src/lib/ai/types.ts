@@ -9,6 +9,7 @@ import type {
   Subject,
   QuizAttempt,
   FocusSession,
+  HabitWithTodayState,
 } from "@/types/database";
 
 export type UrgencyLevel = "critical" | "warning" | "moderate" | "mastered";
@@ -147,6 +148,7 @@ export interface AIPlanRequest {
   masteryList: SubjectMasterySummary[];
   freeSlots: TimeSlot[];
   focusHistory?: FocusSession[];
+  habits?: HabitWithTodayState[];
 }
 
 export interface AIDrillRequest {

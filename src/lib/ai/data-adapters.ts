@@ -49,7 +49,7 @@ import type {
   TimeConflict,
   TimeSlot,
 } from "./types.ts";
-import type { Subject, AcademicTask, CalendarTimeblock } from "@/types/database";
+import type { Subject, AcademicTask, CalendarTimeblock, HabitWithTodayState } from "@/types/database";
 
 export interface UserContextSnapshot {
   userId: string;
@@ -62,6 +62,7 @@ export interface UserContextSnapshot {
   conflicts: TimeConflict[];
   masteryList: SubjectMasterySummary[];
   subjects: Subject[];
+  habits?: HabitWithTodayState[];
 }
 
 import { getLocalTodayDateString } from "../utils.ts";
@@ -219,6 +220,17 @@ export async function getAuthorizedUserContext(
   // Sort mastery: critical & warning first
   masteryList.sort((a, b) => a.masteryScore - b.masteryScore);
 
+  let habits: HabitWithTodayState[] = [];
+  try {
+    const habitMod = await import("../actions/habit-actions");
+    const habitRes = await habitMod.getHabitsAction({ status: "active", targetDate: effectiveDateStr });
+    if (habitRes.success && habitRes.data) {
+      habits = habitRes.data;
+    }
+  } catch {
+    // Graceful fallback if habits cannot be retrieved
+  }
+
   return {
     userId,
     userName: user.name || "Étudiant IGL4",
@@ -230,5 +242,6 @@ export async function getAuthorizedUserContext(
     conflicts,
     masteryList,
     subjects,
+    habits,
   };
 }

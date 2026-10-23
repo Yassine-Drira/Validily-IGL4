@@ -514,3 +514,112 @@ export interface AcademicGoalWithProgress extends AcademicGoal {
   percentage: number;
   is_automated: boolean;
 }
+
+// -----------------------------------------------------------------------------
+// Habits & Personal Productivity Intelligence Types
+// -----------------------------------------------------------------------------
+
+export type HabitType = "binary" | "quantitative";
+
+export type HabitCategory =
+  | "study"
+  | "health"
+  | "mindfulness"
+  | "productivity"
+  | "routine"
+  | "other";
+
+export type HabitFrequencyType = "daily" | "specific_days" | "weekly_count";
+
+export type HabitStatus = "active" | "paused" | "archived";
+
+export type HabitPreferredTime = "morning" | "afternoon" | "evening" | "anytime";
+
+export type HabitCheckinStatus = "completed" | "partial" | "skipped";
+
+export interface Habit {
+  id: string;
+  user_id: string;
+  goal_id?: string | null;
+  name: string;
+  description?: string | null;
+  icon: string;
+  category: HabitCategory;
+  habit_type: HabitType;
+  target_value: number;
+  unit: string;
+  frequency_type: HabitFrequencyType;
+  scheduled_days: number[]; // 0=Sunday, 1=Monday, ..., 6=Saturday
+  target_days_per_week?: number; // for weekly_count (e.g. 3)
+  preferred_time: HabitPreferredTime;
+  reminder_time?: string | null; // HH:MM
+  start_date: string; // YYYY-MM-DD
+  status: HabitStatus;
+  created_at: string;
+  updated_at: string;
+  archived_at?: string | null;
+  goal?: AcademicGoal;
+}
+
+export interface HabitCheckin {
+  id: string;
+  habit_id: string;
+  user_id: string;
+  date: string; // YYYY-MM-DD
+  value: number;
+  status: HabitCheckinStatus;
+  notes?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type DayCompletionStatus =
+  | "completed"
+  | "partial"
+  | "skipped"
+  | "missed"
+  | "pending"
+  | "future"
+  | "not_scheduled";
+
+export interface HabitDiagnostic {
+  id: string;
+  habitId: string;
+  habitName: string;
+  type: "observed" | "explanation" | "adjustment";
+  title: string;
+  description: string;
+  metricLabel?: string;
+  metricValue?: string | number;
+  actionable?: boolean;
+  actionType?: "shift_time" | "reduce_target" | "change_frequency" | "link_goal";
+  actionPayload?: any;
+}
+
+export interface HabitAnalyticsSummary {
+  habitId: string;
+  totalEligibleDays: number;
+  completedDays: number;
+  partiallyCompletedDays: number;
+  skippedDays: number;
+  missedDays: number;
+  completionRate: number; // 0 - 100 percentage
+  currentStreak: number;
+  longestStreak: number;
+  recoveryRate: number; // percentage of times user bounced back after a missed day
+  weekdayRates: Record<number, number>; // 0 to 6 -> percentage
+  timeOfDayRates?: Record<HabitPreferredTime, number>;
+  trendComparedToPreviousPeriod: number; // delta percentage e.g. +12 or -5
+  diagnostics: HabitDiagnostic[];
+}
+
+export interface HabitWithTodayState extends Habit {
+  todayStatus: DayCompletionStatus;
+  todayCheckin?: HabitCheckin | null;
+  currentStreak: number;
+  weeklyProgress?: {
+    completedThisWeek: number;
+    targetDays: number;
+  };
+}
+

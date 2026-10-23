@@ -20,6 +20,7 @@ import {
   CalendarCheck2,
   UploadCloud,
   Bot,
+  Flame,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -32,6 +33,7 @@ const navItems = [
   { label: "Accueil", href: "/", icon: LayoutDashboard },
   { label: "Coach IA & Tuteur", href: "/coach", icon: Bot },
   { label: "Planning & Tâches", href: "/planner", icon: CalendarCheck2 },
+  { label: "Habitudes & Routine", href: "/habits", icon: Flame },
   { label: "Semestres", href: "/semesters", icon: Calendar },
   { label: "Matières", href: "/subjects", icon: BookOpen },
   { label: "Bibliothèque", href: "/library", icon: FolderArchive },
