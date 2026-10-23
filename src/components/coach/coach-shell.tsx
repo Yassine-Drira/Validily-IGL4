@@ -230,7 +230,7 @@ export function CoachShell({ initialPlan }: CoachShellProps) {
               className="px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold text-xs transition-all flex items-center gap-2 shadow-xs cursor-pointer"
             >
               <BookOpen className="w-4 h-4" />
-              <span>Studio Quiz RAG</span>
+              <span>Studio Quiz IA</span>
             </button>
 
             <button

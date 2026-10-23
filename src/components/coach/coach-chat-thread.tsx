@@ -227,7 +227,7 @@ export function CoachChatThread({
               </span>
             </div>
             <p className="text-xs text-[#68748A]">
-              Conseiller stratégique certifié • Synthèse RAG en temps réel de votre cursus IGL4
+              Conseiller stratégique certifié • Synthèse personnalisée en temps réel de votre cursus IGL4
             </p>
           </div>
         </div>
@@ -494,17 +494,7 @@ export function CoachChatThread({
                   </div>
                 )}
 
-                {/* Telemetry info */}
-                {message.telemetry && (
-                  <div className="mt-3.5 text-[10px] text-[#94A3B8] flex items-center gap-2">
-                    <span className="font-tabular">
-                      Généré en {message.telemetry.latencyMs}ms ({message.telemetry.provider})
-                    </span>
-                    {message.telemetry.isFallback && (
-                      <span className="text-amber-600 font-semibold">• Mode déterministe certifié</span>
-                    )}
-                  </div>
-                )}
+
               </div>
             </div>
           );
@@ -595,8 +585,8 @@ export function CoachChatThread({
           <span>
             Touche <strong className="text-[#68748A]">Entrée</strong> pour envoyer • <strong className="text-[#68748A]">Maj+Entrée</strong> pour nouvelle ligne
           </span>
-          <span className="hidden sm:inline text-[#2855D9] font-medium">
-            ✓ Réponses déterministes vérifiées sur vos bases de données
+          <span className="hidden sm:inline text-[#059669] font-medium">
+            ✓ Synchronisé avec vos cours, devoirs et agenda universitaire
           </span>
         </div>
       </div>

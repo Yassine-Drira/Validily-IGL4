@@ -118,7 +118,7 @@ export function AdaptiveDrillModal({
                   {drill ? drill.title : "Studio Quiz Validily AI"}
                 </h3>
                 <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#EDF2FF] text-[#2855D9] border border-[#2855D9]/20 font-mono">
-                  RAG Fondé
+                  Validé sur vos cours
                 </span>
               </div>
               <p className="text-xs text-[#68748A]">
@@ -261,7 +261,7 @@ export function AdaptiveDrillModal({
                 className="w-full py-3.5 rounded-2xl bg-[#2855D9] hover:bg-[#1E42B0] text-white font-bold text-xs transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer"
               >
                 <Sparkles className="w-4 h-4" />
-                <span>Générer le Quiz RAG ({selectedCount} questions)</span>
+                <span>Générer le Quiz IA ({selectedCount} questions)</span>
               </button>
             </div>
           ) : isFinished ? (
