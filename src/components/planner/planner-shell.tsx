@@ -12,6 +12,7 @@ import {
   ArrowRight,
   ListTodo,
   ExternalLink,
+  Bot,
 } from "lucide-react";
 import type {
   AcademicTask,
@@ -195,6 +196,15 @@ export function PlannerShell({
               <span>Ouvrir NotebookLM</span>
               <ExternalLink className="w-3 h-3 text-[#68748A] group-hover:text-[#2855D9] transition-colors" />
             </a>
+
+            <Link
+              href="/coach"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-[#6366F1] bg-[#6366F1]/10 hover:bg-[#6366F1]/20 border border-[#6366F1]/20 transition-colors shadow-2xs"
+            >
+              <Bot className="w-4 h-4 text-[#6366F1]" />
+              <span>Coach IA & Tuteur</span>
+              <ArrowRight className="w-3 h-3" />
+            </Link>
 
             <Link
               href="/forest"

@@ -19,6 +19,7 @@ import {
   Trees,
   CalendarCheck2,
   UploadCloud,
+  Bot,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -29,6 +30,7 @@ import { useSidebar } from "./workspace-shell";
 
 const navItems = [
   { label: "Accueil", href: "/", icon: LayoutDashboard },
+  { label: "Coach IA & Tuteur", href: "/coach", icon: Bot },
   { label: "Planning & Tâches", href: "/planner", icon: CalendarCheck2 },
   { label: "Semestres", href: "/semesters", icon: Calendar },
   { label: "Matières", href: "/subjects", icon: BookOpen },
