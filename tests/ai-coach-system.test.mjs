@@ -30,6 +30,7 @@ import {
   getCoachingPlanAction,
   applyProposedTimeblockAction,
   generateAdaptiveDrillAction,
+  sendCoachChatMessageAction,
 } from "../src/lib/actions/coach-actions.ts";
 import {
   _resetLocalPlannerStore,
@@ -472,3 +473,96 @@ test("AI-ACTION-04: generateAdaptiveDrillAction returns structured adaptive dril
     assert.equal(correctOptions.length, 1);
   }
 });
+
+// -----------------------------------------------------------------------------
+// 6. CONVERSATIONAL RAG & PRODUCT INTERACTIONS
+// -----------------------------------------------------------------------------
+
+test("AI-CHAT-01: 'What should I study today, and why?' retrieves actual tasks, availability, and citations", async () => {
+  setTestUser(USER_ALICE);
+
+  // Inject a real urgent task
+  await _injectLocalTask({
+    id: "task-k8s-urgent",
+    user_id: USER_ALICE.id,
+    subject_id: "sub-igl4-devops",
+    title: "Déploiement Helm & Kubernetes",
+    description: "Projet à rendre",
+    category: "project",
+    priority: "urgent",
+    due_date: "2026-10-23", // Due today
+    due_time: "18:00",
+    estimated_minutes: 60,
+    actual_minutes: 0,
+    is_completed: false,
+    completed_at: null,
+    subtasks: [],
+    sort_order: 1,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  });
+
+  const chatRes = await sendCoachChatMessageAction([
+    { role: "user", content: "What should I study today, and why?" },
+  ], "2026-10-23");
+
+  assert.equal(chatRes.success, true);
+  assert.ok(chatRes.data);
+  assert.ok(chatRes.data.reply.length > 50);
+
+  // Must mention the real urgent task
+  assert.ok(chatRes.data.reply.includes("Déploiement Helm & Kubernetes"));
+
+  // Must cite real evidence
+  assert.ok(chatRes.data.citations.length > 0);
+  const taskCitation = chatRes.data.citations.find((c) => c.type === "task");
+  assert.ok(taskCitation);
+  assert.equal(taskCitation.id, "task-k8s-urgent");
+});
+
+test("AI-CHAT-02: 'Why do you think this is my weakest topic?' provides factual assessment evidence or explains lack of assessment", async () => {
+  setTestUser(USER_ALICE);
+
+  const chatRes = await sendCoachChatMessageAction([
+    { role: "user", content: "Why do you think this is my weakest topic?" },
+  ], "2026-10-23");
+
+  assert.equal(chatRes.success, true);
+  assert.ok(chatRes.data);
+  assert.ok(chatRes.data.reply.length > 50);
+
+  // Must provide assessment or honest missing-data explanation with proposed drill
+  assert.ok(
+    chatRes.data.reply.includes("taux de réussite") ||
+    chatRes.data.reply.includes("0 tentative") ||
+    chatRes.data.reply.includes("évaluation")
+  );
+
+  // If no attempts exist, must propose diagnostic drill without hallucinating imaginary grades
+  assert.ok(chatRes.data.proposedDrill);
+  assert.equal(chatRes.data.proposedDrill.questionCount, 3);
+});
+
+test("AI-CHAT-03: 'Schedule a 30-minute review for my weakest topic' calculates slot and produces confirmable proposal", async () => {
+  setTestUser(USER_ALICE);
+
+  const chatRes = await sendCoachChatMessageAction([
+    { role: "user", content: "Schedule a 30-minute review for my weakest topic." },
+  ], "2026-10-23");
+
+  assert.equal(chatRes.success, true);
+  assert.ok(chatRes.data);
+  assert.ok(chatRes.data.proposedSchedule.length > 0);
+
+  const proposed = chatRes.data.proposedSchedule[0];
+  assert.equal(proposed.durationMinutes, 30);
+  assert.ok(proposed.startTime);
+  assert.ok(proposed.endTime);
+  assert.ok(chatRes.data.reply.includes(proposed.startTime));
+
+  // The proposed block must be valid and confirmable
+  const applyRes = await applyProposedTimeblockAction(proposed);
+  assert.equal(applyRes.success, true);
+  assert.ok(applyRes.blockId);
+});
+

@@ -186,4 +186,70 @@ Format JSON: { "questions": [ { "questionText": "...", "options": [ { "id": "1",
       clearTimeout(timeout);
     }
   }
+
+  async generateChatResponse(
+    request: any,
+    subjects: Subject[] = []
+  ): Promise<any> {
+    if (!this.isConfigured()) {
+      throw new Error("GEMINI_API_KEY not configured.");
+    }
+
+    const { messages, context, date } = request;
+    const systemPrompt = `You are an academic coach and tutor for INSAT IGL4 software engineering students.
+Context:
+- Active tasks: ${JSON.stringify(context.tasks.slice(0, 8).map((t: any) => ({ id: t.id, title: t.title, priority: t.priority, due_date: t.due_date })))}
+- Available free slots today (${date}): ${JSON.stringify(context.freeSlots)}
+- Weak subjects & mastery: ${JSON.stringify(context.masteryList.slice(0, 5).map((m: any) => ({ name: m.subjectName, accuracy: m.accuracyRate, score: m.masteryScore, attempts: m.totalAttempts })))}
+
+Respond with JSON:
+{
+  "reply": "Grounded answer with markdown and citations",
+  "citations": [],
+  "recommendations": [],
+  "proposedSchedule": [],
+  "proposedDrill": null
+}`;
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent?key=${this.apiKey}`;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 9000);
+
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: systemPrompt }] },
+          contents: messages.slice(-5).map((m: any) => ({
+            role: m.role === "assistant" ? "model" : "user",
+            parts: [{ text: m.content }],
+          })),
+          generationConfig: {
+            responseMimeType: "application/json",
+            maxOutputTokens: 1500,
+          },
+        }),
+        signal: controller.signal,
+      });
+
+      if (!res.ok) throw new Error(`Gemini error ${res.status}`);
+
+      const json = await res.json();
+      const rawText = json.candidates?.[0]?.content?.parts?.[0]?.text;
+      const parsed = JSON.parse(rawText || "{}");
+
+      return {
+        reply: parsed.reply || "Analyse Gemini effectuée.",
+        citations: Array.isArray(parsed.citations) ? parsed.citations : [],
+        recommendations: Array.isArray(parsed.recommendations) ? parsed.recommendations : [],
+        proposedSchedule: Array.isArray(parsed.proposedSchedule) ? parsed.proposedSchedule : [],
+        proposedDrill: parsed.proposedDrill || null,
+        tokensUsed: json.usageMetadata?.totalTokenCount || 0,
+      };
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
 }
+

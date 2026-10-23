@@ -12,6 +12,8 @@ import type {
   AIDrillRequest,
   AIPlanResponse,
   AdaptiveDrill,
+  CoachChatRequest,
+  CoachChatResponse,
 } from "../types.ts";
 import { detectConflicts } from "../planning-engine.ts";
 import type { Subject } from "@/types/database";
@@ -128,5 +130,49 @@ export class ProviderRegistry {
       console.warn(`[AI-Coach] Drill generation failed on ${primary.name}: ${err.message}. Using local mistake-based bank.`);
       return await this.fallbackProvider.generateAdaptiveDrill(request, mistakes, subjects);
     }
+  }
+
+  /**
+   * Execute conversational RAG query with automatic failover and telemetry capture
+   */
+  public async executeChat(
+    request: CoachChatRequest,
+    subjects: Subject[]
+  ): Promise<CoachChatResponse> {
+    const startTime = Date.now();
+    const primary = this.getActiveProvider();
+    let isFallback = primary.id === this.fallbackProvider.id;
+    let providerName = primary.name;
+    let errorMessage: string | undefined = undefined;
+
+    let result;
+    try {
+      result = await primary.generateChatResponse(request, subjects);
+    } catch (err: any) {
+      console.warn(`[AI-Coach] Chat error on ${primary.name}: ${err.message}. Falling back to deterministic assistant.`);
+      isFallback = true;
+      providerName = this.fallbackProvider.name;
+      errorMessage = err.message || "Provider unavailable";
+      result = await this.fallbackProvider.generateChatResponse(request, subjects);
+    }
+
+    const duration = Date.now() - startTime;
+
+    return {
+      reply: result.reply,
+      citations: result.citations || [],
+      recommendations: result.recommendations || [],
+      proposedSchedule: result.proposedSchedule || [],
+      proposedDrill: result.proposedDrill || null,
+      telemetry: {
+        provider: providerName,
+        model: isFallback ? "deterministic-assistant-v1" : (primary as any).model || "remote-llm",
+        latencyMs: duration,
+        cacheHit: false,
+        tokensUsed: result.tokensUsed || 0,
+        isFallback,
+        errorMessage,
+      },
+    };
   }
 }

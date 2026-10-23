@@ -28,6 +28,9 @@ import type {
   AIPlanResponse,
   ProposedTimeblock,
   AdaptiveDrill,
+  ChatMessage,
+  CoachChatResponse,
+  CoachChatRequest,
 } from "../ai/types.ts";
 import { getLocalTodayDateString } from "../utils.ts";
 
@@ -210,3 +213,70 @@ export async function generateAdaptiveDrillAction(
     return { success: false, error: err.message || "Échec de génération du micro-drill." };
   }
 }
+
+/**
+ * Send conversational chat message to the AI Coach
+ * Retrieves real context, computes deterministic values, invokes provider, and validates any actions.
+ */
+export async function sendCoachChatMessageAction(
+  messages: Array<{ role: "user" | "assistant"; content: string }>,
+  targetDate?: string
+): Promise<{ success: boolean; data?: CoachChatResponse; error?: string }> {
+  try {
+    const user = await getRequesterUser();
+    if (!user?.id) {
+      return { success: false, error: "Authentification requise pour discuter avec le Coach IA." };
+    }
+
+    const dateStr = targetDate || getLocalTodayDateString();
+    const context = await getAuthorizedUserContext(dateStr);
+
+    if (!context) {
+      return { success: false, error: "Impossible de charger le contexte utilisateur." };
+    }
+
+    const registry = ProviderRegistry.getInstance();
+    const chatResponse = await registry.executeChat(
+      {
+        userId: user.id,
+        date: dateStr,
+        messages,
+        context: {
+          userId: user.id,
+          date: dateStr,
+          workingHours: context.workingHours,
+          tasks: context.tasks,
+          existingBlocks: context.existingBlocks,
+          masteryList: context.masteryList,
+          freeSlots: context.freeSlots,
+        },
+      },
+      context.subjects
+    );
+
+    // Validate any proposed schedule blocks or recommendations to prevent hallucination
+    const subjectIds = new Set(context.subjects.map((s) => s.id));
+    const validated = sanitizeAndValidatePlan(
+      chatResponse.recommendations,
+      chatResponse.proposedSchedule,
+      {
+        validTasks: context.tasks,
+        validSubjectIds: subjectIds,
+        freeSlots: context.freeSlots,
+      }
+    );
+
+    return {
+      success: true,
+      data: {
+        ...chatResponse,
+        recommendations: validated.validRecommendations,
+        proposedSchedule: validated.validSchedule,
+      },
+    };
+  } catch (err: any) {
+    console.error("sendCoachChatMessageAction error:", err);
+    return { success: false, error: err.message || "Erreur lors de la réponse du Coach." };
+  }
+}
+

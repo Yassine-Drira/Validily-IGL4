@@ -6,16 +6,28 @@
 import type {
   AIPlanRequest,
   AIDrillRequest,
+  CoachChatRequest,
   CoachingRecommendation,
   ProposedTimeblock,
   AdaptiveDrill,
-} from "../types";
+  EvidenceCitation,
+  ProposedDrillAction,
+} from "../types.ts";
 import type { Subject } from "@/types/database";
 
 export interface AIPlanGenerationResult {
   overview: string;
   recommendations: CoachingRecommendation[];
   proposedSchedule: ProposedTimeblock[];
+  tokensUsed?: number;
+}
+
+export interface AIChatGenerationResult {
+  reply: string;
+  citations: EvidenceCitation[];
+  recommendations: CoachingRecommendation[];
+  proposedSchedule: ProposedTimeblock[];
+  proposedDrill: ProposedDrillAction | null;
   tokensUsed?: number;
 }
 
@@ -29,4 +41,8 @@ export interface AIInferenceProvider {
     mistakes: any[],
     subjects: Subject[]
   ): Promise<AdaptiveDrill>;
+  generateChatResponse(
+    request: CoachChatRequest,
+    subjects: Subject[]
+  ): Promise<AIChatGenerationResult>;
 }

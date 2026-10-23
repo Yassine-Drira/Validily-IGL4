@@ -1,6 +1,6 @@
 /**
  * Autonomous AI Coach & Scheduler - Type Definitions & Contracts
- * Pure TypeScript interfaces for deterministic planning, inference, and validation.
+ * Pure TypeScript interfaces for deterministic planning, conversational RAG, and validation.
  */
 
 import type {
@@ -154,4 +154,52 @@ export interface AIDrillRequest {
   subjectId?: string;
   targetCount?: number;
   preferredDifficulty?: "beginner" | "intermediate" | "advanced";
+}
+
+// -----------------------------------------------------------------------------
+// Conversational RAG & Assistant Contracts
+// -----------------------------------------------------------------------------
+
+export type EvidenceType = "task" | "calendar" | "assessment" | "mistake" | "availability";
+
+export interface EvidenceCitation {
+  type: EvidenceType;
+  id: string;
+  label: string;
+  detail: string;
+}
+
+export interface ProposedDrillAction {
+  subjectId: string;
+  subjectName: string;
+  questionCount: number;
+  reason?: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  role: "user" | "assistant" | "system";
+  content: string;
+  timestamp: string;
+  citations?: EvidenceCitation[];
+  recommendations?: CoachingRecommendation[];
+  proposedSchedule?: ProposedTimeblock[];
+  proposedDrill?: ProposedDrillAction | null;
+  telemetry?: PlanTelemetry;
+}
+
+export interface CoachChatRequest {
+  userId: string;
+  date: string;
+  messages: Array<{ role: "user" | "assistant"; content: string }>;
+  context: AIPlanRequest;
+}
+
+export interface CoachChatResponse {
+  reply: string;
+  citations: EvidenceCitation[];
+  recommendations: CoachingRecommendation[];
+  proposedSchedule: ProposedTimeblock[];
+  proposedDrill: ProposedDrillAction | null;
+  telemetry: PlanTelemetry;
 }

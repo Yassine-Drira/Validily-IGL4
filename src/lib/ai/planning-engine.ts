@@ -474,3 +474,56 @@ export function generateDeterministicRecommendations(params: {
 
   return recommendations;
 }
+
+/**
+ * Allocate a specific duration slot for a requested subject or task
+ */
+export function allocateSpecificSlot(params: {
+  date: string;
+  durationMinutes: number;
+  subjectId: string | null;
+  subjectName: string;
+  freeSlots: TimeSlot[];
+  existingBlocks: CalendarTimeblock[];
+  title?: string;
+  category?: "revision" | "practice" | "deep_work" | "drill";
+}): ProposedTimeblock | null {
+  const {
+    date,
+    durationMinutes,
+    subjectId,
+    subjectName,
+    freeSlots,
+    existingBlocks,
+    title,
+    category = "revision",
+  } = params;
+
+  for (const slot of freeSlots) {
+    if (slot.durationMinutes >= durationMinutes) {
+      const startMin = timeToMinutes(slot.start);
+      const endMin = startMin + durationMinutes;
+      const startTime = minutesToTime(startMin);
+      const endTime = minutesToTime(endMin);
+
+      const conflicts = detectConflicts(startTime, endTime, existingBlocks);
+      if (conflicts.length === 0) {
+        return {
+          tempId: `prop-slot-${Date.now()}-${startTime.replace(":", "")}`,
+          taskId: null,
+          subjectId,
+          title: title || `Révision ciblée: ${subjectName}`,
+          date,
+          startTime,
+          endTime,
+          durationMinutes,
+          rationale: `Créneau de ${durationMinutes} min sans conflit réservé dans la plage disponible de ${slot.start} à ${slot.end}.`,
+          category,
+        };
+      }
+    }
+  }
+
+  return null;
+}
+

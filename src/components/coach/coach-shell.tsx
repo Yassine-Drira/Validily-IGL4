@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useTransition } from "react";
+import React, { useState } from "react";
 import {
   Sparkles,
   Calendar,
@@ -9,7 +9,9 @@ import {
   Clock,
   ArrowRight,
   RefreshCw,
-  Flame,
+  MessageSquare,
+  BarChart3,
+  ListTodo,
 } from "lucide-react";
 import type {
   AIPlanResponse,
@@ -28,6 +30,7 @@ import { CoachingCards } from "./coaching-cards";
 import { WeaknessMatrix } from "./weakness-matrix";
 import { ScheduleDiffModal } from "./schedule-diff-modal";
 import { AdaptiveDrillModal } from "./adaptive-drill-modal";
+import { CoachChatThread } from "./coach-chat-thread";
 import { useFocus } from "@/components/focus/focus-provider";
 import Link from "next/link";
 
@@ -38,7 +41,11 @@ interface CoachShellProps {
 export function CoachShell({ initialPlan }: CoachShellProps) {
   const [plan, setPlan] = useState<AIPlanResponse>(initialPlan);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState<"coach" | "weaknesses">("coach");
+  
+  // Mobile / compact tab navigation: "chat" is default primary
+  const [mobileTab, setMobileTab] = useState<"chat" | "timeline" | "weaknesses">("chat");
+  // Sidebar tab for desktop
+  const [sidebarTab, setSidebarTab] = useState<"timeline" | "weaknesses" | "recommendations">("timeline");
 
   // Modals
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
@@ -50,7 +57,7 @@ export function CoachShell({ initialPlan }: CoachShellProps) {
   const { setIsModalOpen: openFocusModal } = useFocus();
 
   // Refresh plan
-  const handleRefresh = async (force: boolean = true) => {
+  const handleRefresh = async (force: boolean = false) => {
     setIsRefreshing(true);
     try {
       const res = await getCoachingPlanAction(plan.date, force);
@@ -102,96 +109,184 @@ export function CoachShell({ initialPlan }: CoachShellProps) {
     return await applyProposedTimeblockAction(block);
   };
 
+  const weakestSubject = plan.weakPoints.length > 0 ? plan.weakPoints[0].subjectName : undefined;
+
   return (
     <div className="space-y-6">
       {/* Top Banner & Telemetry Bar */}
-      <div className="bg-[#0f172a]/95 backdrop-blur-md rounded-2xl border border-slate-800 p-6 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-[#0f172a]/95 backdrop-blur-md rounded-2xl border border-slate-800 p-5 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="space-y-1">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-white shadow-lg shadow-indigo-500/20">
               <Sparkles className="w-5 h-5" />
             </div>
-            <h1 className="text-xl font-bold text-slate-100">Coach IA & Tuteur Personnel</h1>
+            <div>
+              <h1 className="text-xl font-bold text-slate-100">Coach IA & Tuteur Personnel</h1>
+              <p className="text-xs text-slate-400">
+                Assistant conversationnel contextuel & planification autonome pour l'IGL4
+              </p>
+            </div>
           </div>
-          <p className="text-xs text-slate-400">
-            {plan.overview}
-          </p>
         </div>
 
-        <div className="flex flex-col items-start md:items-end gap-2">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
           <TelemetryBadge
             telemetry={plan.telemetry}
             onRefresh={() => handleRefresh(true)}
             isRefreshing={isRefreshing}
           />
-          <div className="flex items-center gap-2 text-xs">
-            <Link
-              href="/planner"
-              className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium transition-colors flex items-center gap-1.5"
-            >
-              <Calendar className="w-3.5 h-3.5 text-indigo-400" />
-              <span>Ouvrir l'Emploi du Temps</span>
-            </Link>
-          </div>
+          <Link
+            href="/planner"
+            className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-xs transition-colors flex items-center gap-1.5 shadow-sm"
+          >
+            <Calendar className="w-3.5 h-3.5 text-indigo-400" />
+            <span>Ouvrir l'Emploi du Temps</span>
+          </Link>
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
+      {/* Mobile Tab Switcher (Visible only on < lg screens) */}
+      <div className="lg:hidden flex items-center gap-1.5 border-b border-slate-800 pb-2">
         <button
-          onClick={() => setActiveTab("coach")}
-          className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all ${
-            activeTab === "coach"
-              ? "bg-indigo-600/20 text-indigo-300 border border-indigo-500/40"
-              : "text-slate-400 hover:text-slate-200 hover:bg-slate-900"
+          onClick={() => setMobileTab("chat")}
+          className={`flex-1 py-2 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+            mobileTab === "chat"
+              ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
+              : "bg-slate-900 text-slate-400 hover:text-slate-200"
           }`}
         >
-          <Sparkles className="w-3.5 h-3.5" />
-          <span>Aujourd'hui & Plan d'Action</span>
+          <MessageSquare className="w-3.5 h-3.5" />
+          <span>Chat Coach IA</span>
         </button>
 
         <button
-          onClick={() => setActiveTab("weaknesses")}
-          className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all ${
-            activeTab === "weaknesses"
-              ? "bg-amber-600/20 text-amber-300 border border-amber-500/40"
-              : "text-slate-400 hover:text-slate-200 hover:bg-slate-900"
+          onClick={() => setMobileTab("timeline")}
+          className={`flex-1 py-2 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+            mobileTab === "timeline"
+              ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
+              : "bg-slate-900 text-slate-400 hover:text-slate-200"
+          }`}
+        >
+          <Calendar className="w-3.5 h-3.5" />
+          <span>Aujourd'hui ({plan.freeSlots.length} créneaux)</span>
+        </button>
+
+        <button
+          onClick={() => setMobileTab("weaknesses")}
+          className={`flex-1 py-2 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+            mobileTab === "weaknesses"
+              ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
+              : "bg-slate-900 text-slate-400 hover:text-slate-200"
           }`}
         >
           <Brain className="w-3.5 h-3.5" />
-          <span>Points Faibles & Rétention ({plan.weakPoints.length})</span>
+          <span>Faiblesses ({plan.weakPoints.length})</span>
         </button>
       </div>
 
-      {/* Active Tab Content */}
-      {activeTab === "coach" ? (
-        <div className="space-y-6">
-          {/* Today Timeline & Availability Gauge */}
-          <TodayTimeline
+      {/* Main Workspace Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* Primary Conversational Workspace (Col 7 or 8 on desktop, or mobileTab === "chat") */}
+        <div
+          className={`lg:col-span-7 xl:col-span-8 ${
+            mobileTab !== "chat" ? "hidden lg:block" : "block"
+          }`}
+        >
+          <CoachChatThread
             date={plan.date}
             availableMinutes={plan.availableMinutes}
             bookedMinutes={plan.bookedMinutes}
-            freeSlots={plan.freeSlots}
-            existingBlocks={[]}
-            conflicts={plan.conflicts}
-            onOpenScheduleProposal={() => setIsScheduleModalOpen(true)}
-            proposedCount={plan.proposedSchedule.length}
-          />
-
-          {/* Coaching Recommendations */}
-          <CoachingCards
-            recommendations={plan.recommendations}
-            onActionClick={handleRecommendationAction}
-            isLoading={isRefreshing}
+            activeTasksCount={plan.recommendations.length}
+            weakestSubjectName={weakestSubject}
+            freeSlotsCount={plan.freeSlots.length}
+            onApplyBlock={handleApplyBlock}
+            onStartDrill={handleStartDrill}
+            onOpenScheduleModal={() => setIsScheduleModalOpen(true)}
+            onRefreshContext={() => handleRefresh(false)}
           />
         </div>
-      ) : (
-        /* Weakness & Spaced Repetition Matrix */
-        <WeaknessMatrix
-          masteryList={plan.weakPoints}
-          onStartDrill={(subId) => handleStartDrill(subId)}
-        />
-      )}
+
+        {/* Supporting Context & Live Insights Sidebar (Col 5 or 4 on desktop) */}
+        <div
+          className={`lg:col-span-5 xl:col-span-4 space-y-4 ${
+            mobileTab === "chat" ? "hidden lg:block" : "block"
+          }`}
+        >
+          {/* Sidebar Tabs */}
+          <div className="bg-slate-900/90 p-1.5 rounded-xl border border-slate-800 flex items-center gap-1">
+            <button
+              onClick={() => setSidebarTab("timeline")}
+              className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+                sidebarTab === "timeline"
+                  ? "bg-indigo-600/20 text-indigo-300 border border-indigo-500/30"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <Calendar className="w-3 h-3" />
+              <span>Emploi du temps</span>
+            </button>
+
+            <button
+              onClick={() => setSidebarTab("weaknesses")}
+              className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+                sidebarTab === "weaknesses"
+                  ? "bg-amber-600/20 text-amber-300 border border-amber-500/30"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <Brain className="w-3 h-3" />
+              <span>Points faibles ({plan.weakPoints.length})</span>
+            </button>
+
+            <button
+              onClick={() => setSidebarTab("recommendations")}
+              className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+                sidebarTab === "recommendations"
+                  ? "bg-purple-600/20 text-purple-300 border border-purple-500/30"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <ListTodo className="w-3 h-3" />
+              <span>Actions</span>
+            </button>
+          </div>
+
+          {/* Sidebar Tab Content */}
+          {sidebarTab === "timeline" && (
+            <div className="space-y-4">
+              <TodayTimeline
+                date={plan.date}
+                availableMinutes={plan.availableMinutes}
+                bookedMinutes={plan.bookedMinutes}
+                freeSlots={plan.freeSlots}
+                existingBlocks={[]}
+                conflicts={plan.conflicts}
+                onOpenScheduleProposal={() => setIsScheduleModalOpen(true)}
+                proposedCount={plan.proposedSchedule.length}
+              />
+            </div>
+          )}
+
+          {sidebarTab === "weaknesses" && (
+            <div className="space-y-4">
+              <WeaknessMatrix
+                masteryList={plan.weakPoints}
+                onStartDrill={(subId) => handleStartDrill(subId)}
+              />
+            </div>
+          )}
+
+          {sidebarTab === "recommendations" && (
+            <div className="space-y-4">
+              <CoachingCards
+                recommendations={plan.recommendations}
+                onActionClick={handleRecommendationAction}
+                isLoading={isRefreshing}
+              />
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Schedule Diff Modal */}
       <ScheduleDiffModal

@@ -233,4 +233,75 @@ Respond ONLY with a JSON object of this format:
       clearTimeout(timeout);
     }
   }
+
+  async generateChatResponse(
+    request: any,
+    subjects: Subject[] = []
+  ): Promise<any> {
+    if (!this.isConfigured()) {
+      throw new Error("GROQ_API_KEY not configured.");
+    }
+
+    const { messages, context, date } = request;
+    const systemPrompt = `You are an expert academic coach and tutor for INSAT IGL4 software engineering students.
+You have access to the student's REAL academic state:
+- Active tasks: ${JSON.stringify(context.tasks.slice(0, 10).map((t: any) => ({ id: t.id, title: t.title, priority: t.priority, due_date: t.due_date })))}
+- Available free slots today (${date}): ${JSON.stringify(context.freeSlots)}
+- Weak subjects & mastery scores: ${JSON.stringify(context.masteryList.slice(0, 5).map((m: any) => ({ name: m.subjectName, accuracy: m.accuracyRate, score: m.masteryScore, attempts: m.totalAttempts })))}
+
+CRITICAL GROUNDING RULES:
+1. ONLY refer to the student's real tasks and subjects above. NEVER invent tasks or deadlines.
+2. If asked about weak topics, cite their real quiz accuracy and attempts. If 0 attempts exist, honestly state that no quiz has been taken yet.
+3. If asked to schedule a slot, select an available free slot from freeSlots and propose it.
+4. Respond ONLY with a JSON object:
+{
+  "reply": "Clear, grounded markdown answer with bullet points and evidence",
+  "citations": [ { "type": "task"|"calendar"|"assessment", "id": "id", "label": "label", "detail": "detail" } ],
+  "recommendations": [],
+  "proposedSchedule": [],
+  "proposedDrill": null
+}`;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 9000);
+
+    try {
+      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: this.model,
+          messages: [
+            { role: "system", content: systemPrompt },
+            ...messages.slice(-6).map((m: any) => ({ role: m.role, content: m.content })),
+          ],
+          response_format: { type: "json_object" },
+          temperature: 0.3,
+          max_tokens: 1500,
+        }),
+        signal: controller.signal,
+      });
+
+      if (!res.ok) throw new Error(`Groq API error ${res.status}`);
+
+      const json = await res.json();
+      const content = json.choices?.[0]?.message?.content;
+      const parsed = JSON.parse(content || "{}");
+
+      return {
+        reply: parsed.reply || "Analyse terminée.",
+        citations: Array.isArray(parsed.citations) ? parsed.citations : [],
+        recommendations: Array.isArray(parsed.recommendations) ? parsed.recommendations : [],
+        proposedSchedule: Array.isArray(parsed.proposedSchedule) ? parsed.proposedSchedule : [],
+        proposedDrill: parsed.proposedDrill || null,
+        tokensUsed: json.usage?.total_tokens || 0,
+      };
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
 }
+
