@@ -1,7 +1,6 @@
 import { cache } from "react";
 import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
-import { findOrphanAuthCookies } from "@/lib/auth/cookie-utils";
+import { findOrphanAuthCookies } from "../auth/cookie-utils.ts";
 
 /**
  * Creates or retrieves a request-scoped Supabase client for Server Components,
@@ -11,7 +10,8 @@ import { findOrphanAuthCookies } from "@/lib/auth/cookie-utils";
 export const createClient = cache(async function createClient() {
   let cookieStore: any = null;
   try {
-    cookieStore = await cookies();
+    const nextHeaders = await import("next/headers");
+    cookieStore = await nextHeaders.cookies();
   } catch {
     // Outside request store context (e.g. testing or scripts)
   }

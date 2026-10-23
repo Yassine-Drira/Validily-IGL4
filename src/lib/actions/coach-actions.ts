@@ -175,6 +175,33 @@ export async function applyProposedTimeblockAction(
   }
 }
 
+import { checkAndConsumeAIQuota, getAIQuotaStatus, type AIQuotaResult } from "../ai/quota-service.ts";
+import {
+  retrieveAcademicContext,
+  retrieveDocumentForQuiz,
+  type AcademicChunk,
+} from "../ai/academic-retrieval-service.ts";
+
+/**
+ * Read current AI quota status without consuming quota (for UI meters)
+ */
+export async function getAIQuotaAction(): Promise<{
+  success: boolean;
+  data?: AIQuotaResult;
+  error?: string;
+}> {
+  try {
+    const user = await getRequesterUser();
+    if (!user?.id) {
+      return { success: false, error: "Non authentifié." };
+    }
+    const status = await getAIQuotaStatus(user.id);
+    return { success: true, data: status };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
 /**
  * Generate adaptive drill targeting weak points
  */
@@ -186,6 +213,12 @@ export async function generateAdaptiveDrillAction(
     const user = await getRequesterUser();
     if (!user?.id) {
       return { success: false, error: "Authentification requise." };
+    }
+
+    // Atomic server-side quota verification
+    const quota = await checkAndConsumeAIQuota(user.id);
+    if (!quota.allowed) {
+      return { success: false, error: quota.error };
     }
 
     const context = await getAuthorizedUserContext();
@@ -215,8 +248,72 @@ export async function generateAdaptiveDrillAction(
 }
 
 /**
- * Send conversational chat message to the AI Coach
- * Retrieves real context, computes deterministic values, invokes provider, and validates any actions.
+ * Generate a dynamic RAG Quiz grounded in real course documents, notes, or syllabus
+ */
+export async function generateRAGQuizAction(params: {
+  subjectId?: string;
+  resourceId?: string;
+  noteId?: string;
+  questionCount?: number;
+  difficulty?: "beginner" | "intermediate" | "advanced";
+}): Promise<{ success: boolean; data?: AdaptiveDrill; error?: string }> {
+  try {
+    const user = await getRequesterUser();
+    if (!user?.id) {
+      return { success: false, error: "Authentification requise." };
+    }
+
+    // 1. Atomic server-side quota check
+    const quota = await checkAndConsumeAIQuota(user.id);
+    if (!quota.allowed) {
+      return { success: false, error: quota.error };
+    }
+
+    const questionCount = Math.min(10, Math.max(1, params.questionCount || 3));
+    const difficulty = params.difficulty || "intermediate";
+
+    // 2. Authoritative Document Retrieval via centralized AcademicRetrievalService
+    const sourceRes = await retrieveDocumentForQuiz(user.id, {
+      resourceId: params.resourceId,
+      noteId: params.noteId,
+      subjectId: params.subjectId,
+    });
+
+    if (!sourceRes.success || !sourceRes.data) {
+      return { success: false, error: sourceRes.error || "Matériel académique introuvable." };
+    }
+
+    const context = await getAuthorizedUserContext();
+    const subjects = context?.subjects || [];
+    const quizMod = await getQuizActions();
+    const mistakes = quizMod?.getStudentMistakes ? await quizMod.getStudentMistakes(user.id) : [];
+
+    const registry = ProviderRegistry.getInstance();
+    const drill = await registry.executeDrill(
+      {
+        userId: user.id,
+        subjectId: sourceRes.data.subjectId,
+        targetResourceId: params.resourceId,
+        targetNoteId: params.noteId,
+        targetDocTitle: sourceRes.data.title,
+        targetCount: questionCount,
+        preferredDifficulty: difficulty,
+      },
+      mistakes,
+      subjects
+    );
+
+    return { success: true, data: drill };
+  } catch (err: any) {
+    console.error("generateRAGQuizAction error:", err);
+    return { success: false, error: err.message || "Échec de génération du quiz RAG." };
+  }
+}
+
+/**
+ * Send conversational chat message to Validily AI Coach
+ * Enforces atomic rolling quota, retrieves authorized academic documents (RAG),
+ * invokes neural inference with fallbacks, and validates actions.
  */
 export async function sendCoachChatMessageAction(
   messages: Array<{ role: "user" | "assistant"; content: string }>,
@@ -225,7 +322,13 @@ export async function sendCoachChatMessageAction(
   try {
     const user = await getRequesterUser();
     if (!user?.id) {
-      return { success: false, error: "Authentification requise pour discuter avec le Coach IA." };
+      return { success: false, error: "Authentification requise pour discuter avec Validily AI." };
+    }
+
+    // 1. Atomic server-side rolling quota consumption
+    const quota = await checkAndConsumeAIQuota(user.id);
+    if (!quota.allowed) {
+      return { success: false, error: quota.error };
     }
 
     const dateStr = targetDate || getLocalTodayDateString();
@@ -235,12 +338,20 @@ export async function sendCoachChatMessageAction(
       return { success: false, error: "Impossible de charger le contexte utilisateur." };
     }
 
+    // 2. Centralized RAG Retrieval for the query
+    const lastUserMessage = [...messages].reverse().find((m) => m.role === "user")?.content || "";
+    const retrievedChunks = await retrieveAcademicContext(user.id, {
+      query: lastUserMessage,
+      maxChunks: 6,
+    });
+
     const registry = ProviderRegistry.getInstance();
     const chatResponse = await registry.executeChat(
       {
         userId: user.id,
         date: dateStr,
         messages,
+        retrievedChunks,
         context: {
           userId: user.id,
           date: dateStr,
@@ -254,7 +365,7 @@ export async function sendCoachChatMessageAction(
       context.subjects
     );
 
-    // Validate any proposed schedule blocks or recommendations to prevent hallucination
+    // 3. Validate any proposed schedule blocks or recommendations to prevent hallucination
     const subjectIds = new Set(context.subjects.map((s) => s.id));
     const validated = sanitizeAndValidatePlan(
       chatResponse.recommendations,
@@ -277,6 +388,92 @@ export async function sendCoachChatMessageAction(
   } catch (err: any) {
     console.error("sendCoachChatMessageAction error:", err);
     return { success: false, error: err.message || "Erreur lors de la réponse du Coach." };
+  }
+}
+
+export interface AcademicKPIsData {
+  nextDeadline: {
+    title: string;
+    dueDate: string;
+    daysRemaining: number;
+    urgency: "critical" | "warning" | "normal";
+  } | null;
+  availableStudyMinutes: number;
+  vigilanceSubjects: Array<{
+    id: string;
+    name: string;
+    accuracyRate: number;
+    attempts: number;
+  }>;
+  quota: AIQuotaResult;
+}
+
+/**
+ * Retrieve authentic academic KPIs calculated from real database records (no invented data)
+ */
+export async function getAcademicCoachKPIsAction(
+  targetDate?: string
+): Promise<{ success: boolean; data?: AcademicKPIsData; error?: string }> {
+  try {
+    const user = await getRequesterUser();
+    if (!user?.id) {
+      return { success: false, error: "Non authentifié." };
+    }
+
+    const dateStr = targetDate || getLocalTodayDateString();
+    const [context, quota] = await Promise.all([
+      getAuthorizedUserContext(dateStr),
+      getAIQuotaStatus(user.id),
+    ]);
+
+    if (!context) {
+      return { success: false, error: "Contexte non disponible." };
+    }
+
+    // 1. Next Critical Deadline from real tasks
+    const activeTasksWithDates = context.tasks
+      .filter((t) => !t.is_completed && t.due_date)
+      .sort((a, b) => new Date(a.due_date!).getTime() - new Date(b.due_date!).getTime());
+
+    let nextDeadline = null;
+    if (activeTasksWithDates.length > 0) {
+      const earliest = activeTasksWithDates[0];
+      const targetTime = new Date(earliest.due_date!).getTime();
+      const nowTime = new Date(dateStr).getTime();
+      const diffDays = Math.ceil((targetTime - nowTime) / (1000 * 60 * 60 * 24));
+      nextDeadline = {
+        title: earliest.title,
+        dueDate: earliest.due_date!,
+        daysRemaining: diffDays,
+        urgency: (diffDays <= 2 ? "critical" : diffDays <= 5 ? "warning" : "normal") as "critical" | "warning" | "normal",
+      };
+    }
+
+    // 2. Available study minutes today
+    const availableStudyMinutes = context.freeSlots.reduce((sum, s) => sum + s.durationMinutes, 0);
+
+    // 3. Vigilance subjects (retention below 65%)
+    const vigilanceSubjects = context.masteryList
+      .filter((m) => m.totalAttempts > 0 && m.accuracyRate < 0.65)
+      .map((m) => ({
+        id: m.subjectId,
+        name: m.subjectName,
+        accuracyRate: Math.round(m.accuracyRate * 100),
+        attempts: m.totalAttempts,
+      }));
+
+    return {
+      success: true,
+      data: {
+        nextDeadline,
+        availableStudyMinutes,
+        vigilanceSubjects,
+        quota,
+      },
+    };
+  } catch (err: any) {
+    console.error("getAcademicCoachKPIsAction error:", err);
+    return { success: false, error: err.message };
   }
 }
 

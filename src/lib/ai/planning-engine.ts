@@ -40,16 +40,29 @@ export function minutesToTime(totalMinutes: number): string {
 }
 
 /**
- * Calculate available free slots for a day given working hours and existing timeblocks
+ * Calculate available free slots for a day given working hours and existing timeblocks.
+ * 
+ * If minStartMinutes is provided (e.g. current time on today), past time is logically
+ * excluded because past hours are already spent and cannot be scheduled or counted as free.
  */
 export function calculateFreeSlots(
   workingHours: { start: string; end: string },
-  existingBlocks: CalendarTimeblock[]
+  existingBlocks: CalendarTimeblock[],
+  minStartMinutes?: number
 ): TimeSlot[] {
   const workStart = timeToMinutes(workingHours.start || "08:00");
   const workEnd = timeToMinutes(workingHours.end || "22:00");
 
   if (workEnd <= workStart) {
+    return [];
+  }
+
+  // If minStartMinutes is provided, cannot schedule anything before that minute
+  const effectiveStart = minStartMinutes !== undefined
+    ? Math.max(workStart, minStartMinutes)
+    : workStart;
+
+  if (effectiveStart >= workEnd) {
     return [];
   }
 
@@ -63,11 +76,12 @@ export function calculateFreeSlots(
     .sort((a, b) => a.start - b.start);
 
   const freeSlots: TimeSlot[] = [];
-  let cursor = workStart;
+  let cursor = effectiveStart;
 
   for (const block of sortedBlocks) {
-    // If block starts after working hours or ended before cursor, skip or adjust
+    // If block ended before cursor, skip it (it is in the past or prior to effectiveStart)
     if (block.end <= cursor) continue;
+    // If block starts after working hours, no more blocks within working hours
     if (block.start >= workEnd) break;
 
     const effectiveBlockStart = Math.max(block.start, cursor);

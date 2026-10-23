@@ -152,6 +152,9 @@ export interface AIPlanRequest {
 export interface AIDrillRequest {
   userId: string;
   subjectId?: string;
+  targetResourceId?: string;
+  targetNoteId?: string;
+  targetDocTitle?: string;
   targetCount?: number;
   preferredDifficulty?: "beginner" | "intermediate" | "advanced";
 }
@@ -160,7 +163,7 @@ export interface AIDrillRequest {
 // Conversational RAG & Assistant Contracts
 // -----------------------------------------------------------------------------
 
-export type EvidenceType = "task" | "calendar" | "assessment" | "mistake" | "availability";
+export type EvidenceType = "task" | "calendar" | "assessment" | "mistake" | "availability" | "document" | "note";
 
 export interface EvidenceCitation {
   type: EvidenceType;
@@ -174,6 +177,8 @@ export interface ProposedDrillAction {
   subjectName: string;
   questionCount: number;
   reason?: string;
+  targetResourceId?: string;
+  targetNoteId?: string;
 }
 
 export interface ChatMessage {
@@ -193,6 +198,22 @@ export interface CoachChatRequest {
   date: string;
   messages: Array<{ role: "user" | "assistant"; content: string }>;
   context: AIPlanRequest;
+  retrievedChunks?: Array<{
+    sourceId: string;
+    sourceType: string;
+    title: string;
+    content: string;
+    snippet: string;
+  }>;
+}
+
+export interface RAGQuizRequest {
+  userId: string;
+  subjectId?: string;
+  resourceId?: string;
+  noteId?: string;
+  questionCount: number; // 3, 5, 10
+  difficulty: "beginner" | "intermediate" | "advanced";
 }
 
 export interface CoachChatResponse {

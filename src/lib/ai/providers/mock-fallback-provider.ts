@@ -60,7 +60,9 @@ export class MockFallbackProvider implements AIInferenceProvider {
     const criticalWeakness = masteryList.find((m) => m.urgencyLevel === "critical");
     const activeTasksCount = tasks.filter((t) => !t.is_completed).length;
 
-    let overview = `Vous disposez de ${totalFreeMinutes} min de temps libre disponible aujourd'hui répartis sur ${freeSlots.length} créneau(x). ${activeTasksCount} tâche(s) en attente.`;
+    let overview = totalFreeMinutes > 0
+      ? `Vous disposez de ${Math.floor(totalFreeMinutes / 60)}h ${totalFreeMinutes % 60}m de temps libre disponible aujourd'hui répartis sur ${freeSlots.length} créneau(x). ${activeTasksCount} tâche(s) en attente.`
+      : `Aucun créneau libre d'étude restant pour aujourd'hui (créneaux passés ou occupés). ${activeTasksCount} tâche(s) en cours de suivi.`;
     if (criticalWeakness) {
       overview += ` Priorité de renforcement identifiée sur ${criticalWeakness.subjectName} (${Math.round(criticalWeakness.accuracyRate * 100)}% de réussite).`;
     }
@@ -383,7 +385,9 @@ Souhaitez-vous que je planifie un créneau plus court (ex: 15 ou 20 min) adapté
 
 Voici votre stratégie d'apprentissage pour aujourd'hui (**${date}**), calibrée pour maximiser votre ratio d'assimilation cognitive :
 
-1. **Capacité Disponible & Fenêtres Focus :** Vous disposez de **${Math.floor(totalFreeMinutes / 60)}h ${totalFreeMinutes % 60}m de temps libre effectif**, structuré en ${freeSlots.length} plage(s) ininterrompue(s).
+1. **Capacité Disponible & Fenêtres Focus :** ${totalFreeMinutes > 0
+  ? `Vous disposez de **${Math.floor(totalFreeMinutes / 60)}h ${totalFreeMinutes % 60}m de temps libre effectif**, structuré en ${freeSlots.length} plage(s) ininterrompue(s).`
+  : `Vous ne disposez d'aucun créneau libre restant pour aujourd'hui (**0 min**). Vos heures de travail sont écoulées ou intégralement occupées.`}
 `;
 
       if (topTask) {
@@ -568,7 +572,7 @@ Cliquez sur le bouton ci-dessous pour lancer la session.`;
 
 Voici votre situation factuelle en un coup d'œil pour aujourd'hui (**${date}**) :
 - **${activeTasks.length} tâche(s)** active(s) en attente.
-- **${Math.floor(totalFreeMinutes / 60)}h ${totalFreeMinutes % 60}m de temps libre** disponible sans conflit.
+${totalFreeMinutes > 0 ? `- **${Math.floor(totalFreeMinutes / 60)}h ${totalFreeMinutes % 60}m de temps libre** disponible sans conflit.` : `- **0m de temps libre restant** pour aujourd'hui.`}
 ${weakestSubject ? `- Point prioritaire de renforcement : **${weakestSubject.subjectName}** (${Math.round(weakestSubject.accuracyRate * 100)}% de réussite).` : ""}
 
 Comment puis-je vous aider ? Vous pouvez me demander par exemple :

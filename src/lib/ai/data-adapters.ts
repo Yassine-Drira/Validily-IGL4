@@ -64,12 +64,15 @@ export interface UserContextSnapshot {
   subjects: Subject[];
 }
 
+import { getLocalTodayDateString } from "../utils.ts";
+
 /**
  * Fetch and aggregate complete authenticated user context for the coach
  */
 export async function getAuthorizedUserContext(
-  targetDateStr: string = new Date().toISOString().slice(0, 10),
-  workingHours: { start: string; end: string } = { start: "08:00", end: "22:00" }
+  targetDateStr?: string,
+  workingHours: { start: string; end: string } = { start: "08:00", end: "22:00" },
+  options?: { now?: Date; minStartMinutes?: number }
 ): Promise<UserContextSnapshot | null> {
   const user = await getRequesterUser();
   if (!user?.id) {
@@ -77,6 +80,23 @@ export async function getAuthorizedUserContext(
   }
 
   const userId = user.id;
+  const now = options?.now || new Date();
+  const effectiveDateStr = targetDateStr || getLocalTodayDateString(now);
+  const localToday = getLocalTodayDateString(now);
+
+  let minStartMinutes: number | undefined;
+  if (options?.minStartMinutes !== undefined) {
+    minStartMinutes = options.minStartMinutes;
+  } else if (effectiveDateStr < localToday) {
+    // Past day: time is gone, 0 free study slots available
+    minStartMinutes = 24 * 60;
+  } else if (effectiveDateStr === localToday) {
+    // Today: only time strictly from current moment onwards can be counted
+    minStartMinutes = now.getHours() * 60 + now.getMinutes();
+  } else {
+    // Future date: all working hours are ahead
+    minStartMinutes = undefined;
+  }
 
   const quizMod = await getQuizActions();
   const attemptsPromise = globalMistakesState.__localTestAttempts
@@ -95,7 +115,7 @@ export async function getAuthorizedUserContext(
   const [dbSubjects, tasksRes, blocksRes, attempts, mistakes] = await Promise.all([
     getSubjects(undefined, userId).catch(() => [] as Subject[]),
     getAcademicTasksAction().catch(() => ({ success: false, data: [] })),
-    getCalendarTimeblocksAction(targetDateStr, targetDateStr).catch(() => ({ success: false, data: [] })),
+    getCalendarTimeblocksAction(effectiveDateStr, effectiveDateStr).catch(() => ({ success: false, data: [] })),
     attemptsPromise,
     mistakesPromise,
   ]);
@@ -116,8 +136,8 @@ export async function getAuthorizedUserContext(
   const userTasks = tasks.filter((t) => t.user_id === userId || !t.user_id);
   const userBlocks = existingBlocks.filter((b) => b.user_id === userId || !b.user_id);
 
-  // 1. Calculate available free slots
-  const freeSlots = calculateFreeSlots(workingHours, userBlocks);
+  // 1. Calculate available free slots (excluding past time)
+  const freeSlots = calculateFreeSlots(workingHours, userBlocks, minStartMinutes);
 
   // 2. Detect any existing conflicts within current calendar blocks
   const conflicts: TimeConflict[] = [];
@@ -189,7 +209,7 @@ export async function getAuthorizedUserContext(
       correctAnswers,
       totalQuestions,
       lastPracticedAt,
-      targetDateStr,
+      targetDateStr: effectiveDateStr,
       recentMistakes: subMistakes.slice(0, 5),
     });
 
@@ -202,7 +222,7 @@ export async function getAuthorizedUserContext(
   return {
     userId,
     userName: user.name || "Étudiant IGL4",
-    date: targetDateStr,
+    date: effectiveDateStr,
     workingHours,
     tasks: userTasks,
     existingBlocks: userBlocks,

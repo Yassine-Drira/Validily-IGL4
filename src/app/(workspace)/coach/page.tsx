@@ -5,9 +5,9 @@ import { getCoachingPlanAction } from "@/lib/actions/coach-actions";
 import { CoachShell } from "@/components/coach/coach-shell";
 
 export const metadata: Metadata = {
-  title: "Coach IA & Tuteur | VALIDILY-IGL4",
+  title: "Validily AI — Coach & Tuteur Académique | VALIDILY-IGL4",
   description:
-    "Votre tuteur personnel autonome pour planifier vos révisions, cibler vos points faibles et optimiser votre emploi du temps.",
+    "Votre tuteur et coach académique fondé sur l'IA pour optimiser vos révisions, pratiquer des quiz RAG et maîtriser votre cursus IGL4.",
 };
 
 export const dynamic = "force-dynamic";

@@ -221,13 +221,13 @@ export function CoachChatThread({
 
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-sm font-bold tracking-tight text-white">Maestro AI</h2>
+              <h2 className="text-sm font-bold tracking-tight text-white">Validily AI</h2>
               <span className="text-[10px] font-semibold tracking-wider uppercase px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-300 border border-indigo-500/30">
-                Architecte Pédagogique
+                Tuteur & Architecte Pédagogique
               </span>
             </div>
             <p className="text-xs text-slate-400">
-              Conseiller stratégique certifié • Synthèse en temps réel de votre cursus IGL4
+              Conseiller stratégique certifié • Synthèse RAG en temps réel de votre cursus IGL4
             </p>
           </div>
         </div>
@@ -332,7 +332,7 @@ export function CoachChatThread({
               {/* Message Label */}
               <div className="flex items-center gap-2 px-1 text-[11px]">
                 <span className="font-semibold text-slate-400">
-                  {isUser ? "Vous" : "Maestro AI"}
+                  {isUser ? "Vous" : "Validily AI"}
                 </span>
                 <span className="text-slate-600 font-tabular">• {message.timestamp}</span>
               </div>
@@ -518,7 +518,7 @@ export function CoachChatThread({
             </div>
             <div className="p-4 rounded-3xl rounded-tl-sm luxury-card border border-white/10 text-xs text-slate-300 flex items-center gap-2.5">
               <Sparkles className="w-4 h-4 text-indigo-400 animate-pulse" />
-              <span>Maestro AI analyse vos données académiques en temps réel...</span>
+              <span>Validily AI analyse vos documents et données académiques en temps réel...</span>
             </div>
           </div>
         )}

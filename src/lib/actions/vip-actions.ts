@@ -1,15 +1,15 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
-import { isSupabaseConfigured } from "@/lib/supabase/server";
-import { getServiceSupabase } from "@/lib/supabase/admin";
-import { assertAdmin, getRequesterUser } from "@/lib/auth/authorization";
-import { VipEntitlement } from "@/types/database";
-import { logAuditEvent } from "@/lib/audit/audit-logger";
+import { isSupabaseConfigured } from "../supabase/server.ts";
+import { getServiceSupabase } from "../supabase/admin.ts";
+import { assertAdmin, getRequesterUser } from "../auth/authorization.ts";
+import type { VipEntitlement } from "../../types/database.ts";
+import { logAuditEvent } from "../audit/audit-logger.ts";
 
-function safeRevalidate(path: string) {
+async function safeRevalidate(path: string) {
   try {
-    revalidatePath(path);
+    const cacheMod = await import("next/cache");
+    cacheMod.revalidatePath?.(path);
   } catch {
     // Outside active Next.js request context
   }
@@ -36,6 +36,27 @@ if (!globalVipState.__localVipEntitlements) {
   globalVipState.__localVipEntitlements = new Map<string, VipEntitlement>();
 }
 const localVipEntitlements = globalVipState.__localVipEntitlements;
+
+export async function _injectTestVip(userId: string, durationDays = 30): Promise<VipEntitlement> {
+  const now = new Date();
+  const ent: VipEntitlement = {
+    id: `vip-test-${userId}`,
+    user_id: userId,
+    starts_at: now.toISOString(),
+    expires_at: new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000).toISOString(),
+    granted_by: "administration",
+    reason: "Test VIP Entitlement",
+    status: "active",
+    created_at: now.toISOString(),
+    updated_at: now.toISOString(),
+  };
+  localVipEntitlements.set(ent.id, ent);
+  return ent;
+}
+
+export async function _resetTestVip(): Promise<void> {
+  localVipEntitlements.clear();
+}
 
 /**
  * Server-authoritative check for a user's VIP status.

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Sparkles,
   Calendar,
@@ -16,6 +16,9 @@ import {
   Zap,
   ShieldCheck,
   CheckCircle2,
+  Crown,
+  AlertTriangle,
+  BookOpen,
 } from "lucide-react";
 import type {
   AIPlanResponse,
@@ -27,6 +30,9 @@ import {
   getCoachingPlanAction,
   applyProposedTimeblockAction,
   generateAdaptiveDrillAction,
+  generateRAGQuizAction,
+  getAcademicCoachKPIsAction,
+  type AcademicKPIsData,
 } from "@/lib/actions/coach-actions";
 import { TelemetryBadge } from "./telemetry-badge";
 import { TodayTimeline } from "./today-timeline";
@@ -45,6 +51,7 @@ interface CoachShellProps {
 export function CoachShell({ initialPlan }: CoachShellProps) {
   const [plan, setPlan] = useState<AIPlanResponse>(initialPlan);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [kpis, setKpis] = useState<AcademicKPIsData | null>(null);
   
   // Mobile / compact tab navigation: "chat" is default primary
   const [mobileTab, setMobileTab] = useState<"chat" | "timeline" | "weaknesses">("chat");
@@ -56,17 +63,40 @@ export function CoachShell({ initialPlan }: CoachShellProps) {
   const [isDrillModalOpen, setIsDrillModalOpen] = useState(false);
   const [activeDrill, setActiveDrill] = useState<AdaptiveDrill | null>(null);
   const [isDrillLoading, setIsDrillLoading] = useState(false);
+  const [generationError, setGenerationError] = useState<string | null>(null);
 
   // Focus provider
   const { setIsModalOpen: openFocusModal } = useFocus();
+
+  // Load authentic KPIs on mount & on date changes
+  const loadKpis = async () => {
+    try {
+      const res = await getAcademicCoachKPIsAction(plan.date);
+      if (res.success && res.data) {
+        setKpis(res.data);
+      }
+    } catch (err) {
+      console.error("Error loading KPIs:", err);
+    }
+  };
+
+  useEffect(() => {
+    loadKpis();
+  }, [plan.date]);
 
   // Refresh plan
   const handleRefresh = async (force: boolean = false) => {
     setIsRefreshing(true);
     try {
-      const res = await getCoachingPlanAction(plan.date, force);
-      if (res.success && res.data) {
-        setPlan(res.data);
+      const [planRes, kpiRes] = await Promise.all([
+        getCoachingPlanAction(plan.date, force),
+        getAcademicCoachKPIsAction(plan.date),
+      ]);
+      if (planRes.success && planRes.data) {
+        setPlan(planRes.data);
+      }
+      if (kpiRes.success && kpiRes.data) {
+        setKpis(kpiRes.data);
       }
     } catch (err) {
       console.error("Refresh coach error:", err);
@@ -75,17 +105,55 @@ export function CoachShell({ initialPlan }: CoachShellProps) {
     }
   };
 
-  // Launch targeted drill
+  // Launch targeted drill directly
   const handleStartDrill = async (subjectId?: string) => {
     setIsDrillModalOpen(true);
     setIsDrillLoading(true);
+    setGenerationError(null);
     try {
       const res = await generateAdaptiveDrillAction(subjectId, 3);
       if (res.success && res.data) {
         setActiveDrill(res.data);
+      } else {
+        setGenerationError(res.error || "Échec de génération du micro-drill.");
       }
-    } catch (err) {
-      console.error("Error generating drill:", err);
+    } catch (err: any) {
+      setGenerationError(err.message || "Erreur de connexion.");
+    } finally {
+      setIsDrillLoading(false);
+    }
+  };
+
+  // Launch dynamic RAG quiz studio
+  const handleOpenQuizStudio = () => {
+    setActiveDrill(null);
+    setGenerationError(null);
+    setIsDrillModalOpen(true);
+  };
+
+  // Generate customized RAG quiz
+  const handleGenerateCustomQuiz = async (params: {
+    subjectId?: string;
+    questionCount: number;
+    difficulty: "beginner" | "intermediate" | "advanced";
+  }) => {
+    setIsDrillLoading(true);
+    setGenerationError(null);
+    try {
+      const res = await generateRAGQuizAction({
+        subjectId: params.subjectId,
+        questionCount: params.questionCount,
+        difficulty: params.difficulty,
+      });
+
+      if (res.success && res.data) {
+        setActiveDrill(res.data);
+        loadKpis(); // update quota meter
+      } else {
+        setGenerationError(res.error || "Matériel source insuffisant pour générer ce quiz.");
+      }
+    } catch (err: any) {
+      setGenerationError(err.message || "Erreur lors de la génération du quiz.");
     } finally {
       setIsDrillLoading(false);
     }
@@ -113,11 +181,7 @@ export function CoachShell({ initialPlan }: CoachShellProps) {
     return await applyProposedTimeblockAction(block);
   };
 
-  const weakestSubject = plan.weakPoints.length > 0 ? plan.weakPoints[0].subjectName : undefined;
-  const totalFreeMinutes = plan.freeSlots.reduce((acc, s) => acc + s.durationMinutes, 0);
-
-  // Cognitive readiness score calculation
-  const cognitiveReadiness = totalFreeMinutes >= 180 ? 94 : totalFreeMinutes >= 90 ? 82 : 68;
+  const totalFreeMinutes = kpis ? kpis.availableStudyMinutes : plan.freeSlots.reduce((acc, s) => acc + s.durationMinutes, 0);
 
   return (
     <div className="space-y-6">
@@ -140,14 +204,20 @@ export function CoachShell({ initialPlan }: CoachShellProps) {
             <div>
               <div className="flex items-center gap-2.5">
                 <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-white">
-                  Coach IA & Tuteur Personnel
+                  Validily AI
                 </h1>
                 <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 shadow-sm">
-                  Executive AI
+                  Cockpit Pédagogique
                 </span>
+                {kpis?.quota?.isVip && (
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-amber-500/10 text-amber-300 border border-amber-500/30 shadow-sm flex items-center gap-1">
+                    <Crown className="w-3 h-3" />
+                    <span>VIP Actif</span>
+                  </span>
+                )}
               </div>
               <p className="text-xs sm:text-sm text-slate-300 mt-0.5">
-                Système autonome de conseil stratégique, analyse d'oubli synaptique et arbitrage d'emploi du temps
+                Système d'assistance académique fondé sur vos documents de cours, rétention mémorielle et emploi du temps
               </p>
             </div>
           </div>
@@ -155,11 +225,20 @@ export function CoachShell({ initialPlan }: CoachShellProps) {
           {/* Quick Cockpit Controls */}
           <div className="flex flex-wrap items-center gap-3">
             <button
+              id="open-rag-quiz-studio-btn"
+              onClick={handleOpenQuizStudio}
+              className="px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:brightness-110 text-white font-bold text-xs transition-all flex items-center gap-2 shadow-lg shadow-purple-600/25 cursor-pointer"
+            >
+              <BookOpen className="w-4 h-4" />
+              <span>Studio Quiz RAG</span>
+            </button>
+
+            <button
               onClick={() => openFocusModal(true)}
               className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-110 text-white font-bold text-xs transition-all flex items-center gap-2 shadow-lg shadow-emerald-600/25 cursor-pointer"
             >
               <Zap className="w-4 h-4" />
-              <span>Démarrer un Focus (Pomodoro)</span>
+              <span>Démarrer un Focus</span>
             </button>
 
             <Link
@@ -167,7 +246,7 @@ export function CoachShell({ initialPlan }: CoachShellProps) {
               className="px-4 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-white font-bold text-xs transition-colors flex items-center gap-2 border border-white/10 shadow-sm"
             >
               <Calendar className="w-4 h-4 text-indigo-400" />
-              <span>Ouvrir l'Emploi du Temps</span>
+              <span>Emploi du Temps</span>
             </Link>
 
             <TelemetryBadge
@@ -178,49 +257,93 @@ export function CoachShell({ initialPlan }: CoachShellProps) {
           </div>
         </div>
 
-        {/* Cognitive Velocity & Readiness Metric Strip */}
+        {/* Authentic Academic KPIs Strip (Calculated from real records) */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-5 mt-5 border-t border-white/[0.08] relative z-10">
-          <div className="p-3 rounded-2xl bg-slate-950/40 border border-white/[0.06] backdrop-blur-md">
+          {/* KPI 1: Prochaine Échéance Critique */}
+          <div className="p-3.5 rounded-2xl bg-slate-950/40 border border-white/[0.06] backdrop-blur-md">
             <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider flex items-center gap-1.5">
-              <Clock className="w-3.5 h-3.5 text-indigo-400" />
-              Temps Libre
+              <Calendar className="w-3.5 h-3.5 text-indigo-400" />
+              Prochaine Échéance
+            </span>
+            {kpis?.nextDeadline ? (
+              <div className="mt-1">
+                <p className="text-xs sm:text-sm font-extrabold text-white truncate" title={kpis.nextDeadline.title}>
+                  {kpis.nextDeadline.title}
+                </p>
+                <p className={`text-[11px] font-bold ${kpis.nextDeadline.urgency === "critical" ? "text-rose-400" : "text-amber-400"}`}>
+                  Dans {kpis.nextDeadline.daysRemaining} jour{kpis.nextDeadline.daysRemaining > 1 ? "s" : ""}
+                </p>
+              </div>
+            ) : (
+              <p className="text-xs font-semibold text-slate-400 mt-1">
+                Aucune échéance urgente
+              </p>
+            )}
+          </div>
+
+          {/* KPI 2: Temps Libre d'Étude */}
+          <div className="p-3.5 rounded-2xl bg-slate-950/40 border border-white/[0.06] backdrop-blur-md">
+            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider flex items-center gap-1.5">
+              <Clock className="w-3.5 h-3.5 text-emerald-400" />
+              Temps Libre Restant
             </span>
             <p className="text-sm sm:text-base font-extrabold text-white mt-1 font-tabular">
-              {Math.floor(totalFreeMinutes / 60)}h {totalFreeMinutes % 60}m
+              {totalFreeMinutes > 0 ? (
+                `${Math.floor(totalFreeMinutes / 60)}h ${totalFreeMinutes % 60}m`
+              ) : (
+                <span className="text-slate-400 font-bold text-xs sm:text-sm">0h 0m</span>
+              )}
+            </p>
+            <p className="text-[10px] text-slate-400 truncate mt-0.5">
+              {totalFreeMinutes > 0 ? "Créneaux exploitables aujourd'hui" : "Planning complet ou temps écoulé"}
             </p>
           </div>
 
-          <div className="p-3 rounded-2xl bg-slate-950/40 border border-white/[0.06] backdrop-blur-md">
+          {/* KPI 3: Quota Validily AI (Rolling 24h) */}
+          <div className="p-3.5 rounded-2xl bg-slate-950/40 border border-white/[0.06] backdrop-blur-md">
             <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider flex items-center gap-1.5">
-              <Layers className="w-3.5 h-3.5 text-emerald-400" />
-              Indice Cognitif
+              <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+              Quota Validily AI
             </span>
-            <p className="text-sm sm:text-base font-extrabold text-emerald-300 mt-1 font-tabular flex items-center gap-1.5">
-              <span>{cognitiveReadiness}%</span>
-              <span className="text-[10px] font-semibold text-slate-400">
-                ({cognitiveReadiness > 80 ? "Optimal" : "Saturé"})
-              </span>
-            </p>
+            {kpis?.quota?.isVip ? (
+              <p className="text-xs sm:text-sm font-extrabold text-amber-300 mt-1 flex items-center gap-1">
+                <Crown className="w-3.5 h-3.5 text-amber-400" />
+                <span>Illimité (VIP)</span>
+              </p>
+            ) : (
+              <div className="mt-1">
+                <p className="text-xs sm:text-sm font-extrabold text-white font-tabular">
+                  <span className={kpis?.quota?.remaining === 0 ? "text-rose-400" : "text-emerald-400"}>
+                    {kpis?.quota?.remaining ?? 5}
+                  </span>{" "}
+                  / 5 requêtes
+                </p>
+                <p className="text-[10px] text-slate-400">24h glissantes</p>
+              </div>
+            )}
           </div>
 
-          <div className="p-3 rounded-2xl bg-slate-950/40 border border-white/[0.06] backdrop-blur-md">
+          {/* KPI 4: Points de Vigilance (< 65%) */}
+          <div className="p-3.5 rounded-2xl bg-slate-950/40 border border-white/[0.06] backdrop-blur-md">
             <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider flex items-center gap-1.5">
-              <Brain className="w-3.5 h-3.5 text-amber-400" />
-              Sujet le Plus Fragile
+              <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+              Points de Vigilance
             </span>
-            <p className="text-xs sm:text-sm font-extrabold text-amber-300 mt-1 truncate">
-              {weakestSubject || "Aucun point critique"}
-            </p>
-          </div>
-
-          <div className="p-3 rounded-2xl bg-slate-950/40 border border-white/[0.06] backdrop-blur-md">
-            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider flex items-center gap-1.5">
-              <ShieldCheck className="w-3.5 h-3.5 text-indigo-400" />
-              Conflits Détectés
-            </span>
-            <p className="text-sm sm:text-base font-extrabold text-white mt-1 font-tabular">
-              {plan.conflicts.length === 0 ? "0 chevauchement" : `${plan.conflicts.length} alerte(s)`}
-            </p>
+            {kpis && kpis.vigilanceSubjects.length > 0 ? (
+              <div className="mt-1">
+                <p className="text-xs sm:text-sm font-extrabold text-amber-300 truncate">
+                  {kpis.vigilanceSubjects[0].name} ({kpis.vigilanceSubjects[0].accuracyRate}%)
+                </p>
+                <p className="text-[10px] text-slate-400">
+                  {kpis.vigilanceSubjects.length} matière(s) &lt; 65%
+                </p>
+              </div>
+            ) : (
+              <p className="text-xs font-semibold text-emerald-400 mt-1 flex items-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Excellente maîtrise</span>
+              </p>
+            )}
           </div>
         </div>
       </div>
@@ -236,7 +359,7 @@ export function CoachShell({ initialPlan }: CoachShellProps) {
           }`}
         >
           <MessageSquare className="w-4 h-4" />
-          <span>Chat Maestro AI</span>
+          <span>Chat Validily AI</span>
         </button>
 
         <button
@@ -260,13 +383,13 @@ export function CoachShell({ initialPlan }: CoachShellProps) {
           }`}
         >
           <Brain className="w-4 h-4" />
-          <span>Points Faibles ({plan.weakPoints.length})</span>
+          <span>Faiblesses ({plan.weakPoints.length})</span>
         </button>
       </div>
 
       {/* Main Workspace Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Primary Conversational Workspace (Col 7 or 8 on desktop) */}
+        {/* Primary Conversational Workspace */}
         <div
           className={`lg:col-span-7 xl:col-span-8 ${
             mobileTab !== "chat" ? "hidden lg:block" : "block"
@@ -277,7 +400,7 @@ export function CoachShell({ initialPlan }: CoachShellProps) {
             availableMinutes={plan.availableMinutes}
             bookedMinutes={plan.bookedMinutes}
             activeTasksCount={plan.recommendations.length}
-            weakestSubjectName={weakestSubject}
+            weakestSubjectName={plan.weakPoints.length > 0 ? plan.weakPoints[0].subjectName : undefined}
             freeSlotsCount={plan.freeSlots.length}
             onApplyBlock={handleApplyBlock}
             onStartDrill={handleStartDrill}
@@ -286,7 +409,7 @@ export function CoachShell({ initialPlan }: CoachShellProps) {
           />
         </div>
 
-        {/* Supporting Context & Live Insights Sidebar (Col 5 or 4 on desktop) */}
+        {/* Supporting Context & Live Insights Sidebar */}
         <div
           className={`lg:col-span-5 xl:col-span-4 space-y-4 ${
             mobileTab === "chat" ? "hidden lg:block" : "block"
@@ -378,12 +501,15 @@ export function CoachShell({ initialPlan }: CoachShellProps) {
         onRefresh={() => handleRefresh(true)}
       />
 
-      {/* Adaptive Drill Modal */}
+      {/* Adaptive Drill & Dynamic RAG Quiz Studio Modal */}
       <AdaptiveDrillModal
         isOpen={isDrillModalOpen}
         onClose={() => setIsDrillModalOpen(false)}
         drill={activeDrill}
         isLoading={isDrillLoading}
+        subjects={plan.weakPoints.map((w) => ({ id: w.subjectId, name: w.subjectName }))}
+        onGenerateQuiz={handleGenerateCustomQuiz}
+        generationError={generationError}
       />
     </div>
   );

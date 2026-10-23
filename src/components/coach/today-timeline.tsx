@@ -70,7 +70,7 @@ export function TodayTimeline({
       {/* Metrics Row */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
         <div className="luxury-card rounded-2xl p-3 border border-white/[0.06]">
-          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Temps Disponible</div>
+          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Temps Libre Restant</div>
           <div className="text-lg font-extrabold text-emerald-400 mt-1 font-tabular flex items-baseline gap-1">
             <span>{Math.floor(availableMinutes / 60)}h {availableMinutes % 60}m</span>
             <span className="text-[11px] text-slate-400 font-normal">({freeSlots.length} créneaux)</span>
@@ -131,7 +131,7 @@ export function TodayTimeline({
         </div>
         {freeSlots.length === 0 ? (
           <div className="text-xs text-slate-400 italic bg-slate-950/40 p-3 rounded-xl border border-white/[0.06]">
-            Aucun créneau libre d'au moins 15 minutes détecté sur vos horaires configurés.
+            Aucun créneau libre restant d'au moins 15 minutes détecté pour aujourd'hui (créneaux passés ou occupés).
           </div>
         ) : (
           <div className="flex flex-wrap gap-2">
