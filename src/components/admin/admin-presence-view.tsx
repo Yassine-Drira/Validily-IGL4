@@ -150,7 +150,7 @@ export function AdminPresenceView({
             <p>Les présences apparaîtront automatiquement dès que les étudiants exploreront la plateforme.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto touch-scroll">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="border-b border-[#E4E8F0] bg-white text-[#68748A] font-semibold">

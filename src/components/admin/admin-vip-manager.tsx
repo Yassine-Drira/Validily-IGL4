@@ -240,7 +240,7 @@ export function AdminVipManager({
             <p>Utilisez &ldquo;Accorder un Accès VIP&rdquo; pour promouvoir un étudiant au statut sonore étendu.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto touch-scroll">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="border-b border-[#E4E8F0] bg-[#FAFBFD] text-[#68748A] font-semibold">

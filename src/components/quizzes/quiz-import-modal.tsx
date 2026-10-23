@@ -157,7 +157,7 @@ export function QuizImportModal({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
-      <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-[#E4E8F0] space-y-5 my-auto animate-in fade-in duration-200">
+      <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[92vh] overflow-y-auto [scrollbar-width:thin] touch-scroll p-6 shadow-2xl border border-[#E4E8F0] space-y-5 my-auto animate-in fade-in duration-200">
         {/* Header */}
         <div className="flex items-start justify-between pb-3 border-b border-[#E4E8F0]">
           <div>
@@ -177,7 +177,7 @@ export function QuizImportModal({
           <button
             type="button"
             onClick={onClose}
-            className="p-1 rounded-lg text-[#68748A] hover:text-[#111A2E] hover:bg-[#F4F6FA] cursor-pointer"
+            className="min-w-[36px] min-h-[36px] flex items-center justify-center p-1 rounded-lg text-[#68748A] hover:text-[#111A2E] hover:bg-[#F4F6FA] cursor-pointer active:scale-90"
           >
             <X className="w-5 h-5" />
           </button>

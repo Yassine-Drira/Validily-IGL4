@@ -211,7 +211,7 @@ export function AdminAudioCatalog({ initialEntries, onNotify }: AdminAudioCatalo
       </div>
 
       {/* Category filter tabs */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+      <div className="flex items-center gap-1.5 overflow-x-auto touch-scroll pb-1 text-xs">
         <button
           type="button"
           onClick={() => setSelectedCategory("all")}
@@ -251,7 +251,7 @@ export function AdminAudioCatalog({ initialEntries, onNotify }: AdminAudioCatalo
             <p>Cliquez sur &ldquo;Ajouter une Piste&rdquo; pour enrichir le catalogue partagé.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto touch-scroll">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="border-b border-[#E4E8F0] bg-[#FAFBFD] text-[#68748A] font-semibold">

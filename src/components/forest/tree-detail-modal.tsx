@@ -63,18 +63,18 @@ export function TreeDetailModal({ entry, season = "summer", onClose }: TreeDetai
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-150"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-150 overflow-y-auto"
       onClick={onClose}
     >
       <div
-        className="bg-white border border-[#E4E8F0] rounded-3xl max-w-sm w-full p-6 shadow-2xl space-y-4 relative animate-in zoom-in-95 duration-150"
+        className="bg-white border border-[#E4E8F0] rounded-3xl max-w-sm w-full max-h-[92vh] overflow-y-auto p-5 sm:p-6 shadow-2xl space-y-4 relative animate-in zoom-in-95 duration-150 [scrollbar-width:thin]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Close Button */}
         <button
           type="button"
           onClick={onClose}
-          className="absolute top-4 right-4 p-1.5 text-[#68748A] hover:text-[#182235] hover:bg-[#F4F6FA] rounded-xl transition-colors cursor-pointer"
+          className="absolute top-3.5 right-3.5 min-w-[36px] min-h-[36px] flex items-center justify-center text-[#68748A] hover:text-[#182235] hover:bg-[#F4F6FA] rounded-xl transition-colors cursor-pointer active:scale-90"
           aria-label="Fermer"
         >
           <X className="w-5 h-5" />
@@ -174,7 +174,7 @@ export function TreeDetailModal({ entry, season = "summer", onClose }: TreeDetai
         <button
           type="button"
           onClick={onClose}
-          className="w-full py-2 rounded-xl text-xs font-semibold bg-[#2855D9] hover:bg-[#1E40AF] text-white transition-colors cursor-pointer shadow-xs"
+          className="w-full min-h-[40px] py-2 rounded-xl text-xs font-semibold bg-[#2855D9] hover:bg-[#1E40AF] text-white transition-colors cursor-pointer shadow-xs active:scale-95 flex items-center justify-center"
         >
           Fermer les détails
         </button>

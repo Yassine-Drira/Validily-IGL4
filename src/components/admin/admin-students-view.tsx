@@ -143,7 +143,7 @@ export function AdminStudentsView({
           />
         </div>
 
-        <div className="flex items-center gap-1.5 overflow-x-auto shrink-0">
+        <div className="flex items-center gap-1.5 overflow-x-auto touch-scroll shrink-0">
           {[
             { id: "all", label: "Tous" },
             { id: "student", label: "Étudiants" },
@@ -185,7 +185,7 @@ export function AdminStudentsView({
             Aucun étudiant ne correspond aux critères de recherche.
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto touch-scroll">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="bg-[#FAFBFD] border-b border-[#E4E8F0] text-[11px] font-mono text-[#68748A] uppercase">

@@ -389,11 +389,11 @@ export function FocusHubModal() {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-black/50 backdrop-blur-sm transition-opacity animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-black/50 backdrop-blur-sm transition-opacity animate-in fade-in duration-200 overflow-y-auto"
       onClick={() => setIsModalOpen(false)}
     >
       <div
-        className="bg-white/95 backdrop-blur-xl border border-[#E4E8F0] rounded-3xl max-w-xl w-full max-h-[94vh] sm:max-h-[92vh] overflow-y-auto shadow-2xl p-4 sm:p-7 space-y-4 sm:space-y-5 relative scrollbar-thin"
+        className="bg-white/95 backdrop-blur-xl border border-[#E4E8F0] rounded-3xl max-w-xl w-full max-h-[92vh] overflow-y-auto shadow-2xl p-4 sm:p-7 space-y-4 sm:space-y-5 relative [scrollbar-width:thin] touch-scroll"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top Header */}
@@ -431,7 +431,7 @@ export function FocusHubModal() {
             <button
               type="button"
               onClick={() => setIsModalOpen(false)}
-              className="p-1.5 text-[#68748A] hover:text-[#182235] hover:bg-[#F4F6FA] rounded-xl transition-colors cursor-pointer"
+              className="min-w-[36px] min-h-[36px] flex items-center justify-center p-1.5 text-[#68748A] hover:text-[#182235] hover:bg-[#F4F6FA] rounded-xl transition-colors cursor-pointer active:scale-90"
               aria-label="Fermer"
             >
               <X className="w-5 h-5" />

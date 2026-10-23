@@ -487,7 +487,7 @@ export function AdminManager({
       </div>
 
       {/* Navigation Tabs */}
-      <div className="flex items-center space-x-1.5 border-b border-[#E4E8F0] pb-2 overflow-x-auto">
+      <div className="flex items-center space-x-1.5 border-b border-[#E4E8F0] pb-2 overflow-x-auto touch-scroll">
         <button
           type="button"
           onClick={() => setActiveTab("curriculum")}
@@ -647,7 +647,7 @@ export function AdminManager({
               </Button>
             </div>
 
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto touch-scroll">
               <table className="w-full text-left text-xs">
                 <thead>
                   <tr className="border-b border-[#E4E8F0] text-[#68748A] font-mono uppercase text-[10px]">
@@ -763,7 +763,7 @@ export function AdminManager({
             </div>
           )}
 
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto touch-scroll">
             <table className="w-full text-left text-xs">
               <thead>
                 <tr className="border-b border-[#E4E8F0] text-[#68748A] font-mono uppercase text-[10px]">
@@ -907,7 +907,7 @@ export function AdminManager({
             </div>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto touch-scroll">
             <table className="w-full text-left text-xs">
               <thead>
                 <tr className="border-b border-[#E4E8F0] text-[#68748A] font-mono uppercase text-[10px]">

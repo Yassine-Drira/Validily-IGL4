@@ -383,7 +383,7 @@ export function QuizRunner({
                 type="button"
                 onClick={() => handleSelectOption(opt.id)}
                 disabled={isAnswerSubmitted}
-                className={`w-full text-left p-3.5 rounded-lg border text-xs transition-all flex items-center justify-between cursor-pointer ${optionStyles}`}
+                className={`w-full text-left p-3.5 rounded-lg border text-xs transition-all flex items-center justify-between cursor-pointer min-h-[44px] active:scale-[0.99] ${optionStyles}`}
               >
                 <span>{optionLabel}</span>
                 {isAnswerSubmitted && opt.is_correct && (
@@ -415,12 +415,12 @@ export function QuizRunner({
           <button
             type="button"
             onClick={onClose}
-            className="text-xs text-[#68748A] hover:text-[#182235] cursor-pointer"
+            className="text-xs text-[#68748A] hover:text-[#182235] cursor-pointer min-h-[36px] flex items-center px-2 py-1 active:scale-95"
           >
             Quitter l&apos;évaluation
           </button>
         ) : (
-          <Link href="/quizzes" className="text-xs text-[#68748A] hover:text-[#182235]">
+          <Link href="/quizzes" className="text-xs text-[#68748A] hover:text-[#182235] min-h-[36px] flex items-center px-2 py-1 active:scale-95">
             Exit Drill
           </Link>
         )}
@@ -432,11 +432,17 @@ export function QuizRunner({
               variant="primary"
               onClick={handleCheckAnswer}
               disabled={!selectedOptionId}
+              className="min-h-[40px] px-5 active:scale-95"
             >
               Submit Answer
             </Button>
           ) : (
-            <Button size="md" variant="primary" onClick={handleNext}>
+            <Button
+              size="md"
+              variant="primary"
+              onClick={handleNext}
+              className="min-h-[40px] px-5 active:scale-95"
+            >
               <span>{isLastQuestion ? "View Final Results" : "Next Question"}</span>
               <ArrowRight className="w-4 h-4 ml-1.5" />
             </Button>

@@ -236,7 +236,7 @@ export function InteractiveHtmlRunner({
           <button
             type="button"
             onClick={handleReload}
-            className="p-1.5 rounded-lg bg-[#334155]/60 hover:bg-[#334155] text-[#94A3B8] hover:text-white transition-colors cursor-pointer"
+            className="min-w-[36px] min-h-[36px] flex items-center justify-center p-1.5 rounded-lg bg-[#334155]/60 hover:bg-[#334155] text-[#94A3B8] hover:text-white transition-colors cursor-pointer active:scale-95"
             title="Recharger l'atelier"
             aria-label="Recharger l'atelier"
           >
@@ -246,7 +246,7 @@ export function InteractiveHtmlRunner({
           <button
             type="button"
             onClick={handleToggleFullscreen}
-            className="p-1.5 rounded-lg bg-[#334155]/60 hover:bg-[#334155] text-[#94A3B8] hover:text-white transition-colors cursor-pointer"
+            className="min-w-[36px] min-h-[36px] flex items-center justify-center p-1.5 rounded-lg bg-[#334155]/60 hover:bg-[#334155] text-[#94A3B8] hover:text-white transition-colors cursor-pointer active:scale-95"
             title={isFullscreen ? "Quitter le plein écran" : "Plein écran"}
             aria-label={isFullscreen ? "Quitter le plein écran" : "Plein écran"}
           >
@@ -257,7 +257,7 @@ export function InteractiveHtmlRunner({
             <button
               type="button"
               onClick={onClose}
-              className="p-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 hover:text-white transition-colors cursor-pointer ml-1"
+              className="min-w-[36px] min-h-[36px] flex items-center justify-center p-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 hover:text-white transition-colors cursor-pointer ml-1 active:scale-95"
               title="Fermer l'atelier"
               aria-label="Fermer l'atelier"
             >

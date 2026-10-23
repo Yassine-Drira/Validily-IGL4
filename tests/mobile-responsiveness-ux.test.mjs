@@ -50,3 +50,39 @@ test("MOBILE-UX-07: resource cards and bookmark buttons satisfy mobile tap ergon
   assert.ok(cardCode.includes("min-h-[36px]"), "Consulter and download buttons must have minimum 36px tap height");
   assert.ok(bookmarkCode.includes("min-h-[36px] min-w-[36px]"), "Bookmark button must have minimum 36px square tap target");
 });
+
+test("MOBILE-UX-08: tree-detail-modal.tsx is scrollable and mobile-safe with tactile close", () => {
+  const code = fs.readFileSync(path.resolve(process.cwd(), "src/components/forest/tree-detail-modal.tsx"), "utf-8");
+  assert.ok(code.includes("max-h-[92vh] overflow-y-auto"), "Tree detail modal must have max-h-[92vh] scrollable body");
+  assert.ok(code.includes("min-w-[36px] min-h-[36px]"), "Close button must meet 36px minimum touch target");
+  assert.ok(code.includes("min-h-[40px]"), "Footer close button must have 40px touch height");
+});
+
+test("MOBILE-UX-09: focus-hub-modal.tsx has scrollable overlay and touch-scroll momentum", () => {
+  const code = fs.readFileSync(path.resolve(process.cwd(), "src/components/focus/focus-hub-modal.tsx"), "utf-8");
+  assert.ok(code.includes("overflow-y-auto"), "Focus modal overlay must have overflow-y-auto");
+  assert.ok(code.includes("touch-scroll"), "Focus modal body must include touch-scroll");
+  assert.ok(code.includes("min-w-[36px] min-h-[36px]"), "Close button must meet 36px touch target");
+});
+
+test("MOBILE-UX-10: quiz-runner.tsx provides 44px touch targets and tactile feedback", () => {
+  const code = fs.readFileSync(path.resolve(process.cwd(), "src/components/quizzes/quiz-runner.tsx"), "utf-8");
+  assert.ok(code.includes("min-h-[44px]"), "Quiz options must meet 44px mobile touch target standard");
+  assert.ok(code.includes("min-h-[40px] px-5 active:scale-95"), "Submit and Next buttons must have 40px height with tactile feedback");
+});
+
+test("MOBILE-UX-11: quiz-import-modal.tsx prevents viewport overflow on narrow screens", () => {
+  const code = fs.readFileSync(path.resolve(process.cwd(), "src/components/quizzes/quiz-import-modal.tsx"), "utf-8");
+  assert.ok(code.includes("max-h-[92vh] overflow-y-auto"), "Quiz import modal must have max-h-[92vh] scrollable body");
+  assert.ok(code.includes("min-w-[36px] min-h-[36px]"), "Close button must meet 36px touch target");
+});
+
+test("MOBILE-UX-12: admin tables enforce touch-scroll for iOS momentum scrolling", () => {
+  const adminManager = fs.readFileSync(path.resolve(process.cwd(), "src/components/admin/admin-manager.tsx"), "utf-8");
+  const adminVip = fs.readFileSync(path.resolve(process.cwd(), "src/components/admin/admin-vip-manager.tsx"), "utf-8");
+  const adminStudents = fs.readFileSync(path.resolve(process.cwd(), "src/components/admin/admin-students-view.tsx"), "utf-8");
+  assert.ok(adminManager.includes("overflow-x-auto touch-scroll"), "Admin manager must use touch-scroll on tables");
+  assert.ok(adminVip.includes("overflow-x-auto touch-scroll"), "Admin VIP manager must use touch-scroll on tables");
+  assert.ok(adminStudents.includes("overflow-x-auto touch-scroll"), "Admin students view must use touch-scroll on tables");
+});
+
