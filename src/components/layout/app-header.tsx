@@ -128,20 +128,18 @@ export function AppHeader({ initialUser }: { initialUser?: HeaderUser | null }) 
         <Menu className="w-5 h-5 text-[#182235]" />
       </button>
 
-      {/* Desktop Sidebar Toggle / Closer Button */}
-      <button
-        type="button"
-        onClick={toggleCollapsed}
-        className="hidden md:flex min-w-[36px] min-h-[36px] items-center justify-center p-2 text-[#68748A] hover:text-[#111A2E] hover:bg-[#F4F6FA] active:bg-[#EDF2FF] rounded-xl transition-all cursor-pointer shrink-0"
-        title={isCollapsed ? "Développer la barre latérale (Ctrl+B)" : "Réduire la barre latérale (Ctrl+B)"}
-        aria-label={isCollapsed ? "Développer la barre latérale" : "Réduire la barre latérale"}
-      >
-        {isCollapsed ? (
+      {/* Desktop Sidebar Opener Button — only shown when sidebar is collapsed/closed */}
+      {isCollapsed && (
+        <button
+          type="button"
+          onClick={toggleCollapsed}
+          className="hidden md:flex min-w-[36px] min-h-[36px] items-center justify-center p-2 text-[#68748A] hover:text-[#2855D9] hover:bg-[#F4F6FA] active:bg-[#EDF2FF] rounded-xl transition-all cursor-pointer shrink-0 animate-in fade-in duration-150"
+          title="Développer la barre latérale (Ctrl+B)"
+          aria-label="Développer la barre latérale"
+        >
           <PanelLeftOpen className="w-5 h-5 text-[#2855D9]" />
-        ) : (
-          <PanelLeftClose className="w-5 h-5 text-[#68748A]" />
-        )}
-      </button>
+        </button>
+      )}
 
       {/* Global Search Bar */}
       <form onSubmit={handleSearch} className="relative flex-1 min-w-[100px] max-w-md">

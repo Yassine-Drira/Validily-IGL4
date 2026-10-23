@@ -384,7 +384,7 @@ export function AppSidebar({ subjects = [], isAdmin = false }: AppSidebarProps) 
           isCollapsed ? "w-[72px]" : "w-64"
         )}
       >
-        {/* Brand Header with Integrated Closer / Toggle */}
+        {/* Brand Header with Integrated Closer */}
         <div
           className={cn(
             "h-14 border-b border-[#E4E8F0] flex items-center bg-white shrink-0 transition-all duration-300",
@@ -392,15 +392,14 @@ export function AppSidebar({ subjects = [], isAdmin = false }: AppSidebarProps) 
           )}
         >
           {isCollapsed ? (
-            <button
-              type="button"
-              onClick={toggleCollapsed}
-              className="p-1.5 rounded-lg text-[#68748A] hover:text-[#2855D9] hover:bg-[#F4F6FA] transition-all cursor-pointer group"
-              title="Développer la barre latérale (Ctrl+B)"
-              aria-label="Développer la barre latérale"
+            <Link
+              href="/"
+              className="flex items-center justify-center p-1.5 rounded-lg hover:bg-[#F4F6FA] transition-colors group"
+              title="validily-IGL4"
+              aria-label="Accueil validily-IGL4"
             >
               <ValidilySymbol size="sm" className="group-hover:scale-105 transition-transform" />
-            </button>
+            </Link>
           ) : (
             <>
               <ValidilyLogo size="md" subtitle="Bibliothèque Académique" />
@@ -419,21 +418,6 @@ export function AppSidebar({ subjects = [], isAdmin = false }: AppSidebarProps) 
 
         {/* Desktop Navigation Content */}
         {renderNavContent(isCollapsed)}
-
-        {/* Collapsed Footer Rail Helper */}
-        {isCollapsed && (
-          <div className="p-2 border-t border-[#E4E8F0] bg-white/50 shrink-0 flex justify-center">
-            <button
-              type="button"
-              onClick={toggleCollapsed}
-              className="p-2 rounded-lg text-[#68748A] hover:text-[#2855D9] hover:bg-[#F4F6FA] transition-all cursor-pointer"
-              title="Développer la barre latérale (Ctrl+B)"
-              aria-label="Développer la barre latérale"
-            >
-              <PanelLeftOpen className="w-4 h-4 text-[#2855D9]" />
-            </button>
-          </div>
-        )}
       </aside>
 
       {/* Mobile Drawer Backdrop & Slide-out Menu */}
