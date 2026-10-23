@@ -104,24 +104,24 @@ export function AdaptiveDrillModal({
   };
 
   return (
-    <div id="rag-quiz-studio-modal" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="luxury-glass bg-[#0c1222] border border-white/10 rounded-3xl w-full max-w-xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden text-slate-200">
+    <div id="rag-quiz-studio-modal" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-200">
+      <div className="bg-white border border-[#E4E8F0] rounded-3xl w-full max-w-xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden text-[#182235]">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between bg-slate-950/60 backdrop-blur-xl">
+        <div className="px-6 py-4 border-b border-[#E4E8F0] flex items-center justify-between bg-[#FAFBFD]">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-white shadow-lg shadow-indigo-500/25 ring-1 ring-white/20">
+            <div className="w-10 h-10 rounded-2xl bg-[#EDF2FF] border border-[#2855D9]/20 flex items-center justify-center text-[#2855D9] shadow-2xs">
               <Sparkles className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-sm sm:text-base font-extrabold text-white tracking-tight">
+                <h3 className="text-sm sm:text-base font-bold text-[#111A2E] tracking-tight">
                   {drill ? drill.title : "Studio Quiz Validily AI"}
                 </h3>
-                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-300 border border-indigo-500/30">
+                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#EDF2FF] text-[#2855D9] border border-[#2855D9]/20 font-mono">
                   RAG Fondé
                 </span>
               </div>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-[#68748A]">
                 {drill
                   ? isFinished
                     ? "Bilan de la séance"
@@ -132,7 +132,7 @@ export function AdaptiveDrillModal({
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+            className="p-2 rounded-xl text-[#68748A] hover:text-[#111A2E] hover:bg-[#F4F6FA] transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -142,12 +142,12 @@ export function AdaptiveDrillModal({
         <div className="p-6 overflow-y-auto space-y-5 flex-1">
           {isLoading ? (
             <div className="py-16 text-center space-y-4">
-              <div className="w-12 h-12 rounded-2xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 mx-auto shadow-lg shadow-indigo-600/30">
+              <div className="w-12 h-12 rounded-2xl bg-[#EDF2FF] border border-[#2855D9]/20 flex items-center justify-center text-[#2855D9] mx-auto shadow-2xs">
                 <Loader2 className="w-6 h-6 animate-spin" />
               </div>
               <div className="space-y-1">
-                <p className="text-sm font-bold text-white">Validily AI extrait le contenu de cours...</p>
-                <p className="text-xs text-slate-400 max-w-xs mx-auto">
+                <p className="text-sm font-bold text-[#111A2E]">Validily AI extrait le contenu de cours...</p>
+                <p className="text-xs text-[#68748A] max-w-xs mx-auto">
                   Vérification des sources autorisées et formulation des questions à choix multiples.
                 </p>
               </div>
@@ -156,30 +156,30 @@ export function AdaptiveDrillModal({
             /* Quiz Configurator Screen */
             <div className="space-y-5">
               {generationError && (
-                <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-start gap-2.5">
-                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-400" />
+                <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-start gap-2.5">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-600" />
                   <span className="leading-relaxed">{generationError}</span>
                 </div>
               )}
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5 uppercase tracking-wider">
-                  <BookOpen className="w-3.5 h-3.5 text-indigo-400" />
+                <label className="text-xs font-bold text-[#111A2E] flex items-center gap-1.5 uppercase tracking-wider">
+                  <BookOpen className="w-3.5 h-3.5 text-[#2855D9]" />
                   Matière Cible (INSAT IGL4)
                 </label>
                 <select
                   value={selectedSubjectId}
                   onChange={(e) => setSelectedSubjectId(e.target.value)}
-                  className="w-full px-4 py-3 rounded-2xl bg-slate-900/90 border border-white/10 text-white text-xs font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-4 py-3 rounded-2xl bg-[#F8FAFC] border border-[#E4E8F0] text-[#111A2E] text-xs font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#2855D9]/20 focus:border-[#2855D9]"
                 >
                   {subjects.length > 0 ? (
                     subjects.map((s) => (
-                      <option key={s.id} value={s.id} className="bg-slate-950 text-white">
+                      <option key={s.id} value={s.id} className="bg-white text-[#111A2E]">
                         {s.name}
                       </option>
                     ))
                   ) : (
-                    <option value="" className="bg-slate-950 text-white">
+                    <option value="" className="bg-white text-[#111A2E]">
                       Tous les cours et notes disponibles
                     </option>
                   )}
@@ -188,8 +188,8 @@ export function AdaptiveDrillModal({
 
               {/* Number of Questions Selector */}
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5 uppercase tracking-wider">
-                  <Layers className="w-3.5 h-3.5 text-indigo-400" />
+                <label className="text-xs font-bold text-[#111A2E] flex items-center gap-1.5 uppercase tracking-wider">
+                  <Layers className="w-3.5 h-3.5 text-[#2855D9]" />
                   Nombre de Questions
                 </label>
                 <div className="grid grid-cols-3 gap-2.5">
@@ -200,12 +200,12 @@ export function AdaptiveDrillModal({
                       onClick={() => setSelectedCount(cnt)}
                       className={`p-3 rounded-2xl border text-center transition-all cursor-pointer ${
                         selectedCount === cnt
-                          ? "bg-indigo-600/30 border-indigo-400 text-white ring-2 ring-indigo-500/40 shadow-lg shadow-indigo-600/20"
-                          : "bg-slate-900/60 border-white/10 text-slate-400 hover:text-white hover:bg-slate-800/80"
+                          ? "bg-[#EDF2FF] border-[#2855D9] text-[#2855D9] shadow-2xs"
+                          : "bg-[#F8FAFC] border-[#E4E8F0] text-[#68748A] hover:text-[#111A2E] hover:bg-white"
                       }`}
                     >
-                      <span className="text-sm font-extrabold block">{cnt} questions</span>
-                      <span className="text-[10px] text-slate-400 mt-0.5 block">
+                      <span className="text-sm font-bold block">{cnt} questions</span>
+                      <span className="text-[10px] mt-0.5 block opacity-80">
                         {cnt === 3 ? "Micro-Drill" : cnt === 5 ? "Évaluation" : "Examen Blanc"}
                       </span>
                     </button>
@@ -215,8 +215,8 @@ export function AdaptiveDrillModal({
 
               {/* Difficulty Selector */}
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5 uppercase tracking-wider">
-                  <Sliders className="w-3.5 h-3.5 text-indigo-400" />
+                <label className="text-xs font-bold text-[#111A2E] flex items-center gap-1.5 uppercase tracking-wider">
+                  <Sliders className="w-3.5 h-3.5 text-[#2855D9]" />
                   Niveau de Difficulté
                 </label>
                 <div className="grid grid-cols-3 gap-2.5">
@@ -233,23 +233,23 @@ export function AdaptiveDrillModal({
                       onClick={() => setSelectedDifficulty(diff.key)}
                       className={`p-3 rounded-2xl border text-center transition-all cursor-pointer ${
                         selectedDifficulty === diff.key
-                          ? "bg-purple-600/30 border-purple-400 text-white ring-2 ring-purple-500/40 shadow-lg shadow-purple-600/20"
-                          : "bg-slate-900/60 border-white/10 text-slate-400 hover:text-white hover:bg-slate-800/80"
+                          ? "bg-[#EDF2FF] border-[#2855D9] text-[#2855D9] shadow-2xs"
+                          : "bg-[#F8FAFC] border-[#E4E8F0] text-[#68748A] hover:text-[#111A2E] hover:bg-white"
                       }`}
                     >
-                      <span className="text-xs font-extrabold block">{diff.label}</span>
-                      <span className="text-[10px] text-slate-400 mt-0.5 block">{diff.desc}</span>
+                      <span className="text-xs font-bold block">{diff.label}</span>
+                      <span className="text-[10px] mt-0.5 block opacity-80">{diff.desc}</span>
                     </button>
                   ))}
                 </div>
               </div>
 
-              <div className="p-4 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs space-y-1">
-                <div className="font-bold flex items-center gap-1.5">
-                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
+              <div className="p-4 rounded-2xl bg-[#F8FAFC] border border-[#E4E8F0] text-xs space-y-1">
+                <div className="font-bold flex items-center gap-1.5 text-[#111A2E]">
+                  <ShieldCheck className="w-4 h-4 text-[#059669]" />
                   <span>Garantie de Fondement Académique</span>
                 </div>
-                <p className="text-[11px] text-slate-300 leading-relaxed">
+                <p className="text-[11px] text-[#68748A] leading-relaxed">
                   Validily AI synthétise uniquement les questions basées sur vos notes réelles et les supports de cours autorisés.
                 </p>
               </div>
@@ -258,7 +258,7 @@ export function AdaptiveDrillModal({
                 id="submit-generate-rag-quiz"
                 type="button"
                 onClick={handleTriggerGenerate}
-                className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:brightness-110 text-white font-extrabold text-xs transition-all shadow-xl shadow-indigo-600/30 flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full py-3.5 rounded-2xl bg-[#2855D9] hover:bg-[#1E42B0] text-white font-bold text-xs transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer"
               >
                 <Sparkles className="w-4 h-4" />
                 <span>Générer le Quiz RAG ({selectedCount} questions)</span>
@@ -267,20 +267,20 @@ export function AdaptiveDrillModal({
           ) : isFinished ? (
             /* Summary Screen */
             <div className="py-8 text-center space-y-4">
-              <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-amber-500/20 to-emerald-500/20 border border-amber-500/30 text-amber-400 flex items-center justify-center mx-auto shadow-xl">
+              <div className="w-16 h-16 rounded-3xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center mx-auto shadow-2xs">
                 <Award className="w-8 h-8" />
               </div>
               <div className="space-y-1">
-                <h4 className="text-xl font-extrabold text-white">Séance d'évaluation terminée !</h4>
-                <p className="text-xs text-slate-300">
+                <h4 className="text-xl font-bold text-[#111A2E]">Séance d'évaluation terminée !</h4>
+                <p className="text-xs text-[#68748A]">
                   Votre score :{" "}
-                  <span className="font-extrabold text-emerald-400 text-base">
+                  <span className="font-bold text-[#059669] text-base">
                     {score} / {questions.length}
                   </span>{" "}
                   ({Math.round((score / Math.max(1, questions.length)) * 100)}%)
                 </p>
               </div>
-              <p className="text-xs text-slate-400 max-w-sm mx-auto leading-relaxed">
+              <p className="text-xs text-[#68748A] max-w-sm mx-auto leading-relaxed">
                 Ce micro-test consolide votre courbe de mémoire à long terme sur le module {drill?.subjectName}.
               </p>
             </div>
@@ -289,17 +289,17 @@ export function AdaptiveDrillModal({
             <div className="space-y-4">
               {/* Provenance Badge */}
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-slate-900 border border-white/10 text-slate-300">
+                <span className="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-[#F8FAFC] border border-[#E4E8F0] text-[#68748A]">
                   {currentQuestion.subjectName}
                 </span>
-                <span className="inline-flex items-center gap-1 text-[11px] text-emerald-400">
+                <span className="inline-flex items-center gap-1 text-[11px] text-[#059669] font-medium">
                   <ShieldCheck className="w-3.5 h-3.5" />
                   <span>Source académique vérifiée</span>
                 </span>
               </div>
 
               {/* Question Text */}
-              <h4 className="text-sm font-bold text-white leading-snug">
+              <h4 className="text-sm font-bold text-[#111A2E] leading-snug">
                 {currentQuestion.questionText}
               </h4>
 
@@ -307,18 +307,18 @@ export function AdaptiveDrillModal({
               <div className="space-y-2">
                 {currentQuestion.options.map((opt) => {
                   const isSelected = selectedOptionId === opt.id;
-                  let optionStyles = "bg-slate-900/60 border-white/10 hover:border-white/20 text-slate-200";
+                  let optionStyles = "bg-[#F8FAFC] border-[#E4E8F0] hover:border-[#2855D9]/40 hover:bg-white text-[#182235]";
 
                   if (hasSubmittedAnswer) {
                     if (opt.isCorrect) {
-                      optionStyles = "bg-emerald-950/60 border-emerald-500 text-emerald-200 shadow-md shadow-emerald-950/30";
+                      optionStyles = "bg-emerald-50 border-emerald-300 text-emerald-800 shadow-2xs";
                     } else if (isSelected && !opt.isCorrect) {
-                      optionStyles = "bg-rose-950/60 border-rose-500 text-rose-200 shadow-md shadow-rose-950/30";
+                      optionStyles = "bg-rose-50 border-rose-300 text-rose-800 shadow-2xs";
                     } else {
-                      optionStyles = "bg-slate-900/20 border-white/[0.04] opacity-35 text-slate-500";
+                      optionStyles = "bg-slate-50 border-[#E4E8F0] opacity-40 text-[#94A3B8]";
                     }
                   } else if (isSelected) {
-                    optionStyles = "bg-indigo-950/50 border-indigo-500 text-indigo-200 ring-1 ring-indigo-500/50";
+                    optionStyles = "bg-[#EDF2FF] border-[#2855D9] text-[#2855D9]";
                   }
 
                   return (
@@ -330,13 +330,13 @@ export function AdaptiveDrillModal({
                     >
                       <div className="mt-0.5 shrink-0">
                         {hasSubmittedAnswer && opt.isCorrect ? (
-                          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                         ) : hasSubmittedAnswer && isSelected && !opt.isCorrect ? (
-                          <XCircle className="w-4 h-4 text-rose-400" />
+                          <XCircle className="w-4 h-4 text-rose-600" />
                         ) : (
                           <div
                             className={`w-4 h-4 rounded-full border flex items-center justify-center text-[10px] ${
-                              isSelected ? "border-indigo-400 bg-indigo-400/20" : "border-slate-700"
+                              isSelected ? "border-[#2855D9] bg-[#2855D9]" : "border-[#E4E8F0] bg-white"
                             }`}
                           />
                         )}
@@ -349,27 +349,27 @@ export function AdaptiveDrillModal({
 
               {/* Explanation on submit */}
               {hasSubmittedAnswer && currentQuestion.explanation && (
-                <div className="p-4 rounded-2xl bg-indigo-950/30 border border-indigo-500/20 text-xs text-slate-300 space-y-1.5 animate-in fade-in duration-200">
-                  <div className="font-bold text-indigo-300 flex items-center gap-1.5">
+                <div className="p-4 rounded-2xl bg-[#F8FAFC] border border-[#E4E8F0] text-xs text-[#68748A] space-y-1.5 animate-in fade-in duration-200">
+                  <div className="font-bold text-[#2855D9] flex items-center gap-1.5">
                     <HelpCircle className="w-3.5 h-3.5" />
                     <span>Explication pédagogique :</span>
                   </div>
-                  <p className="text-[11px] leading-relaxed text-slate-300">{currentQuestion.explanation}</p>
+                  <p className="text-[11px] leading-relaxed text-[#182235]">{currentQuestion.explanation}</p>
                 </div>
               )}
             </div>
           ) : (
-            <div className="py-8 text-center text-slate-400 text-xs">
+            <div className="py-8 text-center text-[#68748A] text-xs">
               Aucune question disponible.
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-white/10 bg-slate-950/60 backdrop-blur-xl flex items-center justify-between">
+        <div className="px-6 py-4 border-t border-[#E4E8F0] bg-[#FAFBFD] flex items-center justify-between">
           <button
             onClick={onClose}
-            className="px-4 py-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 text-xs font-bold transition-colors cursor-pointer"
+            className="px-4 py-2 rounded-xl text-[#68748A] hover:text-[#111A2E] hover:bg-[#F4F6FA] text-xs font-bold transition-colors cursor-pointer"
           >
             Fermer
           </button>
@@ -379,7 +379,7 @@ export function AdaptiveDrillModal({
               {isFinished ? (
                 <button
                   onClick={handleRestart}
-                  className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all shadow-md cursor-pointer"
+                  className="px-5 py-2.5 rounded-xl bg-[#2855D9] hover:bg-[#1E42B0] text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
                 >
                   Recommencer ce quiz
                 </button>
@@ -387,14 +387,14 @@ export function AdaptiveDrillModal({
                 <button
                   onClick={handleValidateAnswer}
                   disabled={!selectedOptionId}
-                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:brightness-110 text-white font-extrabold text-xs transition-all shadow-lg shadow-indigo-600/30 disabled:opacity-40 cursor-pointer"
+                  className="px-5 py-2.5 rounded-xl bg-[#2855D9] hover:bg-[#1E42B0] text-white font-bold text-xs transition-all shadow-xs disabled:opacity-40 cursor-pointer"
                 >
                   Valider la réponse
                 </button>
               ) : (
                 <button
                   onClick={handleNext}
-                  className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs flex items-center gap-1.5 transition-all shadow-md shadow-emerald-950/40 cursor-pointer"
+                  className="px-5 py-2.5 rounded-xl bg-[#059669] hover:bg-[#047857] text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
                 >
                   <span>{currentIndex + 1 < questions.length ? "Question suivante" : "Voir le bilan"}</span>
                   <ArrowRight className="w-3.5 h-3.5" />

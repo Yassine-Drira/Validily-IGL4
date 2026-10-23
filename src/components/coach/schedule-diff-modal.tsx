@@ -70,22 +70,22 @@ export function ScheduleDiffModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-[#0f172a] border border-slate-800 rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-200">
+      <div className="bg-white border border-[#E4E8F0] rounded-3xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/50">
+        <div className="px-6 py-4 border-b border-[#E4E8F0] flex items-center justify-between bg-[#FAFBFD]">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+            <div className="w-10 h-10 rounded-2xl bg-[#EDF2FF] border border-[#2855D9]/20 flex items-center justify-center text-[#2855D9] shadow-2xs">
               <Calendar className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-slate-100">Proposition d'Emploi du Temps</h3>
-              <p className="text-xs text-slate-400">Vérifiez et validez les créneaux suggérés avant inscription au calendrier</p>
+              <h3 className="text-base font-bold text-[#111A2E]">Proposition d'Emploi du Temps</h3>
+              <p className="text-xs text-[#68748A]">Vérifiez et validez les créneaux suggérés avant inscription au calendrier</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+            className="p-2 rounded-xl text-[#68748A] hover:text-[#111A2E] hover:bg-[#F4F6FA] transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -94,14 +94,14 @@ export function ScheduleDiffModal({
         {/* Content list */}
         <div className="p-6 overflow-y-auto space-y-4 flex-1">
           {proposedBlocks.length === 0 ? (
-            <div className="text-center py-8 text-slate-400 text-xs">
+            <div className="text-center py-8 text-[#68748A] text-xs">
               Aucune nouvelle proposition de créneau pour cette journée.
             </div>
           ) : (
             <div className="space-y-3">
-              <div className="flex items-center justify-between text-xs text-slate-400 px-1">
+              <div className="flex items-center justify-between text-xs text-[#68748A] px-1">
                 <span>Sélectionnez les blocs à valider :</span>
-                <span>{selectedIds.size} / {proposedBlocks.length} sélectionné(s)</span>
+                <span className="font-medium text-[#111A2E]">{selectedIds.size} / {proposedBlocks.length} sélectionné(s)</span>
               </div>
 
               {proposedBlocks.map((block) => {
@@ -110,17 +110,17 @@ export function ScheduleDiffModal({
                   <div
                     key={block.tempId}
                     onClick={() => toggleSelect(block.tempId)}
-                    className={`p-4 rounded-xl border transition-all cursor-pointer flex items-start gap-3 ${
+                    className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-start gap-3 ${
                       isSelected
-                        ? "bg-emerald-950/20 border-emerald-500/50 shadow-md"
-                        : "bg-slate-900/40 border-slate-800 opacity-60 hover:opacity-100"
+                        ? "bg-emerald-50/70 border-emerald-300 shadow-2xs"
+                        : "bg-[#F8FAFC] border-[#E4E8F0] hover:border-slate-300 hover:bg-white"
                     }`}
                   >
                     <div
                       className={`w-5 h-5 rounded-md border flex items-center justify-center mt-0.5 flex-shrink-0 transition-colors ${
                         isSelected
-                          ? "bg-emerald-600 border-emerald-500 text-white"
-                          : "border-slate-700 bg-slate-800"
+                          ? "bg-[#059669] border-[#059669] text-white"
+                          : "border-[#E4E8F0] bg-white"
                       }`}
                     >
                       {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
@@ -128,15 +128,15 @@ export function ScheduleDiffModal({
 
                     <div className="flex-1 space-y-1">
                       <div className="flex items-center justify-between gap-2">
-                        <h4 className="text-sm font-semibold text-slate-100">{block.title}</h4>
-                        <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[#182234] border border-[#23334d] text-emerald-400 text-xs font-mono">
+                        <h4 className="text-sm font-bold text-[#111A2E]">{block.title}</h4>
+                        <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#EDF2FF] border border-[#2855D9]/20 text-[#2855D9] text-xs font-mono">
                           <Clock className="w-3 h-3" />
                           <span>{block.startTime} - {block.endTime}</span>
-                          <span className="text-slate-500">({block.durationMinutes}m)</span>
+                          <span className="text-[#68748A]">({block.durationMinutes}m)</span>
                         </div>
                       </div>
 
-                      <p className="text-xs text-slate-400 leading-relaxed">{block.rationale}</p>
+                      <p className="text-xs text-[#68748A] leading-relaxed">{block.rationale}</p>
                     </div>
                   </div>
                 );
@@ -146,23 +146,23 @@ export function ScheduleDiffModal({
 
           {statusMessage && (
             <div
-              className={`p-3 rounded-xl border text-xs flex items-center gap-2 ${
+              className={`p-3.5 rounded-2xl border text-xs flex items-center gap-2 shadow-2xs ${
                 statusMessage.isError
-                  ? "bg-rose-950/40 border-rose-900 text-rose-300"
-                  : "bg-emerald-950/40 border-emerald-900 text-emerald-300"
+                  ? "bg-rose-50 border-rose-200 text-rose-700"
+                  : "bg-emerald-50 border-emerald-200 text-emerald-700"
               }`}
             >
-              <ShieldCheck className="w-4 h-4 flex-shrink-0" />
+              <ShieldCheck className="w-4 h-4 flex-shrink-0 text-emerald-600" />
               <span>{statusMessage.text}</span>
             </div>
           )}
         </div>
 
         {/* Footer actions */}
-        <div className="px-6 py-4 border-t border-slate-800 bg-slate-900/40 flex items-center justify-between">
+        <div className="px-6 py-4 border-t border-[#E4E8F0] bg-[#FAFBFD] flex items-center justify-between">
           <button
             onClick={onClose}
-            className="px-4 py-2 rounded-xl text-slate-300 hover:bg-slate-800 text-xs font-medium transition-colors"
+            className="px-4 py-2 rounded-xl text-[#68748A] hover:text-[#111A2E] hover:bg-[#F4F6FA] text-xs font-bold transition-colors cursor-pointer"
           >
             Annuler
           </button>
@@ -170,7 +170,7 @@ export function ScheduleDiffModal({
           <button
             onClick={handleApplySelected}
             disabled={isApplying || selectedIds.size === 0}
-            className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-semibold flex items-center gap-2 shadow-lg shadow-emerald-950/40 transition-all disabled:opacity-50"
+            className="px-5 py-2.5 rounded-xl bg-[#059669] hover:bg-[#047857] text-white text-xs font-bold flex items-center gap-2 shadow-xs transition-all disabled:opacity-50 cursor-pointer"
           >
             {isApplying ? (
               <>

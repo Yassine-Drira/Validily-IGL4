@@ -42,16 +42,16 @@ export function TodayTimeline({
   });
 
   return (
-    <div className="luxury-glass rounded-3xl border border-white/10 p-5 shadow-2xl space-y-4 backdrop-blur-2xl">
+    <div className="bg-white rounded-3xl border border-[#E4E8F0] p-5 shadow-xs space-y-4">
       {/* Header & Date Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/[0.08]">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#E4E8F0]">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-500/20 to-emerald-500/20 border border-white/10 flex items-center justify-center text-indigo-400 shadow-sm">
+          <div className="w-10 h-10 rounded-2xl bg-[#EDF2FF] border border-[#2855D9]/20 flex items-center justify-center text-[#2855D9] shadow-2xs">
             <Calendar className="w-5 h-5" />
           </div>
           <div>
-            <h2 className="text-base font-extrabold text-white capitalize">{formattedDate}</h2>
-            <p className="text-xs text-slate-400">Cartographie de disponibilité & créneaux</p>
+            <h2 className="text-base font-bold text-[#111A2E] capitalize">{formattedDate}</h2>
+            <p className="text-xs text-[#68748A]">Cartographie de disponibilité & créneaux</p>
           </div>
         </div>
 
@@ -59,7 +59,7 @@ export function TodayTimeline({
         {proposedCount > 0 && onOpenScheduleProposal && (
           <button
             onClick={onOpenScheduleProposal}
-            className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-110 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-emerald-600/20 transition-all cursor-pointer"
+            className="px-3.5 py-1.5 rounded-xl bg-[#059669] hover:bg-[#047857] text-white font-bold text-xs flex items-center gap-1.5 shadow-xs transition-all cursor-pointer"
           >
             <Sparkles className="w-3.5 h-3.5 text-white" />
             <span>Voir planning proposé ({proposedCount})</span>
@@ -69,34 +69,34 @@ export function TodayTimeline({
 
       {/* Metrics Row */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-        <div className="luxury-card rounded-2xl p-3 border border-white/[0.06]">
-          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Temps Libre Restant</div>
-          <div className="text-lg font-extrabold text-emerald-400 mt-1 font-tabular flex items-baseline gap-1">
+        <div className="bg-[#F8FAFC] rounded-2xl p-3 border border-[#E4E8F0]">
+          <div className="text-[10px] font-bold text-[#68748A] uppercase tracking-wider">Temps Libre Restant</div>
+          <div className="text-lg font-bold text-[#059669] mt-1 font-tabular flex items-baseline gap-1">
             <span>{Math.floor(availableMinutes / 60)}h {availableMinutes % 60}m</span>
-            <span className="text-[11px] text-slate-400 font-normal">({freeSlots.length} créneaux)</span>
+            <span className="text-[11px] text-[#68748A] font-normal">({freeSlots.length} créneaux)</span>
           </div>
         </div>
 
-        <div className="luxury-card rounded-2xl p-3 border border-white/[0.06]">
-          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Temps Occupé</div>
-          <div className="text-lg font-extrabold text-indigo-400 mt-1 font-tabular flex items-baseline gap-1">
+        <div className="bg-[#F8FAFC] rounded-2xl p-3 border border-[#E4E8F0]">
+          <div className="text-[10px] font-bold text-[#68748A] uppercase tracking-wider">Temps Occupé</div>
+          <div className="text-lg font-bold text-[#2855D9] mt-1 font-tabular flex items-baseline gap-1">
             <span>{Math.floor(bookedMinutes / 60)}h {bookedMinutes % 60}m</span>
-            <span className="text-[11px] text-slate-400 font-normal">({existingBlocks.length} cours)</span>
+            <span className="text-[11px] text-[#68748A] font-normal">({existingBlocks.length} cours)</span>
           </div>
         </div>
 
-        <div className="luxury-card rounded-2xl p-3 border border-white/[0.06]">
-          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Conflits d'Agenda</div>
-          <div className={`text-lg font-extrabold mt-1 font-tabular flex items-center gap-1.5 ${conflicts.length > 0 ? "text-rose-400" : "text-slate-300"}`}>
+        <div className="bg-[#F8FAFC] rounded-2xl p-3 border border-[#E4E8F0]">
+          <div className="text-[10px] font-bold text-[#68748A] uppercase tracking-wider">Conflits d'Agenda</div>
+          <div className={`text-lg font-bold mt-1 font-tabular flex items-center gap-1.5 ${conflicts.length > 0 ? "text-rose-600" : "text-[#111A2E]"}`}>
             {conflicts.length > 0 ? (
               <>
-                <AlertTriangle className="w-4 h-4 text-rose-400" />
+                <AlertTriangle className="w-4 h-4 text-rose-500" />
                 <span>{conflicts.length} alerte(s)</span>
               </>
             ) : (
               <>
-                <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                <span className="text-xs font-semibold text-slate-300">0 chevauchement</span>
+                <ShieldCheck className="w-4 h-4 text-[#059669]" />
+                <span className="text-xs font-semibold text-[#059669]">0 chevauchement</span>
               </>
             )}
           </div>
@@ -105,18 +105,18 @@ export function TodayTimeline({
 
       {/* Visual Availability Bar */}
       <div className="space-y-1.5 pt-1">
-        <div className="flex justify-between text-[11px] text-slate-400">
+        <div className="flex justify-between text-[11px] text-[#68748A]">
           <span>Distribution de la journée</span>
           <span className="font-tabular font-medium">{bookedPercent}% occupé • {freePercent}% libre</span>
         </div>
-        <div className="w-full h-2.5 bg-slate-900 rounded-full overflow-hidden flex border border-white/10 shadow-inner">
+        <div className="w-full h-2.5 bg-[#EDF2FF] rounded-full overflow-hidden flex border border-[#E4E8F0]">
           <div
-            className="bg-indigo-500 transition-all duration-500"
+            className="bg-[#2855D9] transition-all duration-500"
             style={{ width: `${bookedPercent}%` }}
             title={`Occupé : ${bookedMinutes} min`}
           />
           <div
-            className="bg-emerald-500 transition-all duration-500"
+            className="bg-[#059669] transition-all duration-500"
             style={{ width: `${freePercent}%` }}
             title={`Libre : ${availableMinutes} min`}
           />
@@ -125,12 +125,12 @@ export function TodayTimeline({
 
       {/* Free Slots Grid */}
       <div className="pt-2">
-        <div className="text-xs font-bold text-slate-300 mb-2 flex items-center gap-1.5">
-          <Clock className="w-3.5 h-3.5 text-emerald-400" />
+        <div className="text-xs font-bold text-[#111A2E] mb-2 flex items-center gap-1.5">
+          <Clock className="w-3.5 h-3.5 text-[#059669]" />
           <span>Créneaux libres certifiés pour révision & focus :</span>
         </div>
         {freeSlots.length === 0 ? (
-          <div className="text-xs text-slate-400 italic bg-slate-950/40 p-3 rounded-xl border border-white/[0.06]">
+          <div className="text-xs text-[#68748A] italic bg-[#F8FAFC] p-3 rounded-xl border border-[#E4E8F0]">
             Aucun créneau libre restant d'au moins 15 minutes détecté pour aujourd'hui (créneaux passés ou occupés).
           </div>
         ) : (
@@ -138,10 +138,10 @@ export function TodayTimeline({
             {freeSlots.map((slot, idx) => (
               <div
                 key={idx}
-                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-emerald-300 text-xs shadow-sm font-tabular"
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs shadow-2xs font-tabular"
               >
                 <span className="font-bold">{slot.start} - {slot.end}</span>
-                <span className="text-emerald-400/80 font-medium">({slot.durationMinutes} min)</span>
+                <span className="text-emerald-600 font-medium">({slot.durationMinutes} min)</span>
               </div>
             ))}
           </div>
@@ -150,13 +150,13 @@ export function TodayTimeline({
 
       {/* Conflict Warning Box */}
       {conflicts.length > 0 && (
-        <div className="p-3.5 rounded-2xl bg-rose-950/40 border border-rose-500/40 text-rose-300 text-xs space-y-1.5">
-          <div className="font-bold flex items-center gap-1.5 text-rose-200">
-            <AlertTriangle className="w-4 h-4 text-rose-400" />
+        <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs space-y-1.5">
+          <div className="font-bold flex items-center gap-1.5 text-rose-800">
+            <AlertTriangle className="w-4 h-4 text-rose-500" />
             <span>Attention : Détection de chevauchement d'horaires</span>
           </div>
           {conflicts.map((c, idx) => (
-            <p key={idx} className="pl-5 text-[11px] text-rose-300/90 leading-snug">
+            <p key={idx} className="pl-5 text-[11px] text-rose-700 leading-snug">
               • "{c.title}" ({c.startTime} - {c.endTime}) entre en conflit avec une autre réservation.
             </p>
           ))}

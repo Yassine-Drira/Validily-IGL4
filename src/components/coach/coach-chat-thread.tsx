@@ -86,9 +86,9 @@ export function CoachChatThread({
       title: "Que dois-je étudier aujourd'hui, et pourquoi ?",
       desc: "Arbitrage stratégique basé sur vos échéances, charge mentale et créneaux libres",
       icon: Sparkles,
-      gradient: "from-indigo-500/20 via-purple-500/10 to-transparent",
-      accent: "text-indigo-300",
-      border: "border-indigo-500/30 hover:border-indigo-400/60",
+      gradient: "from-blue-50/80 to-indigo-50/40",
+      accent: "text-[#2855D9]",
+      border: "border-[#E4E8F0] hover:border-[#2855D9]",
     },
     {
       title: "Pourquoi considères-tu cela comme mon point faible ?",
@@ -96,25 +96,25 @@ export function CoachChatThread({
         ? `Audit mémoriel chiffré des résultats en ${weakestSubjectName}`
         : "Diagnostic factuel selon la courbe d'oubli d'Ebbinghaus",
       icon: Brain,
-      gradient: "from-amber-500/20 via-orange-500/10 to-transparent",
-      accent: "text-amber-300",
-      border: "border-amber-500/30 hover:border-amber-400/60",
+      gradient: "from-amber-50/80 to-orange-50/40",
+      accent: "text-amber-600",
+      border: "border-[#E4E8F0] hover:border-amber-400",
     },
     {
       title: "Planifie une révision de 30 minutes sur mon sujet le plus fragile.",
       desc: "Allocation d'un créneau certifié sans chevauchement sur votre temps disponible",
       icon: Calendar,
-      gradient: "from-emerald-500/20 via-teal-500/10 to-transparent",
-      accent: "text-emerald-300",
-      border: "border-emerald-500/30 hover:border-emerald-400/60",
+      gradient: "from-emerald-50/80 to-teal-50/40",
+      accent: "text-[#059669]",
+      border: "border-[#E4E8F0] hover:border-emerald-400",
     },
     {
       title: "Fais-moi réviser mes erreurs récurrentes.",
       desc: "Micro-drill adaptatif de 3 questions pour stabiliser vos ancrages réflexes",
       icon: Zap,
-      gradient: "from-cyan-500/20 via-blue-500/10 to-transparent",
-      accent: "text-cyan-300",
-      border: "border-cyan-500/30 hover:border-cyan-400/60",
+      gradient: "from-purple-50/80 to-indigo-50/40",
+      accent: "text-purple-600",
+      border: "border-[#E4E8F0] hover:border-purple-400",
     },
   ];
 
@@ -202,31 +202,31 @@ export function CoachChatThread({
   };
 
   return (
-    <div className="flex flex-col h-[780px] luxury-glass rounded-3xl border border-white/10 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.7)] backdrop-blur-2xl relative overflow-hidden">
-      {/* Ambient background glows */}
-      <div className="absolute top-0 right-1/4 w-96 h-96 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-10 left-10 w-80 h-80 bg-purple-600/10 rounded-full blur-3xl pointer-events-none" />
+    <div className="flex flex-col h-[780px] bg-white rounded-3xl border border-[#E4E8F0] shadow-xs relative overflow-hidden">
+      {/* Subtle luminous background wash */}
+      <div className="absolute top-0 right-0 w-96 h-96 bg-blue-50/50 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-0 left-0 w-80 h-80 bg-indigo-50/40 rounded-full blur-3xl pointer-events-none" />
 
       {/* Thread Header - Executive Cockpit Bar */}
-      <div className="px-6 py-4 border-b border-white/[0.07] flex items-center justify-between bg-slate-950/40 backdrop-blur-xl relative z-10">
+      <div className="px-6 py-4 border-b border-[#E4E8F0] flex items-center justify-between bg-white/90 backdrop-blur-md relative z-10">
         <div className="flex items-center gap-3.5">
           <div className="relative">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-500 via-indigo-600 to-purple-600 flex items-center justify-center text-white shadow-lg shadow-indigo-500/30 ring-1 ring-white/20">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-[#2855D9] via-indigo-600 to-indigo-700 flex items-center justify-center text-white shadow-sm ring-2 ring-blue-100">
               <Sparkles className="w-5 h-5" />
             </div>
-            <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 ring-2 ring-slate-950 flex items-center justify-center">
+            <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 ring-2 ring-white flex items-center justify-center">
               <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
             </span>
           </div>
 
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-sm font-bold tracking-tight text-white">Validily AI</h2>
-              <span className="text-[10px] font-semibold tracking-wider uppercase px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-300 border border-indigo-500/30">
+              <h2 className="text-sm font-bold tracking-tight text-[#111A2E]">Validily AI</h2>
+              <span className="text-[10px] font-semibold tracking-wider uppercase px-2 py-0.5 rounded-full bg-[#EDF2FF] text-[#2855D9] border border-[#2855D9]/20 font-mono">
                 Tuteur & Architecte Pédagogique
               </span>
             </div>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-[#68748A]">
               Conseiller stratégique certifié • Synthèse RAG en temps réel de votre cursus IGL4
             </p>
           </div>
@@ -234,15 +234,15 @@ export function CoachChatThread({
 
         {/* Live Context Indicators */}
         <div className="hidden sm:flex items-center gap-2.5">
-          <div className="px-3 py-1.5 rounded-xl bg-slate-900/60 border border-white/[0.08] text-slate-300 text-xs flex items-center gap-2 shadow-sm backdrop-blur-md">
-            <Clock className="w-3.5 h-3.5 text-indigo-400" />
+          <div className="px-3 py-1.5 rounded-xl bg-[#F8FAFC] border border-[#E4E8F0] text-[#111A2E] text-xs flex items-center gap-2 shadow-2xs">
+            <Clock className="w-3.5 h-3.5 text-[#2855D9]" />
             <span className="font-tabular font-medium">
               {Math.floor(availableMinutes / 60)}h{availableMinutes % 60}m disponibles
             </span>
           </div>
 
-          <div className="px-3 py-1.5 rounded-xl bg-slate-900/60 border border-white/[0.08] text-slate-300 text-xs flex items-center gap-2 shadow-sm backdrop-blur-md">
-            <BookOpen className="w-3.5 h-3.5 text-emerald-400" />
+          <div className="px-3 py-1.5 rounded-xl bg-[#F8FAFC] border border-[#E4E8F0] text-[#111A2E] text-xs flex items-center gap-2 shadow-2xs">
+            <BookOpen className="w-3.5 h-3.5 text-[#059669]" />
             <span className="font-tabular font-medium">{activeTasksCount} devoirs</span>
           </div>
         </div>
@@ -253,17 +253,17 @@ export function CoachChatThread({
         ref={scrollContainerRef}
         className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-6 relative z-10 touch-scroll"
       >
-        {/* Empty / Welcome State with Luxury Aesthetics */}
+        {/* Empty / Welcome State with Light Luxury Aesthetics */}
         {messages.length === 0 && (
           <div className="max-w-2xl mx-auto py-4 space-y-6 animate-fadeIn">
             <div className="text-center space-y-3">
-              <div className="inline-flex p-3 rounded-3xl bg-gradient-to-br from-indigo-500/20 via-purple-500/10 to-transparent border border-indigo-500/30 shadow-[0_0_30px_rgba(99,102,241,0.2)] text-indigo-300 mb-1">
+              <div className="inline-flex p-3 rounded-2xl bg-[#EDF2FF] border border-[#2855D9]/20 text-[#2855D9] shadow-2xs mb-1">
                 <Sparkles className="w-7 h-7" />
               </div>
-              <h3 className="text-xl font-extrabold tracking-tight text-white">
+              <h3 className="text-xl font-bold tracking-tight text-[#111A2E]">
                 Prêt pour votre prochaine session d'excellence ?
               </h3>
-              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-lg mx-auto">
+              <p className="text-xs sm:text-sm text-[#68748A] leading-relaxed max-w-lg mx-auto">
                 Je suis directement synchronisé avec votre emploi du temps universitaire, vos devoirs à rendre et vos résultats d'évaluations pour arbitrer vos priorités sans aucune complaisance.
               </p>
             </div>
@@ -276,19 +276,19 @@ export function CoachChatThread({
                   <button
                     key={idx}
                     onClick={() => handleSendMessage(prompt.title)}
-                    className={`p-4 rounded-2xl border text-left bg-gradient-to-br ${prompt.gradient} ${prompt.border} bg-slate-900/50 backdrop-blur-md hover:bg-slate-800/60 hover:scale-[1.01] transition-all duration-200 flex flex-col justify-between group cursor-pointer shadow-lg`}
+                    className={`p-4 rounded-2xl border text-left bg-gradient-to-br ${prompt.gradient} ${prompt.border} hover:bg-white hover:shadow-xs transition-all duration-150 flex flex-col justify-between group cursor-pointer shadow-2xs`}
                   >
                     <div className="flex items-start justify-between gap-2 mb-3">
-                      <span className={`p-2 rounded-xl bg-slate-950/60 border border-white/10 ${prompt.accent}`}>
+                      <span className={`p-2 rounded-xl bg-white border border-[#E4E8F0] shadow-2xs ${prompt.accent}`}>
                         <IconComponent className="w-4 h-4" />
                       </span>
-                      <ArrowRight className="w-4 h-4 opacity-0 group-hover:opacity-100 -translate-x-1 group-hover:translate-x-0 transition-all text-white" />
+                      <ArrowRight className="w-4 h-4 opacity-0 group-hover:opacity-100 -translate-x-1 group-hover:translate-x-0 transition-all text-[#2855D9]" />
                     </div>
                     <div>
-                      <p className="text-xs sm:text-sm font-bold text-white group-hover:text-indigo-200 transition-colors">
+                      <p className="text-xs sm:text-sm font-bold text-[#111A2E] group-hover:text-[#2855D9] transition-colors">
                         {prompt.title}
                       </p>
-                      <p className="text-[11px] text-slate-400 mt-1 leading-snug">
+                      <p className="text-[11px] text-[#68748A] mt-1 leading-snug">
                         {prompt.desc}
                       </p>
                     </div>
@@ -298,21 +298,21 @@ export function CoachChatThread({
             </div>
 
             {/* Context Verification Card */}
-            <div className="p-4 rounded-2xl bg-slate-950/60 border border-white/[0.08] text-slate-300 text-xs flex items-center justify-between gap-4 backdrop-blur-md">
+            <div className="p-4 rounded-2xl bg-[#F8FAFC] border border-[#E4E8F0] text-[#182235] text-xs flex items-center justify-between gap-4 shadow-2xs">
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0">
+                <div className="w-8 h-8 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-700 shrink-0">
                   <ShieldCheck className="w-4 h-4" />
                 </div>
                 <div>
-                  <span className="font-semibold text-white">Données académiques certifiées</span>
-                  <p className="text-[11px] text-slate-400">
+                  <span className="font-bold text-[#111A2E]">Données académiques certifiées</span>
+                  <p className="text-[11px] text-[#68748A]">
                     {freeSlotsCount} créneau(x) libre(s) aujourd'hui • {activeTasksCount} devoir(s) en cours de suivi
                   </p>
                 </div>
               </div>
               <button
                 onClick={onRefreshContext}
-                className="px-3 py-1.5 rounded-lg bg-white/[0.06] hover:bg-white/[0.1] text-[11px] font-semibold text-indigo-300 transition-colors shrink-0"
+                className="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 border border-[#E4E8F0] text-[11px] font-semibold text-[#2855D9] transition-colors shrink-0 shadow-2xs"
               >
                 Actualiser le contexte
               </button>
@@ -331,28 +331,28 @@ export function CoachChatThread({
             >
               {/* Message Label */}
               <div className="flex items-center gap-2 px-1 text-[11px]">
-                <span className="font-semibold text-slate-400">
+                <span className={`font-semibold ${isUser ? "text-[#68748A]" : "text-[#2855D9]"}`}>
                   {isUser ? "Vous" : "Validily AI"}
                 </span>
-                <span className="text-slate-600 font-tabular">• {message.timestamp}</span>
+                <span className="text-[#94A3B8] font-tabular">• {message.timestamp}</span>
               </div>
 
               {/* Message Bubble */}
               <div
-                className={`max-w-[92%] sm:max-w-[85%] rounded-3xl p-5 text-xs sm:text-sm leading-relaxed transition-all ${
+                className={`max-w-[92%] sm:max-w-[85%] rounded-2xl p-5 text-xs sm:text-sm leading-relaxed transition-all ${
                   isUser
-                    ? "bg-gradient-to-r from-indigo-600 via-indigo-600 to-purple-600 text-white rounded-tr-sm shadow-[0_8px_25px_rgba(79,70,229,0.3)] border border-white/20"
-                    : "luxury-card text-slate-200 rounded-tl-sm border border-white/[0.08] shadow-2xl backdrop-blur-2xl"
+                    ? "bg-[#2855D9] text-white rounded-tr-xs shadow-xs"
+                    : "bg-[#F8FAFC] text-[#182235] rounded-tl-xs border border-[#E4E8F0] shadow-2xs"
                 }`}
               >
                 {/* Formatted Content */}
-                <FormattedMessage content={message.content} />
+                <FormattedMessage content={message.content} isUser={isUser} />
 
                 {/* Evidence Citations Bar */}
                 {message.citations && message.citations.length > 0 && (
-                  <div className="mt-4 pt-3.5 border-t border-white/[0.08] space-y-2">
-                    <div className="flex items-center gap-2 text-[11px] font-bold text-indigo-300">
-                      <ShieldCheck className="w-3.5 h-3.5 text-indigo-400" />
+                  <div className="mt-4 pt-3.5 border-t border-[#E4E8F0] space-y-2">
+                    <div className="flex items-center gap-2 text-[11px] font-bold text-[#2855D9]">
+                      <ShieldCheck className="w-3.5 h-3.5 text-[#2855D9]" />
                       <span className="uppercase tracking-wider">Données & Preuves Réelles :</span>
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -360,15 +360,15 @@ export function CoachChatThread({
                         <div
                           key={cIdx}
                           title={cite.detail}
-                          className="px-3 py-1.5 rounded-xl bg-slate-950/70 border border-white/10 text-[11px] text-slate-200 flex items-center gap-2 shadow-sm"
+                          className="px-3 py-1.5 rounded-xl bg-white border border-[#E4E8F0] text-[11px] text-[#182235] flex items-center gap-2 shadow-2xs"
                         >
-                          {cite.type === "task" && <BookOpen className="w-3.5 h-3.5 text-sky-400 shrink-0" />}
-                          {cite.type === "availability" && <Clock className="w-3.5 h-3.5 text-emerald-400 shrink-0" />}
-                          {cite.type === "assessment" && <Brain className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
-                          {cite.type === "mistake" && <AlertTriangle className="w-3.5 h-3.5 text-rose-400 shrink-0" />}
-                          {cite.type === "calendar" && <Calendar className="w-3.5 h-3.5 text-indigo-400 shrink-0" />}
-                          <span className="font-semibold text-white">{cite.label}</span>
-                          <span className="text-slate-400 hidden sm:inline">• {cite.detail}</span>
+                          {cite.type === "task" && <BookOpen className="w-3.5 h-3.5 text-[#2855D9] shrink-0" />}
+                          {cite.type === "availability" && <Clock className="w-3.5 h-3.5 text-[#059669] shrink-0" />}
+                          {cite.type === "assessment" && <Brain className="w-3.5 h-3.5 text-[#D97706] shrink-0" />}
+                          {cite.type === "mistake" && <AlertTriangle className="w-3.5 h-3.5 text-rose-500 shrink-0" />}
+                          {cite.type === "calendar" && <Calendar className="w-3.5 h-3.5 text-indigo-600 shrink-0" />}
+                          <span className="font-semibold text-[#111A2E]">{cite.label}</span>
+                          <span className="text-[#68748A] hidden sm:inline">• {cite.detail}</span>
                         </div>
                       ))}
                     </div>
@@ -386,50 +386,50 @@ export function CoachChatThread({
                       return (
                         <div
                           key={block.tempId}
-                          className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-indigo-950/40 via-slate-950/70 to-slate-900/60 border border-indigo-500/40 shadow-[0_8px_30px_rgba(0,0,0,0.5)] space-y-3 relative overflow-hidden"
+                          className="p-4 sm:p-5 rounded-2xl bg-white border border-blue-200 shadow-xs space-y-3 relative overflow-hidden"
                         >
                           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                             <div className="space-y-1">
                               <div className="flex items-center gap-2">
-                                <span className="px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/40">
+                                <span className="px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full bg-[#EDF2FF] text-[#2855D9] border border-[#2855D9]/20 font-mono">
                                   Créneau Proposé
                                 </span>
-                                <span className="text-xs font-tabular font-bold text-slate-300">
+                                <span className="text-xs font-tabular font-bold text-[#111A2E]">
                                   {block.date} • {block.startTime} → {block.endTime}
                                 </span>
                               </div>
-                              <h4 className="text-sm font-extrabold text-white tracking-tight">
+                              <h4 className="text-sm font-bold text-[#111A2E] tracking-tight">
                                 {block.title}
                               </h4>
                             </div>
 
-                            <span className="self-start sm:self-auto text-[11px] font-bold text-emerald-300 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/30 flex items-center gap-1.5 shadow-sm">
-                              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                            <span className="self-start sm:self-auto text-[11px] font-bold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200 flex items-center gap-1.5 shadow-2xs">
+                              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
                               Sans conflit d'agenda
                             </span>
                           </div>
 
-                          <p className="text-[11px] text-slate-300 leading-relaxed">
+                          <p className="text-[12px] text-[#68748A] leading-relaxed">
                             {block.rationale}
                           </p>
 
                           {hasError && (
-                            <p className="text-[11px] text-rose-300 bg-rose-500/10 p-2.5 rounded-xl border border-rose-500/30">
+                            <p className="text-[11px] text-rose-700 bg-rose-50 p-2.5 rounded-xl border border-rose-200">
                               {blockError.msg}
                             </p>
                           )}
 
                           <div className="pt-2 flex flex-wrap items-center gap-3">
                             {isApplied ? (
-                              <div className="flex items-center gap-2 text-xs font-bold text-emerald-300 bg-emerald-950/60 border border-emerald-500/40 px-4 py-2.5 rounded-xl shadow-lg">
-                                <CheckCheck className="w-4 h-4 text-emerald-400" />
+                              <div className="flex items-center gap-2 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-4 py-2.5 rounded-xl shadow-2xs">
+                                <CheckCheck className="w-4 h-4 text-emerald-600" />
                                 <span>Inscrit avec succès à votre emploi du temps !</span>
                               </div>
                             ) : (
                               <button
                                 onClick={() => handleConfirmBlock(block)}
                                 disabled={isApplying}
-                                className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-emerald-600 hover:brightness-110 text-white font-bold text-xs transition-all flex items-center gap-2 shadow-lg shadow-indigo-600/30 disabled:opacity-50 cursor-pointer"
+                                className="px-4 py-2.5 rounded-xl bg-[#2855D9] hover:bg-[#1E42B0] text-white font-bold text-xs transition-all flex items-center gap-2 shadow-xs disabled:opacity-50 cursor-pointer"
                               >
                                 {isApplying ? (
                                   <>
@@ -447,7 +447,7 @@ export function CoachChatThread({
 
                             <button
                               onClick={onOpenScheduleModal}
-                              className="px-3.5 py-2.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-white font-medium text-xs transition-colors border border-white/10"
+                              className="px-3.5 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-[#111A2E] font-medium text-xs transition-colors border border-[#E4E8F0] shadow-2xs"
                             >
                               Comparer avec le calendrier
                             </button>
@@ -460,33 +460,33 @@ export function CoachChatThread({
 
                 {/* Inline Proposed Drill Card */}
                 {message.proposedDrill && (
-                  <div className="mt-5 p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-amber-950/30 via-slate-950/70 to-orange-950/30 border border-amber-500/40 shadow-xl space-y-3">
+                  <div className="mt-5 p-4 sm:p-5 rounded-2xl bg-amber-50/60 border border-amber-200 shadow-xs space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-300">
+                        <div className="w-8 h-8 rounded-xl bg-amber-100 border border-amber-300 flex items-center justify-center text-amber-700">
                           <Brain className="w-4 h-4" />
                         </div>
                         <div>
-                          <span className="text-xs sm:text-sm font-extrabold text-amber-100">
+                          <span className="text-xs sm:text-sm font-bold text-[#111A2E]">
                             Micro-Drill Adaptatif ({message.proposedDrill.questionCount} questions)
                           </span>
-                          <p className="text-[10px] text-amber-400 font-medium">
+                          <p className="text-[11px] text-amber-700 font-medium">
                             Discipline ciblée : {message.proposedDrill.subjectName}
                           </p>
                         </div>
                       </div>
-                      <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/30">
+                      <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300">
                         ~3 minutes
                       </span>
                     </div>
 
-                    <p className="text-[11px] text-slate-300 leading-relaxed">
+                    <p className="text-[12px] text-[#68748A] leading-relaxed">
                       {message.proposedDrill.reason || "Ciblé sur vos erreurs pour consolider votre mémoire à long terme."}
                     </p>
 
                     <button
                       onClick={() => onStartDrill(message.proposedDrill?.subjectId)}
-                      className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:brightness-110 text-white font-bold text-xs transition-all flex items-center gap-2 shadow-lg shadow-amber-600/30 cursor-pointer"
+                      className="px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs transition-all flex items-center gap-2 shadow-xs cursor-pointer"
                     >
                       <Zap className="w-4 h-4" />
                       <span>Lancer le micro-drill maintenant</span>
@@ -496,12 +496,12 @@ export function CoachChatThread({
 
                 {/* Telemetry info */}
                 {message.telemetry && (
-                  <div className="mt-3.5 text-[10px] text-slate-500 flex items-center gap-2">
+                  <div className="mt-3.5 text-[10px] text-[#94A3B8] flex items-center gap-2">
                     <span className="font-tabular">
                       Généré en {message.telemetry.latencyMs}ms ({message.telemetry.provider})
                     </span>
                     {message.telemetry.isFallback && (
-                      <span className="text-amber-400/90">• Mode déterministe certifié</span>
+                      <span className="text-amber-600 font-semibold">• Mode déterministe certifié</span>
                     )}
                   </div>
                 )}
@@ -510,14 +510,14 @@ export function CoachChatThread({
           );
         })}
 
-        {/* Loading Indicator with Luxury Shimmer */}
+        {/* Loading Indicator */}
         {isLoading && (
           <div className="flex items-start gap-3 animate-fadeIn">
-            <div className="w-9 h-9 rounded-2xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shadow-lg shadow-indigo-600/20">
+            <div className="w-9 h-9 rounded-2xl bg-[#EDF2FF] border border-[#2855D9]/20 flex items-center justify-center text-[#2855D9] shadow-2xs">
               <Loader2 className="w-4 h-4 animate-spin" />
             </div>
-            <div className="p-4 rounded-3xl rounded-tl-sm luxury-card border border-white/10 text-xs text-slate-300 flex items-center gap-2.5">
-              <Sparkles className="w-4 h-4 text-indigo-400 animate-pulse" />
+            <div className="p-4 rounded-2xl rounded-tl-xs bg-white border border-[#E4E8F0] text-xs text-[#68748A] flex items-center gap-2.5 shadow-2xs">
+              <Sparkles className="w-4 h-4 text-[#2855D9] animate-pulse" />
               <span>Validily AI analyse vos documents et données académiques en temps réel...</span>
             </div>
           </div>
@@ -525,14 +525,14 @@ export function CoachChatThread({
 
         {/* Error Banner */}
         {error && (
-          <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center justify-between gap-3">
+          <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center justify-between gap-3 shadow-2xs">
             <div className="flex items-center gap-2.5">
-              <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+              <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
               <span>{error}</span>
             </div>
             <button
               onClick={() => handleSendMessage()}
-              className="px-3 py-1.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 font-bold text-xs flex items-center gap-1.5 transition-colors"
+              className="px-3 py-1.5 rounded-xl bg-rose-100 hover:bg-rose-200 text-rose-800 font-bold text-xs flex items-center gap-1.5 transition-colors"
             >
               <RotateCcw className="w-3.5 h-3.5" />
               <span>Réessayer</span>
@@ -545,9 +545,9 @@ export function CoachChatThread({
 
       {/* Quick Prompts Bar (when chat has messages) */}
       {messages.length > 0 && (
-        <div className="px-6 py-2.5 border-t border-white/[0.06] bg-slate-950/60 backdrop-blur-md flex items-center gap-2 overflow-x-auto touch-scroll">
-          <span className="text-[10px] uppercase font-bold text-slate-500 shrink-0 flex items-center gap-1">
-            <Sparkles className="w-3 h-3 text-indigo-400" />
+        <div className="px-6 py-2.5 border-t border-[#E4E8F0] bg-[#FAFBFD] flex items-center gap-2 overflow-x-auto touch-scroll">
+          <span className="text-[10px] uppercase font-bold text-[#68748A] shrink-0 flex items-center gap-1">
+            <Sparkles className="w-3 h-3 text-[#2855D9]" />
             Suggestions :
           </span>
           {suggestedPrompts.map((p, idx) => (
@@ -555,7 +555,7 @@ export function CoachChatThread({
               key={idx}
               onClick={() => handleSendMessage(p.title)}
               disabled={isLoading}
-              className="px-3 py-1 rounded-full bg-slate-900/90 hover:bg-indigo-600/30 hover:border-indigo-500/50 border border-white/[0.08] text-[11px] text-slate-300 whitespace-nowrap transition-all disabled:opacity-50 cursor-pointer shadow-sm"
+              className="px-3 py-1 rounded-full bg-white hover:bg-[#EDF2FF] hover:text-[#2855D9] hover:border-[#2855D9]/30 border border-[#E4E8F0] text-[11px] text-[#182235] whitespace-nowrap transition-all disabled:opacity-50 cursor-pointer shadow-2xs"
             >
               {p.title}
             </button>
@@ -563,9 +563,9 @@ export function CoachChatThread({
         </div>
       )}
 
-      {/* Composer Input Area with Luxury Glass Styling */}
-      <div className="p-4 sm:p-5 border-t border-white/[0.08] bg-slate-950/80 backdrop-blur-xl relative z-10">
-        <div className="relative flex items-center gap-2 focus-within:ring-2 focus-within:ring-indigo-500/30 rounded-2xl transition-all">
+      {/* Composer Input Area */}
+      <div className="p-4 sm:p-5 border-t border-[#E4E8F0] bg-white relative z-10">
+        <div className="relative flex items-center gap-2 focus-within:ring-2 focus-within:ring-[#2855D9]/20 rounded-2xl transition-all">
           <textarea
             ref={textareaRef}
             rows={1}
@@ -574,13 +574,13 @@ export function CoachChatThread({
             onKeyDown={handleKeyDown}
             placeholder="Posez une question sur vos devoirs, créneaux ou points faibles... (Entrée pour envoyer)"
             disabled={isLoading}
-            className="w-full resize-none rounded-2xl bg-slate-900/90 border border-white/10 px-5 py-3.5 text-xs sm:text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-indigo-500/60 transition-all disabled:opacity-50 pr-14 min-h-[50px] max-h-[140px] shadow-inner"
+            className="w-full resize-none rounded-2xl bg-[#F8FAFC] border border-[#E4E8F0] px-5 py-3.5 text-xs sm:text-sm text-[#182235] placeholder:text-[#94A3B8] focus:bg-white focus:outline-none focus:border-[#2855D9] transition-all disabled:opacity-50 pr-14 min-h-[50px] max-h-[140px]"
           />
 
           <button
             onClick={() => handleSendMessage()}
             disabled={!inputMessage.trim() || isLoading}
-            className="absolute right-2.5 px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:brightness-110 text-white font-bold transition-all disabled:opacity-30 disabled:hover:brightness-100 cursor-pointer shadow-lg shadow-indigo-600/30"
+            className="absolute right-2.5 px-3.5 py-2.5 rounded-xl bg-[#2855D9] hover:bg-[#1E42B0] text-white font-bold transition-all disabled:opacity-30 cursor-pointer shadow-xs"
             title="Envoyer le message"
           >
             {isLoading ? (
@@ -591,11 +591,11 @@ export function CoachChatThread({
           </button>
         </div>
 
-        <div className="flex items-center justify-between mt-2.5 px-2 text-[10px] text-slate-500 font-medium">
+        <div className="flex items-center justify-between mt-2.5 px-2 text-[10px] text-[#94A3B8] font-medium">
           <span>
-            Touche <strong className="text-slate-400">Entrée</strong> pour envoyer • <strong className="text-slate-400">Maj+Entrée</strong> pour nouvelle ligne
+            Touche <strong className="text-[#68748A]">Entrée</strong> pour envoyer • <strong className="text-[#68748A]">Maj+Entrée</strong> pour nouvelle ligne
           </span>
-          <span className="hidden sm:inline text-indigo-400/80">
+          <span className="hidden sm:inline text-[#2855D9] font-medium">
             ✓ Réponses déterministes vérifiées sur vos bases de données
           </span>
         </div>
@@ -605,9 +605,9 @@ export function CoachChatThread({
 }
 
 /**
- * Safe, high-end Markdown & Typography Renderer for Coach answers
+ * High-end Markdown & Typography Renderer for Coach answers
  */
-function FormattedMessage({ content }: { content: string }) {
+function FormattedMessage({ content, isUser = false }: { content: string; isUser?: boolean }) {
   const lines = content.split("\n");
 
   return (
@@ -622,7 +622,7 @@ function FormattedMessage({ content }: { content: string }) {
         // H3 Header
         if (line.startsWith("### ")) {
           return (
-            <h3 key={idx} className="text-sm font-extrabold text-indigo-200 mt-3 mb-1 tracking-tight flex items-center gap-1.5">
+            <h3 key={idx} className={`text-sm font-bold mt-3 mb-1 tracking-tight flex items-center gap-1.5 ${isUser ? "text-white" : "text-[#2855D9]"}`}>
               {line.replace("### ", "")}
             </h3>
           );
@@ -631,7 +631,7 @@ function FormattedMessage({ content }: { content: string }) {
         // H2 Header
         if (line.startsWith("## ")) {
           return (
-            <h2 key={idx} className="text-base font-extrabold text-white mt-3 mb-1 tracking-tight">
+            <h2 key={idx} className={`text-base font-bold mt-3 mb-1 tracking-tight ${isUser ? "text-white" : "text-[#111A2E]"}`}>
               {line.replace("## ", "")}
             </h2>
           );
@@ -641,9 +641,9 @@ function FormattedMessage({ content }: { content: string }) {
         if (line.startsWith("- ") || line.startsWith("* ")) {
           return (
             <div key={idx} className="flex items-start gap-2.5 ml-2">
-              <span className="text-indigo-400 mt-1 text-xs">•</span>
-              <span className="flex-1 text-slate-300">
-                <InlineFormatting text={line.slice(2)} />
+              <span className={`mt-1 text-xs ${isUser ? "text-white/80" : "text-[#2855D9]"}`}>•</span>
+              <span className={`flex-1 ${isUser ? "text-white/95" : "text-[#182235]"}`}>
+                <InlineFormatting text={line.slice(2)} isUser={isUser} />
               </span>
             </div>
           );
@@ -654,9 +654,9 @@ function FormattedMessage({ content }: { content: string }) {
         if (numMatch) {
           return (
             <div key={idx} className="flex items-start gap-2.5 ml-1">
-              <span className="font-bold text-indigo-400 min-w-[18px] font-tabular">{numMatch[1]}.</span>
-              <span className="flex-1 text-slate-300">
-                <InlineFormatting text={numMatch[2]} />
+              <span className={`font-bold min-w-[18px] font-tabular ${isUser ? "text-white" : "text-[#2855D9]"}`}>{numMatch[1]}.</span>
+              <span className={`flex-1 ${isUser ? "text-white/95" : "text-[#182235]"}`}>
+                <InlineFormatting text={numMatch[2]} isUser={isUser} />
               </span>
             </div>
           );
@@ -664,8 +664,8 @@ function FormattedMessage({ content }: { content: string }) {
 
         // Regular paragraph
         return (
-          <p key={idx} className="text-slate-200">
-            <InlineFormatting text={line} />
+          <p key={idx} className={isUser ? "text-white" : "text-[#182235]"}>
+            <InlineFormatting text={line} isUser={isUser} />
           </p>
         );
       })}
@@ -676,7 +676,7 @@ function FormattedMessage({ content }: { content: string }) {
 /**
  * Parses bold (**text**), inline code (`code`), and italics (*text*)
  */
-function InlineFormatting({ text }: { text: string }) {
+function InlineFormatting({ text, isUser = false }: { text: string; isUser?: boolean }) {
   const parts = text.split(/(\*\*.*?\*\*|`.*?`|\*.*?\*)/g);
 
   return (
@@ -684,7 +684,7 @@ function InlineFormatting({ text }: { text: string }) {
       {parts.map((part, i) => {
         if (part.startsWith("**") && part.endsWith("**")) {
           return (
-            <strong key={i} className="font-bold text-white">
+            <strong key={i} className={`font-bold ${isUser ? "text-white" : "text-[#111A2E]"}`}>
               {part.slice(2, -2)}
             </strong>
           );
@@ -693,7 +693,11 @@ function InlineFormatting({ text }: { text: string }) {
           return (
             <code
               key={i}
-              className="px-1.5 py-0.5 rounded-md bg-slate-950 border border-white/10 text-indigo-300 font-mono text-[11px]"
+              className={`px-1.5 py-0.5 rounded-md font-mono text-[11px] ${
+                isUser
+                  ? "bg-white/20 text-white"
+                  : "bg-[#EDF2FF] border border-[#2855D9]/20 text-[#2855D9]"
+              }`}
             >
               {part.slice(1, -1)}
             </code>
@@ -701,7 +705,7 @@ function InlineFormatting({ text }: { text: string }) {
         }
         if (part.startsWith("*") && part.endsWith("*")) {
           return (
-            <em key={i} className="italic text-slate-300">
+            <em key={i} className={`italic ${isUser ? "text-white/80" : "text-[#68748A]"}`}>
               {part.slice(1, -1)}
             </em>
           );

@@ -186,48 +186,48 @@ export function CoachShell({ initialPlan }: CoachShellProps) {
   return (
     <div className="space-y-6">
       {/* Executive Intelligence Cockpit - Top Banner */}
-      <div className="luxury-glass rounded-3xl border border-white/10 p-6 shadow-2xl relative overflow-hidden backdrop-blur-2xl">
+      <div className="bg-white/95 backdrop-blur-md border border-[#E4E8F0] rounded-2xl sm:rounded-3xl p-5 sm:p-6 shadow-xs relative overflow-hidden">
         {/* Ambient Top Glow */}
-        <div className="absolute top-0 right-10 w-80 h-32 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none" />
+        <div className="absolute top-0 right-10 w-96 h-36 bg-gradient-to-br from-[#2855D9]/5 via-[#4F46E5]/5 to-transparent rounded-full blur-2xl pointer-events-none" />
 
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5 relative z-10">
           <div className="flex items-center gap-4">
             <div className="relative">
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-500 via-indigo-600 to-purple-600 flex items-center justify-center text-white shadow-xl shadow-indigo-500/30 ring-1 ring-white/20">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#2855D9] via-[#3B82F6] to-[#4F46E5] flex items-center justify-center text-white shadow-md shadow-[#2855D9]/20">
                 <Sparkles className="w-6 h-6" />
               </div>
-              <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 ring-2 ring-slate-950 flex items-center justify-center">
-                <CheckCircle2 className="w-3 h-3 text-slate-950" />
+              <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 ring-2 ring-white flex items-center justify-center">
+                <CheckCircle2 className="w-3 h-3 text-white" />
               </span>
             </div>
 
             <div>
-              <div className="flex items-center gap-2.5">
-                <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-white">
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#111A2E]">
                   Validily AI
                 </h1>
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 shadow-sm">
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[#EDF2FF] text-[#2855D9] border border-[#2855D9]/20 shadow-2xs font-mono">
                   Cockpit Pédagogique
                 </span>
                 {kpis?.quota?.isVip && (
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-amber-500/10 text-amber-300 border border-amber-500/30 shadow-sm flex items-center gap-1">
-                    <Crown className="w-3 h-3" />
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-50 text-amber-700 border border-amber-300 shadow-2xs flex items-center gap-1 font-mono">
+                    <Crown className="w-3 h-3 text-amber-500" />
                     <span>VIP Actif</span>
                   </span>
                 )}
               </div>
-              <p className="text-xs sm:text-sm text-slate-300 mt-0.5">
+              <p className="text-xs sm:text-sm text-[#68748A] mt-1">
                 Système d'assistance académique fondé sur vos documents de cours, rétention mémorielle et emploi du temps
               </p>
             </div>
           </div>
 
           {/* Quick Cockpit Controls */}
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2.5">
             <button
               id="open-rag-quiz-studio-btn"
               onClick={handleOpenQuizStudio}
-              className="px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:brightness-110 text-white font-bold text-xs transition-all flex items-center gap-2 shadow-lg shadow-purple-600/25 cursor-pointer"
+              className="px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold text-xs transition-all flex items-center gap-2 shadow-xs cursor-pointer"
             >
               <BookOpen className="w-4 h-4" />
               <span>Studio Quiz RAG</span>
@@ -235,7 +235,7 @@ export function CoachShell({ initialPlan }: CoachShellProps) {
 
             <button
               onClick={() => openFocusModal(true)}
-              className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-110 text-white font-bold text-xs transition-all flex items-center gap-2 shadow-lg shadow-emerald-600/25 cursor-pointer"
+              className="px-4 py-2 rounded-xl bg-[#059669] hover:bg-[#047857] text-white font-semibold text-xs transition-all flex items-center gap-2 shadow-xs cursor-pointer"
             >
               <Zap className="w-4 h-4" />
               <span>Démarrer un Focus</span>
@@ -243,9 +243,9 @@ export function CoachShell({ initialPlan }: CoachShellProps) {
 
             <Link
               href="/planner"
-              className="px-4 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-white font-bold text-xs transition-colors flex items-center gap-2 border border-white/10 shadow-sm"
+              className="px-4 py-2 rounded-xl bg-white hover:bg-[#F8FAFC] text-[#111A2E] hover:text-[#2855D9] font-semibold text-xs transition-colors flex items-center gap-2 border border-[#E4E8F0] shadow-2xs"
             >
-              <Calendar className="w-4 h-4 text-indigo-400" />
+              <Calendar className="w-4 h-4 text-[#2855D9]" />
               <span>Emploi du Temps</span>
             </Link>
 
@@ -258,88 +258,88 @@ export function CoachShell({ initialPlan }: CoachShellProps) {
         </div>
 
         {/* Authentic Academic KPIs Strip (Calculated from real records) */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-5 mt-5 border-t border-white/[0.08] relative z-10">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-5 mt-5 border-t border-[#E4E8F0] relative z-10">
           {/* KPI 1: Prochaine Échéance Critique */}
-          <div className="p-3.5 rounded-2xl bg-slate-950/40 border border-white/[0.06] backdrop-blur-md">
-            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider flex items-center gap-1.5">
-              <Calendar className="w-3.5 h-3.5 text-indigo-400" />
+          <div className="p-3.5 rounded-2xl bg-[#F8FAFC] border border-[#E4E8F0] hover:border-slate-300 hover:bg-white transition-all shadow-2xs">
+            <span className="text-[10px] uppercase font-bold text-[#68748A] tracking-wider flex items-center gap-1.5">
+              <Calendar className="w-3.5 h-3.5 text-[#2855D9]" />
               Prochaine Échéance
             </span>
             {kpis?.nextDeadline ? (
               <div className="mt-1">
-                <p className="text-xs sm:text-sm font-extrabold text-white truncate" title={kpis.nextDeadline.title}>
+                <p className="text-xs sm:text-sm font-bold text-[#111A2E] truncate" title={kpis.nextDeadline.title}>
                   {kpis.nextDeadline.title}
                 </p>
-                <p className={`text-[11px] font-bold ${kpis.nextDeadline.urgency === "critical" ? "text-rose-400" : "text-amber-400"}`}>
+                <p className={`text-[11px] font-bold ${kpis.nextDeadline.urgency === "critical" ? "text-rose-600" : "text-amber-600"}`}>
                   Dans {kpis.nextDeadline.daysRemaining} jour{kpis.nextDeadline.daysRemaining > 1 ? "s" : ""}
                 </p>
               </div>
             ) : (
-              <p className="text-xs font-semibold text-slate-400 mt-1">
+              <p className="text-xs font-semibold text-[#68748A] mt-1">
                 Aucune échéance urgente
               </p>
             )}
           </div>
 
           {/* KPI 2: Temps Libre d'Étude */}
-          <div className="p-3.5 rounded-2xl bg-slate-950/40 border border-white/[0.06] backdrop-blur-md">
-            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider flex items-center gap-1.5">
-              <Clock className="w-3.5 h-3.5 text-emerald-400" />
+          <div className="p-3.5 rounded-2xl bg-[#F8FAFC] border border-[#E4E8F0] hover:border-slate-300 hover:bg-white transition-all shadow-2xs">
+            <span className="text-[10px] uppercase font-bold text-[#68748A] tracking-wider flex items-center gap-1.5">
+              <Clock className="w-3.5 h-3.5 text-[#059669]" />
               Temps Libre Restant
             </span>
-            <p className="text-sm sm:text-base font-extrabold text-white mt-1 font-tabular">
+            <p className="text-sm sm:text-base font-bold text-[#111A2E] mt-1 font-tabular">
               {totalFreeMinutes > 0 ? (
                 `${Math.floor(totalFreeMinutes / 60)}h ${totalFreeMinutes % 60}m`
               ) : (
-                <span className="text-slate-400 font-bold text-xs sm:text-sm">0h 0m</span>
+                <span className="text-[#68748A] font-bold text-xs sm:text-sm">0h 0m</span>
               )}
             </p>
-            <p className="text-[10px] text-slate-400 truncate mt-0.5">
+            <p className="text-[10px] text-[#68748A] truncate mt-0.5">
               {totalFreeMinutes > 0 ? "Créneaux exploitables aujourd'hui" : "Planning complet ou temps écoulé"}
             </p>
           </div>
 
           {/* KPI 3: Quota Validily AI (Rolling 24h) */}
-          <div className="p-3.5 rounded-2xl bg-slate-950/40 border border-white/[0.06] backdrop-blur-md">
-            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+          <div className="p-3.5 rounded-2xl bg-[#F8FAFC] border border-[#E4E8F0] hover:border-slate-300 hover:bg-white transition-all shadow-2xs">
+            <span className="text-[10px] uppercase font-bold text-[#68748A] tracking-wider flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-[#4F46E5]" />
               Quota Validily AI
             </span>
             {kpis?.quota?.isVip ? (
-              <p className="text-xs sm:text-sm font-extrabold text-amber-300 mt-1 flex items-center gap-1">
-                <Crown className="w-3.5 h-3.5 text-amber-400" />
+              <p className="text-xs sm:text-sm font-bold text-amber-700 mt-1 flex items-center gap-1">
+                <Crown className="w-3.5 h-3.5 text-amber-500" />
                 <span>Illimité (VIP)</span>
               </p>
             ) : (
               <div className="mt-1">
-                <p className="text-xs sm:text-sm font-extrabold text-white font-tabular">
-                  <span className={kpis?.quota?.remaining === 0 ? "text-rose-400" : "text-emerald-400"}>
+                <p className="text-xs sm:text-sm font-bold text-[#111A2E] font-tabular">
+                  <span className={kpis?.quota?.remaining === 0 ? "text-rose-600 font-bold" : "text-[#059669] font-bold"}>
                     {kpis?.quota?.remaining ?? 5}
                   </span>{" "}
                   / 5 requêtes
                 </p>
-                <p className="text-[10px] text-slate-400">24h glissantes</p>
+                <p className="text-[10px] text-[#68748A]">24h glissantes</p>
               </div>
             )}
           </div>
 
           {/* KPI 4: Points de Vigilance (< 65%) */}
-          <div className="p-3.5 rounded-2xl bg-slate-950/40 border border-white/[0.06] backdrop-blur-md">
-            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider flex items-center gap-1.5">
-              <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+          <div className="p-3.5 rounded-2xl bg-[#F8FAFC] border border-[#E4E8F0] hover:border-slate-300 hover:bg-white transition-all shadow-2xs">
+            <span className="text-[10px] uppercase font-bold text-[#68748A] tracking-wider flex items-center gap-1.5">
+              <AlertTriangle className="w-3.5 h-3.5 text-[#D97706]" />
               Points de Vigilance
             </span>
             {kpis && kpis.vigilanceSubjects.length > 0 ? (
               <div className="mt-1">
-                <p className="text-xs sm:text-sm font-extrabold text-amber-300 truncate">
+                <p className="text-xs sm:text-sm font-bold text-amber-700 truncate" title={kpis.vigilanceSubjects[0].name}>
                   {kpis.vigilanceSubjects[0].name} ({kpis.vigilanceSubjects[0].accuracyRate}%)
                 </p>
-                <p className="text-[10px] text-slate-400">
+                <p className="text-[10px] text-[#68748A]">
                   {kpis.vigilanceSubjects.length} matière(s) &lt; 65%
                 </p>
               </div>
             ) : (
-              <p className="text-xs font-semibold text-emerald-400 mt-1 flex items-center gap-1">
+              <p className="text-xs font-semibold text-[#059669] mt-1 flex items-center gap-1">
                 <CheckCircle2 className="w-3.5 h-3.5" />
                 <span>Excellente maîtrise</span>
               </p>
@@ -349,40 +349,40 @@ export function CoachShell({ initialPlan }: CoachShellProps) {
       </div>
 
       {/* Mobile Tab Switcher (Visible only on < lg screens) */}
-      <div className="lg:hidden flex items-center gap-2 border-b border-white/10 pb-3">
+      <div className="lg:hidden flex items-center gap-2 bg-[#F1F5F9] p-1.5 rounded-2xl border border-[#E4E8F0]">
         <button
           onClick={() => setMobileTab("chat")}
-          className={`flex-1 py-2.5 px-3 rounded-2xl text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+          className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all ${
             mobileTab === "chat"
-              ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-600/30 ring-1 ring-white/20"
-              : "bg-slate-900/80 text-slate-400 hover:text-white"
+              ? "bg-white text-[#111A2E] shadow-xs border border-[#E4E8F0]"
+              : "text-[#68748A] hover:text-[#111A2E]"
           }`}
         >
-          <MessageSquare className="w-4 h-4" />
+          <MessageSquare className="w-4 h-4 text-[#2855D9]" />
           <span>Chat Validily AI</span>
         </button>
 
         <button
           onClick={() => setMobileTab("timeline")}
-          className={`flex-1 py-2.5 px-3 rounded-2xl text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+          className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all ${
             mobileTab === "timeline"
-              ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-600/30 ring-1 ring-white/20"
-              : "bg-slate-900/80 text-slate-400 hover:text-white"
+              ? "bg-white text-[#111A2E] shadow-xs border border-[#E4E8F0]"
+              : "text-[#68748A] hover:text-[#111A2E]"
           }`}
         >
-          <Calendar className="w-4 h-4" />
+          <Calendar className="w-4 h-4 text-[#059669]" />
           <span>Agenda ({plan.freeSlots.length})</span>
         </button>
 
         <button
           onClick={() => setMobileTab("weaknesses")}
-          className={`flex-1 py-2.5 px-3 rounded-2xl text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+          className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all ${
             mobileTab === "weaknesses"
-              ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-600/30 ring-1 ring-white/20"
-              : "bg-slate-900/80 text-slate-400 hover:text-white"
+              ? "bg-white text-[#111A2E] shadow-xs border border-[#E4E8F0]"
+              : "text-[#68748A] hover:text-[#111A2E]"
           }`}
         >
-          <Brain className="w-4 h-4" />
+          <Brain className="w-4 h-4 text-[#D97706]" />
           <span>Faiblesses ({plan.weakPoints.length})</span>
         </button>
       </div>
@@ -415,17 +415,17 @@ export function CoachShell({ initialPlan }: CoachShellProps) {
             mobileTab === "chat" ? "hidden lg:block" : "block"
           }`}
         >
-          {/* Sidebar Luxury Segmented Control */}
-          <div className="luxury-glass p-1.5 rounded-2xl border border-white/10 flex items-center gap-1.5 backdrop-blur-xl">
+          {/* Sidebar Segmented Control */}
+          <div className="bg-[#F1F5F9] p-1.5 rounded-2xl border border-[#E4E8F0] flex items-center gap-1.5 shadow-2xs">
             <button
               onClick={() => setSidebarTab("timeline")}
               className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all ${
                 sidebarTab === "timeline"
-                  ? "bg-indigo-600/30 text-indigo-200 border border-indigo-500/40 shadow-sm"
-                  : "text-slate-400 hover:text-white"
+                  ? "bg-white text-[#111A2E] shadow-xs border border-[#E4E8F0]"
+                  : "text-[#68748A] hover:text-[#111A2E]"
               }`}
             >
-              <Calendar className="w-3.5 h-3.5" />
+              <Calendar className="w-3.5 h-3.5 text-[#2855D9]" />
               <span>Planning</span>
             </button>
 
@@ -433,11 +433,11 @@ export function CoachShell({ initialPlan }: CoachShellProps) {
               onClick={() => setSidebarTab("weaknesses")}
               className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all ${
                 sidebarTab === "weaknesses"
-                  ? "bg-amber-600/30 text-amber-200 border border-amber-500/40 shadow-sm"
-                  : "text-slate-400 hover:text-white"
+                  ? "bg-white text-[#111A2E] shadow-xs border border-[#E4E8F0]"
+                  : "text-[#68748A] hover:text-[#111A2E]"
               }`}
             >
-              <Brain className="w-3.5 h-3.5" />
+              <Brain className="w-3.5 h-3.5 text-[#D97706]" />
               <span>Faiblesses ({plan.weakPoints.length})</span>
             </button>
 
@@ -445,11 +445,11 @@ export function CoachShell({ initialPlan }: CoachShellProps) {
               onClick={() => setSidebarTab("recommendations")}
               className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all ${
                 sidebarTab === "recommendations"
-                  ? "bg-purple-600/30 text-purple-200 border border-purple-500/40 shadow-sm"
-                  : "text-slate-400 hover:text-white"
+                  ? "bg-white text-[#111A2E] shadow-xs border border-[#E4E8F0]"
+                  : "text-[#68748A] hover:text-[#111A2E]"
               }`}
             >
-              <ListTodo className="w-3.5 h-3.5" />
+              <ListTodo className="w-3.5 h-3.5 text-purple-600" />
               <span>Actions</span>
             </button>
           </div>

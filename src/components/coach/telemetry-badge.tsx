@@ -14,29 +14,29 @@ export function TelemetryBadge({ telemetry, onRefresh, isRefreshing }: Telemetry
   return (
     <div className="flex flex-wrap items-center gap-2 text-xs font-mono">
       {/* Provider & Latency */}
-      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#182234] border border-[#23334d] text-[#93c5fd]">
-        <Zap className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
-        <span className="font-medium text-slate-200">{telemetry.provider}</span>
-        <span className="text-[#64748b]">·</span>
-        <span className="text-emerald-400 font-semibold">{telemetry.latencyMs} ms</span>
+      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#F8FAFC] border border-[#E4E8F0] text-[#1E293B] shadow-2xs">
+        <Zap className="w-3.5 h-3.5 text-amber-500" />
+        <span className="font-semibold text-[#111A2E]">{telemetry.provider}</span>
+        <span className="text-[#94A3B8]">·</span>
+        <span className="text-[#059669] font-bold">{telemetry.latencyMs} ms</span>
       </div>
 
       {/* Cache Status */}
       <div
-        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[11px] ${
+        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-[11px] font-semibold ${
           telemetry.cacheHit
-            ? "bg-emerald-950/40 border-emerald-800/60 text-emerald-300"
-            : "bg-slate-800/40 border-slate-700/60 text-slate-300"
+            ? "bg-emerald-50 border-emerald-200 text-emerald-700"
+            : "bg-slate-100 border-[#E4E8F0] text-[#68748A]"
         }`}
       >
-        <Database className="w-3 h-3" />
+        <Database className="w-3 h-3 text-[#2855D9]" />
         <span>{telemetry.cacheHit ? "Cache HIT (<1ms)" : "Calcul dynamique"}</span>
       </div>
 
       {/* Fallback / Local mode indicator */}
       {telemetry.isFallback && (
-        <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-950/40 border border-blue-800/60 text-blue-300 text-[11px]">
-          <CheckCircle2 className="w-3 h-3 text-blue-400" />
+        <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#EDF2FF] border border-[#2855D9]/20 text-[#2855D9] text-[11px] font-semibold">
+          <CheckCircle2 className="w-3 h-3 text-[#2855D9]" />
           <span>100% Local / Zero Egress</span>
         </div>
       )}
@@ -46,12 +46,12 @@ export function TelemetryBadge({ telemetry, onRefresh, isRefreshing }: Telemetry
         <button
           onClick={onRefresh}
           disabled={isRefreshing}
-          className="px-2.5 py-1 rounded-lg bg-[#1e293b] hover:bg-[#334155] border border-[#334155] text-slate-200 transition-colors text-[11px] flex items-center gap-1 disabled:opacity-50"
+          className="px-2.5 py-1 rounded-lg bg-white hover:bg-[#F8FAFC] border border-[#E4E8F0] text-[#111A2E] transition-colors text-[11px] font-semibold flex items-center gap-1 shadow-2xs disabled:opacity-50 cursor-pointer"
           title="Forcer le recalcul du plan"
         >
           {isRefreshing ? (
             <>
-              <span className="w-2.5 h-2.5 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
+              <span className="w-2.5 h-2.5 border-2 border-[#2855D9] border-t-transparent rounded-full animate-spin" />
               <span>Actualisation...</span>
             </>
           ) : (
