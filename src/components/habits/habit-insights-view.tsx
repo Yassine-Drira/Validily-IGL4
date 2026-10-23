@@ -18,6 +18,9 @@ import {
   Lock,
   BarChart3,
   Target,
+  ChevronLeft,
+  ChevronRight,
+  RotateCcw,
 } from "lucide-react";
 import type {
   HabitWithTodayState,
@@ -30,6 +33,7 @@ import {
   getHabitAnalyticsAction,
   applyDiagnosticAdjustmentAction,
 } from "@/lib/actions/habit-actions";
+import { getLocalTodayDateString } from "@/lib/habits/habit-engine";
 
 interface HabitInsightsViewProps {
   habits: HabitWithTodayState[];
@@ -48,6 +52,38 @@ const WEEKDAY_LOCALE_ORDER = [
   { index: 0, label: "Dim", fullName: "Dimanche" },
 ];
 
+function getPreviousMonth(monthStr: string): string {
+  const [year, month] = monthStr.split("-").map(Number);
+  const d = new Date(year, month - 2, 1);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  return `${y}-${m}`;
+}
+
+function getNextMonth(monthStr: string): string {
+  const [year, month] = monthStr.split("-").map(Number);
+  const d = new Date(year, month, 1);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  return `${y}-${m}`;
+}
+
+function formatMonthYear(monthStr: string): string {
+  try {
+    const [year, month] = monthStr.split("-").map(Number);
+    const d = new Date(year, month - 1, 1);
+    const label = new Intl.DateTimeFormat("fr-FR", { month: "long", year: "numeric" }).format(d);
+    return label.charAt(0).toUpperCase() + label.slice(1);
+  } catch {
+    return monthStr;
+  }
+}
+
+function getDaysInMonth(monthStr: string): number {
+  const [year, month] = monthStr.split("-").map(Number);
+  return new Date(year, month, 0).getDate();
+}
+
 export function HabitInsightsView({
   habits,
   goals,
@@ -61,6 +97,20 @@ export function HabitInsightsView({
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [applyingDiagId, setApplyingDiagId] = useState<string | null>(null);
 
+  const todayStr = React.useMemo(() => getLocalTodayDateString(), []);
+  const currentMonthStr = todayStr.slice(0, 7);
+  const [selectedMonth, setSelectedMonth] = useState<string>(currentMonthStr);
+
+  const isCurrentMonth = selectedMonth === currentMonthStr;
+
+  const anchorDate = React.useMemo(() => {
+    if (isCurrentMonth) {
+      return todayStr;
+    }
+    const lastDay = getDaysInMonth(selectedMonth);
+    return `${selectedMonth}-${String(lastDay).padStart(2, "0")}`;
+  }, [isCurrentMonth, selectedMonth, todayStr]);
+
   // Sync selectedHabitId if habits change
   useEffect(() => {
     if (!selectedHabitId && habits.length > 0) {
@@ -68,7 +118,7 @@ export function HabitInsightsView({
     }
   }, [habits, selectedHabitId]);
 
-  // Load analytics when habit or range changes
+  // Load analytics when habit, range, or selected month changes
   useEffect(() => {
     if (!selectedHabitId) return;
     let isCancelled = false;
@@ -76,7 +126,7 @@ export function HabitInsightsView({
     async function load() {
       setIsLoading(true);
       try {
-        const res = await getHabitAnalyticsAction(selectedHabitId, rangeDays);
+        const res = await getHabitAnalyticsAction(selectedHabitId, rangeDays, anchorDate);
         if (!isCancelled && res.success && res.data) {
           setAnalytics(res.data);
         }
@@ -91,7 +141,7 @@ export function HabitInsightsView({
     return () => {
       isCancelled = true;
     };
-  }, [selectedHabitId, rangeDays]);
+  }, [selectedHabitId, rangeDays, anchorDate]);
 
   const activeHabit = habits.find((h) => h.id === selectedHabitId) || habits[0];
 
@@ -108,7 +158,7 @@ export function HabitInsightsView({
         );
         if (res.success) {
           onRefresh();
-          const updated = await getHabitAnalyticsAction(activeHabit.id, rangeDays);
+          const updated = await getHabitAnalyticsAction(activeHabit.id, rangeDays, anchorDate);
           if (updated.success && updated.data) {
             setAnalytics(updated.data);
           }
@@ -198,14 +248,67 @@ export function HabitInsightsView({
             </select>
           </div>
 
-          <div className="flex items-center gap-1 bg-[#F4F6FA] p-1 rounded-lg border border-[#E4E8F0] text-xs font-semibold">
-            {[7, 30, 90].map((days) => (
+          {/* Month History Navigator */}
+          <div className="flex items-center gap-1 bg-[#F4F6FA] p-1 rounded-xl border border-[#E4E8F0] text-xs">
+            <button
+              type="button"
+              onClick={() => setSelectedMonth(getPreviousMonth(selectedMonth))}
+              className="p-1.5 text-[#68748A] hover:text-[#111A2E] hover:bg-white rounded-lg transition-colors cursor-pointer"
+              title="Mois précédent"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+
+            <div className="flex items-center gap-1.5 px-2 font-bold text-[#111A2E] text-xs">
+              <Calendar className="w-3.5 h-3.5 text-[#2855D9]" />
+              <span>{formatMonthYear(selectedMonth)}</span>
+              {isCurrentMonth ? (
+                <span className="text-[10px] font-semibold bg-[#ECFDF5] text-[#059669] px-1.5 py-0.2 rounded-full border border-[#A7F3D0]">
+                  Actuel
+                </span>
+              ) : (
+                <span className="text-[10px] font-semibold bg-[#FEF3C7] text-[#D97706] px-1.5 py-0.2 rounded-full border border-[#FDE68A]">
+                  Historique
+                </span>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setSelectedMonth(getNextMonth(selectedMonth))}
+              disabled={isCurrentMonth}
+              className={`p-1.5 rounded-lg transition-colors ${
+                isCurrentMonth
+                  ? "text-[#CBD5E1] cursor-not-allowed"
+                  : "text-[#68748A] hover:text-[#111A2E] hover:bg-white cursor-pointer"
+              }`}
+              title="Mois suivant"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+
+          {!isCurrentMonth && (
+            <button
+              type="button"
+              onClick={() => setSelectedMonth(currentMonthStr)}
+              className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-[#2855D9] bg-[#EDF2FF] hover:bg-[#DBEAFE] border border-[#BFDBFE] rounded-lg transition-colors cursor-pointer"
+              title="Revenir au mois en cours"
+            >
+              <RotateCcw className="w-3 h-3" />
+              <span>Ce mois-ci</span>
+            </button>
+          )}
+
+          {/* Segmented Period Horizon Controls: 7j, 15j, 30j, 50j (90j eliminated) */}
+          <div className="flex items-center gap-1 bg-[#F4F6FA] p-1 rounded-xl border border-[#E4E8F0] text-xs font-semibold">
+            {[7, 15, 30, 50].map((days) => (
               <button
                 key={days}
                 onClick={() => setRangeDays(days)}
-                className={`px-3 py-1 rounded-md transition-colors cursor-pointer ${
+                className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
                   rangeDays === days
-                    ? "bg-white text-[#2855D9] shadow-xs"
+                    ? "bg-white text-[#2855D9] shadow-xs font-bold"
                     : "text-[#68748A] hover:text-[#182235]"
                 }`}
               >
@@ -396,6 +499,9 @@ export function HabitInsightsView({
         selectedHabitId={selectedHabitId}
         onSelectHabit={setSelectedHabitId}
         rangeDays={rangeDays}
+        selectedMonth={selectedMonth}
+        onMonthChange={setSelectedMonth}
+        onRangeDaysChange={setRangeDays}
       />
 
       {/* 4. Weekday Consistency Visualization (7 Compact Pillars with Non-Scheduled Handling) */}

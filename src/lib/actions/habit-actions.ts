@@ -655,7 +655,8 @@ export async function undoCheckinAction(payload: {
 
 export async function getHabitAnalyticsAction(
   habitId: string,
-  rangeDays: number = 30
+  rangeDays: number = 30,
+  anchorDate?: string
 ): Promise<{ success: boolean; data?: HabitAnalyticsSummary; error?: string }> {
   try {
     const authMod = await getAuthModule();
@@ -699,7 +700,8 @@ export async function getHabitAnalyticsAction(
       );
     }
 
-    const analytics = calculateHabitAnalytics(habit, checkins, rangeDays);
+    const todayStr = anchorDate || getLocalTodayDateString();
+    const analytics = calculateHabitAnalytics(habit, checkins, rangeDays, todayStr);
     return { success: true, data: analytics };
   } catch (err: any) {
     return { success: false, error: err.message || "Erreur lors du calcul analytique." };

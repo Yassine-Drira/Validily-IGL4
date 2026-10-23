@@ -17,6 +17,8 @@ import {
   Layers,
   LayoutGrid,
   CircleDot,
+  Calendar,
+  RotateCcw,
 } from "lucide-react";
 
 interface CircularHabitDialProps {
@@ -24,6 +26,41 @@ interface CircularHabitDialProps {
   selectedHabitId: string;
   onSelectHabit: (id: string) => void;
   rangeDays: number;
+  selectedMonth?: string;
+  onMonthChange?: (month: string) => void;
+  onRangeDaysChange?: (days: number) => void;
+}
+
+function getPreviousMonth(monthStr: string): string {
+  const [year, month] = monthStr.split("-").map(Number);
+  const d = new Date(year, month - 2, 1);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  return `${y}-${m}`;
+}
+
+function getNextMonth(monthStr: string): string {
+  const [year, month] = monthStr.split("-").map(Number);
+  const d = new Date(year, month, 1);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  return `${y}-${m}`;
+}
+
+function formatMonthYear(monthStr: string): string {
+  try {
+    const [year, month] = monthStr.split("-").map(Number);
+    const d = new Date(year, month - 1, 1);
+    const label = new Intl.DateTimeFormat("fr-FR", { month: "long", year: "numeric" }).format(d);
+    return label.charAt(0).toUpperCase() + label.slice(1);
+  } catch {
+    return monthStr;
+  }
+}
+
+function getDaysInMonth(monthStr: string): number {
+  const [year, month] = monthStr.split("-").map(Number);
+  return new Date(year, month, 0).getDate();
 }
 
 // 12 curated, high-contrast harmonic colorways for rings
@@ -167,13 +204,13 @@ function SingleDialRenderer({
 
   const numDays = dateList.length;
 
-  // SVG Geometry Constants: adapt hub radius dynamically to ring count
-  const cx = 250;
-  const cy = 250;
+  // SVG Geometry Constants: 540x540 viewport with ample margins for crisp numbers
+  const cx = 270;
+  const cy = 270;
   const outerRadius = 210;
   const numRings = Math.max(1, habits.length);
   // Give extra breathing room to hub when fewer rings; tighten slightly when 6+ rings
-  const hubRadius = numRings <= 4 ? 76 : numRings <= 6 ? 64 : 54;
+  const hubRadius = numRings <= 4 ? 78 : numRings <= 6 ? 66 : 56;
   const ringWidth = (outerRadius - hubRadius) / numRings;
 
   // Calculate completion stats for this specific wheel using exact check-in data
@@ -315,11 +352,11 @@ function SingleDialRenderer({
       >
         <div
           className={`relative w-full ${
-            isCompact ? "max-w-[340px]" : "max-w-[420px]"
+            isCompact ? "max-w-[340px]" : "max-w-[440px]"
           } aspect-square flex items-center justify-center`}
         >
           <svg
-            viewBox="0 0 500 500"
+            viewBox="0 0 540 540"
             className="w-full h-full drop-shadow-xs transition-transform duration-300"
           >
             {/* Outer Dial Rim Ring */}
@@ -333,28 +370,71 @@ function SingleDialRenderer({
               strokeDasharray="2 3"
             />
 
-            {/* Day Number Markers along Circumference */}
+            {/* Circumference Tick Marks for Precision Gauge Readability */}
             {dateList.map((dStr, dayIdx) => {
-              const angle =
-                (dayIdx / numDays) * 2 * Math.PI - Math.PI / 2 + Math.PI / numDays;
-              const markerPos = polarToCartesian(cx, cy, outerRadius + 22, angle);
-              const dayNum = parseInt(dStr.slice(8), 10);
+              const sliceAngle = (2 * Math.PI) / numDays;
+              const boundaryAngle = dayIdx * sliceAngle - Math.PI / 2;
+              const tickInner = polarToCartesian(cx, cy, outerRadius + 4, boundaryAngle);
+              const tickOuter = polarToCartesian(cx, cy, outerRadius + 11, boundaryAngle);
               const isToday = dStr === todayStr;
 
               return (
-                <text
-                  key={`label-${dayIdx}`}
-                  x={markerPos.x}
-                  y={markerPos.y}
-                  fontSize={isToday ? "11" : "9"}
-                  fontWeight={isToday ? "bold" : "600"}
-                  fill={isToday ? "#2855D9" : "#68748A"}
-                  fontFamily="monospace"
-                  textAnchor="middle"
-                  dominantBaseline="central"
-                >
-                  {dayNum}
-                </text>
+                <line
+                  key={`tick-${dayIdx}`}
+                  x1={tickInner.x}
+                  y1={tickInner.y}
+                  x2={tickOuter.x}
+                  y2={tickOuter.y}
+                  stroke={isToday ? "#2855D9" : "#CBD5E1"}
+                  strokeWidth={isToday ? "2" : "1"}
+                  strokeLinecap="round"
+                />
+              );
+            })}
+
+            {/* Day Number Markers along Circumference (High-Contrast & Large) */}
+            {dateList.map((dStr, dayIdx) => {
+              const angle =
+                (dayIdx / numDays) * 2 * Math.PI - Math.PI / 2 + Math.PI / numDays;
+              const markerPos = polarToCartesian(cx, cy, outerRadius + 26, angle);
+              const dayNum = parseInt(dStr.slice(8), 10);
+              const isToday = dStr === todayStr;
+              const isFuture = dStr > todayStr;
+
+              // High-visibility dynamic typography based on slice count
+              const fontSize =
+                numDays <= 7
+                  ? "14"
+                  : numDays <= 15
+                  ? "13"
+                  : numDays <= 31
+                  ? "11.5"
+                  : "10";
+
+              return (
+                <g key={`marker-group-${dayIdx}`}>
+                  {isToday && (
+                    <circle
+                      cx={markerPos.x}
+                      cy={markerPos.y}
+                      r={numDays <= 15 ? 13 : 11}
+                      fill="#2855D9"
+                      className="shadow-sm"
+                    />
+                  )}
+                  <text
+                    x={markerPos.x}
+                    y={markerPos.y}
+                    fontSize={isToday ? (numDays <= 15 ? "13" : "11") : fontSize}
+                    fontWeight={isToday ? "bold" : "700"}
+                    fill={isToday ? "#FFFFFF" : isFuture ? "#94A3B8" : "#1E293B"}
+                    fontFamily="monospace"
+                    textAnchor="middle"
+                    dominantBaseline="central"
+                  >
+                    {dayNum}
+                  </text>
+                </g>
               );
             })}
 
@@ -507,35 +587,35 @@ function SingleDialRenderer({
               <g className="pointer-events-none">
                 <text
                   x={cx}
-                  y={cy - 14}
+                  y={cy - 18}
                   textAnchor="middle"
-                  fontSize="8"
+                  fontSize="9"
                   fontWeight="bold"
-                  letterSpacing="1"
-                  fill="#68748A"
+                  letterSpacing="1.2"
+                  fill="#64748B"
                   fontFamily="monospace"
                   className="uppercase"
                 >
-                  {catMeta ? catMeta.label.slice(0, 10) : "MOIS"}
+                  {catMeta ? catMeta.label.slice(0, 12) : "MOIS"}
                 </text>
                 <text
                   x={cx}
-                  y={cy + 2}
+                  y={cy + 1}
                   textAnchor="middle"
-                  fontSize="11"
+                  fontSize="12.5"
                   fontWeight="bold"
-                  fill="#111A2E"
+                  fill="#0F172A"
                   className="capitalize"
                 >
-                  {currentMonthLabel.slice(0, 9)}
+                  {currentMonthLabel}
                 </text>
                 <text
                   x={cx}
-                  y={cy + 18}
+                  y={cy + 19}
                   textAnchor="middle"
-                  fontSize="9"
-                  fontWeight="600"
-                  fill="#2855D9"
+                  fontSize="10.5"
+                  fontWeight="bold"
+                  fill="#059669"
                   fontFamily="monospace"
                 >
                   {dialStats.pct}% régularité
@@ -546,13 +626,15 @@ function SingleDialRenderer({
         </div>
 
         {/* Legend Caption */}
-        <div className="text-center text-xs text-[#68748A] mt-2 font-mono">
+        <div className="text-center text-xs text-[#334155] mt-2 font-mono font-medium">
           <span>
             ● Anneaux {startIndex + 1} à {startIndex + habits.length}
             {totalHabitsCount > habits.length && ` (sur ${totalHabitsCount})`}
           </span>
           <span className="mx-2">•</span>
           <span>Rayons 1 à {numDays} jours</span>
+          <span className="mx-2">•</span>
+          <span className="font-bold text-[#111A2E]">{currentMonthLabel}</span>
         </div>
       </div>
     </div>
@@ -567,37 +649,60 @@ export function CircularHabitDial({
   selectedHabitId,
   onSelectHabit,
   rangeDays,
+  selectedMonth,
+  onMonthChange,
+  onRangeDaysChange,
 }: CircularHabitDialProps) {
   const [selectedCategory, setSelectedCategory] = useState<HabitCategory | "all">("all");
   const [viewMode, setViewMode] = useState<"single" | "multi">("single");
   const [pageIndex, setPageIndex] = useState<number>(0);
 
   const todayStr = useMemo(() => getLocalTodayDateString(), []);
+  const currentMonthStr = todayStr.slice(0, 7);
 
-  // Determine number of days in the wheel (e.g. 30 days default or rangeDays capped at 31)
-  const numDays = useMemo(() => {
-    return Math.min(31, Math.max(7, rangeDays));
-  }, [rangeDays]);
+  // Month navigation state (controlled or uncontrolled)
+  const [internalMonth, setInternalMonth] = useState<string>(currentMonthStr);
+  const activeMonth = selectedMonth || internalMonth;
+  const setActiveMonth = onMonthChange || setInternalMonth;
 
-  // Build the array of dates going from (today - numDays + 1) to today
+  const isCurrentMonth = activeMonth === currentMonthStr;
+
+  // Determine anchor date for date calculations
+  const anchorDate = useMemo(() => {
+    if (isCurrentMonth) {
+      return todayStr;
+    }
+    const lastDay = getDaysInMonth(activeMonth);
+    return `${activeMonth}-${String(lastDay).padStart(2, "0")}`;
+  }, [isCurrentMonth, activeMonth, todayStr]);
+
+  // Determine dates to render on the dial
   const dateList = useMemo(() => {
+    // If rangeDays is 30, render the full calendar month days 1..daysInMonth
+    if (rangeDays === 30) {
+      const daysCount = getDaysInMonth(activeMonth);
+      const list: string[] = [];
+      for (let day = 1; day <= daysCount; day++) {
+        list.push(`${activeMonth}-${String(day).padStart(2, "0")}`);
+      }
+      return list;
+    }
+
+    // For 7, 15, or 50 days (or custom ranges):
+    const count = rangeDays; // 7, 15, or 50
     const list: string[] = [];
-    for (let i = numDays - 1; i >= 0; i--) {
-      list.push(addDaysToDateString(todayStr, -i));
+    for (let i = count - 1; i >= 0; i--) {
+      list.push(addDaysToDateString(anchorDate, -i));
     }
     return list;
-  }, [todayStr, numDays]);
+  }, [rangeDays, activeMonth, anchorDate]);
+
+  const numDays = dateList.length;
 
   // Month label for the center hub
   const currentMonthLabel = useMemo(() => {
-    try {
-      const [year, month] = todayStr.split("-").map(Number);
-      const d = new Date(year, month - 1, 1);
-      return new Intl.DateTimeFormat("fr-FR", { month: "long", year: "numeric" }).format(d);
-    } catch {
-      return "Octobre 2026";
-    }
-  }, [todayStr]);
+    return formatMonthYear(activeMonth);
+  }, [activeMonth]);
 
   // Derive unique categories present in the habits list
   const categorySummary = useMemo(() => {
@@ -721,7 +826,77 @@ export function CircularHabitDial({
           </p>
         </div>
 
-        <div className="flex items-center gap-3 self-start md:self-auto">
+        <div className="flex flex-wrap items-center gap-3 self-start md:self-auto">
+          {/* Month History Navigator in Dial Header */}
+          <div className="flex items-center gap-1 bg-[#F4F6FA] p-1 rounded-xl border border-[#E4E8F0] text-xs">
+            <button
+              type="button"
+              onClick={() => setActiveMonth(getPreviousMonth(activeMonth))}
+              className="p-1.5 text-[#68748A] hover:text-[#111A2E] hover:bg-white rounded-lg transition-colors cursor-pointer"
+              title="Mois précédent"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+            </button>
+            <div className="flex items-center gap-1 px-1.5 font-bold text-[#111A2E] text-xs">
+              <Calendar className="w-3 h-3 text-[#2855D9]" />
+              <span>{currentMonthLabel}</span>
+              {isCurrentMonth ? (
+                <span className="text-[9px] font-semibold bg-[#ECFDF5] text-[#059669] px-1 py-0.2 rounded-full border border-[#A7F3D0]">
+                  Actuel
+                </span>
+              ) : (
+                <span className="text-[9px] font-semibold bg-[#FEF3C7] text-[#D97706] px-1 py-0.2 rounded-full border border-[#FDE68A]">
+                  Archive
+                </span>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => setActiveMonth(getNextMonth(activeMonth))}
+              disabled={isCurrentMonth}
+              className={`p-1.5 rounded-lg transition-colors ${
+                isCurrentMonth
+                  ? "text-[#CBD5E1] cursor-not-allowed"
+                  : "text-[#68748A] hover:text-[#111A2E] hover:bg-white cursor-pointer"
+              }`}
+              title="Mois suivant"
+            >
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {!isCurrentMonth && (
+            <button
+              type="button"
+              onClick={() => setActiveMonth(currentMonthStr)}
+              className="flex items-center gap-1 px-2 py-1 text-xs font-semibold text-[#2855D9] bg-[#EDF2FF] hover:bg-[#DBEAFE] border border-[#BFDBFE] rounded-lg transition-colors cursor-pointer"
+              title="Revenir au mois en cours"
+            >
+              <RotateCcw className="w-3 h-3" />
+              <span>Actuel</span>
+            </button>
+          )}
+
+          {/* Period Range Filter: 7, 15, 30, 50 (90 removed) */}
+          {onRangeDaysChange && (
+            <div className="flex items-center gap-1 bg-[#F4F6FA] p-1 rounded-xl border border-[#E4E8F0] text-xs font-semibold">
+              {[7, 15, 30, 50].map((days) => (
+                <button
+                  key={days}
+                  type="button"
+                  onClick={() => onRangeDaysChange(days)}
+                  className={`px-2.5 py-1 rounded-lg transition-colors cursor-pointer ${
+                    rangeDays === days
+                      ? "bg-white text-[#2855D9] shadow-xs font-bold"
+                      : "text-[#68748A] hover:text-[#111A2E]"
+                  }`}
+                >
+                  {days} j
+                </button>
+              ))}
+            </div>
+          )}
+
           {/* View Mode Toggle Button: Single Wheel vs Multi-Wheels per Category */}
           {multiCategories.length > 1 && (
             <div className="flex items-center p-1 bg-[#F4F6FA] rounded-xl border border-[#E4E8F0] text-xs">
