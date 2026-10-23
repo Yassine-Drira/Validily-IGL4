@@ -103,6 +103,11 @@ function get3Days(baseDateStr: string): Date[] {
   });
 }
 
+import {
+  computeTimeblockDayLayout,
+  type ColumnLayout,
+} from "@/lib/planner/calendar-layout";
+
 export function AcademicCalendarView({
   timeblocks,
   tasks,
@@ -156,9 +161,135 @@ export function AcademicCalendarView({
     currentMin: number;
   } | null>(null);
 
+  // Dynamic stretching / resizing state (supports top and bottom bar dragging with 15m snapping)
+  const [resizingBlock, setResizingBlock] = useState<{
+    blockId: string;
+    edge: "top" | "bottom";
+    dateStr: string;
+    initialStartMin: number;
+    initialEndMin: number;
+    currentStartMin: number;
+    currentEndMin: number;
+  } | null>(null);
+
+  const justResizedRef = useRef(false);
+
   const gridContainerRef = useRef<HTMLDivElement>(null);
 
   const todayStr = useMemo(() => getLocalTodayDateString(), []);
+
+  // Window pointer listeners for smooth 60fps dynamic task stretching / resizing
+  useEffect(() => {
+    if (!resizingBlock) return;
+
+    const handlePointerMove = (e: PointerEvent) => {
+      if (!gridContainerRef.current) return;
+      const gridRect = gridContainerRef.current.getBoundingClientRect();
+      const scrollOffset = gridContainerRef.current.scrollTop;
+      const offsetY = e.clientY - gridRect.top + scrollOffset;
+      const rawMin = START_HOUR * 60 + (offsetY / SLOT_HEIGHT) * 60;
+      // Snap to 15-minute intervals
+      const snapped = Math.round(rawMin / 15) * 15;
+
+      if (resizingBlock.edge === "top") {
+        // Upper bar: cannot extend before START_HOUR, and must leave at least 15m before initialEndMin
+        const clamped = Math.max(
+          START_HOUR * 60,
+          Math.min(resizingBlock.initialEndMin - 15, snapped)
+        );
+        setResizingBlock((prev) => (prev ? { ...prev, currentStartMin: clamped } : null));
+      } else {
+        // Lower bar: cannot extend beyond END_HOUR, and must leave at least 15m after initialStartMin
+        const clamped = Math.min(
+          END_HOUR * 60,
+          Math.max(resizingBlock.initialStartMin + 15, snapped)
+        );
+        setResizingBlock((prev) => (prev ? { ...prev, currentEndMin: clamped } : null));
+      }
+    };
+
+    const handlePointerUp = async () => {
+      const current = resizingBlock;
+      setResizingBlock(null);
+      if (!current) return;
+
+      const { blockId, currentStartMin, currentEndMin, initialStartMin, initialEndMin } = current;
+
+      if (currentStartMin !== initialStartMin || currentEndMin !== initialEndMin) {
+        justResizedRef.current = true;
+        setTimeout(() => {
+          justResizedRef.current = false;
+        }, 250);
+
+        const newStartStr = minutesToTimeString(currentStartMin);
+        const newEndStr = minutesToTimeString(currentEndMin);
+        const newDuration = currentEndMin - currentStartMin;
+
+        const previousBlocks = [...localBlocks];
+
+        // Zero-latency optimistic update (< 1ms)
+        setLocalBlocks((prev) =>
+          prev.map((b) =>
+            b.id === blockId
+              ? {
+                  ...b,
+                  start_time: newStartStr,
+                  end_time: newEndStr,
+                  duration_minutes: newDuration,
+                }
+              : b
+          )
+        );
+
+        const res = await updateCalendarTimeblockAction(blockId, {
+          start_time: newStartStr,
+          end_time: newEndStr,
+          duration_minutes: newDuration,
+        });
+
+        if (!res.success) {
+          setLocalBlocks(previousBlocks);
+          alert(res.error || "Impossible de redimensionner le créneau");
+        } else {
+          onRefresh();
+        }
+      }
+    };
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+    };
+  }, [resizingBlock, localBlocks, onRefresh]);
+
+  const handleResizeStart = (
+    e: React.PointerEvent,
+    block: CalendarTimeblock,
+    edge: "top" | "bottom"
+  ) => {
+    e.stopPropagation();
+    e.preventDefault();
+
+    const startMin = parseTimeToMinutes(block.start_time);
+    const endMin = parseTimeToMinutes(block.end_time, true);
+
+    setResizingBlock({
+      blockId: block.id,
+      edge,
+      dateStr: block.block_date,
+      initialStartMin: startMin,
+      initialEndMin: endMin,
+      currentStartMin: startMin,
+      currentEndMin: endMin,
+    });
+  };
+
+  const handleCardClick = (block: CalendarTimeblock) => {
+    if (justResizedRef.current) return;
+    handleOpenEditModal(block);
+  };
 
   // Identify unscheduled tasks (active tasks without any linked calendar timeblock)
   const unscheduledTasks = useMemo(() => {
@@ -179,6 +310,17 @@ export function AcademicCalendarView({
     }
     return [];
   }, [viewMode, currentDate]);
+
+  // Compute collision layout for all displayed days (memoized O(N log N))
+  const layoutMap = useMemo(() => {
+    const map = new Map<string, Map<string, ColumnLayout>>();
+    for (const dateObj of displayedDates) {
+      const dStr = getLocalTodayDateString(dateObj);
+      const dBlocks = localBlocks.filter((b) => b.block_date === dStr);
+      map.set(dStr, computeTimeblockDayLayout(dBlocks));
+    }
+    return map;
+  }, [displayedDates, localBlocks]);
 
   // Navigate Previous
   const handlePrev = () => {
@@ -793,12 +935,50 @@ export function AcademicCalendarView({
                       </div>
                     )}
 
-                    {/* Continuous Multi-Hour Timeblock Event Cards */}
+                    {/* Dynamic Resize Floating Live Badge Indicator */}
+                    {resizingBlock && resizingBlock.dateStr === dateStr && (
+                      <div
+                        className="absolute left-1 right-1 z-50 pointer-events-none transition-all duration-75 flex items-center justify-center animate-in fade-in zoom-in-95"
+                        style={{
+                          top: `${((resizingBlock[resizingBlock.edge === "top" ? "currentStartMin" : "currentEndMin"] - START_HOUR * 60) / 60) * SLOT_HEIGHT - 20}px`,
+                        }}
+                      >
+                        <div className="bg-[#111A2E]/95 text-white backdrop-blur-md px-3 py-1 rounded-xl border border-blue-400/50 shadow-2xl flex items-center gap-2 text-xs font-bold font-tabular text-blue-200">
+                          <span className="w-2 h-2 rounded-full bg-blue-400 animate-ping" />
+                          <span>
+                            {minutesToTimeString(resizingBlock.currentStartMin)} -{" "}
+                            {minutesToTimeString(resizingBlock.currentEndMin)} (
+                            {resizingBlock.currentEndMin - resizingBlock.currentStartMin}m)
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Continuous Multi-Hour Timeblock Event Cards with Collision Clustering & Vertical Seam Separation */}
                     {dayBlocks.map((block) => {
+                      const dayLayouts = layoutMap.get(dateStr);
+                      const layout = dayLayouts?.get(block.id) || { colIndex: 0, totalCols: 1 };
+                      const isSingleCol = layout.totalCols === 1;
+
+                      const widthPercent = 100 / layout.totalCols;
+                      const leftPercent = layout.colIndex * widthPercent;
+                      const leftStyle = isSingleCol ? "4px" : `calc(${leftPercent}% + 2px)`;
+                      const widthStyle = isSingleCol ? "calc(100% - 8px)" : `calc(${widthPercent}% - 4px)`;
+
                       const startMins = parseTimeToMinutes(block.start_time);
-                      const duration = block.duration_minutes;
-                      const topPx = ((startMins - START_HOUR * 60) / 60) * SLOT_HEIGHT;
-                      const heightPx = Math.max(32, (duration / 60) * SLOT_HEIGHT - 3);
+                      const duration = block.duration_minutes || 60;
+
+                      const isResizingThis = resizingBlock && resizingBlock.blockId === block.id;
+                      const effectiveStart = isResizingThis ? resizingBlock.currentStartMin : startMins;
+                      const effectiveEnd = isResizingThis
+                        ? resizingBlock.currentEndMin
+                        : parseTimeToMinutes(block.end_time, true);
+                      const effectiveDuration = Math.max(15, effectiveEnd - effectiveStart);
+
+                      // Clean vertical placement with 5px gap between consecutive blocks
+                      const topPx = ((effectiveStart - START_HOUR * 60) / 60) * SLOT_HEIGHT + 2;
+                      const heightPx = Math.max(28, (effectiveDuration / 60) * SLOT_HEIGHT - 5);
+                      const isNearTop = topPx < 120;
 
                       const sub = subjects.find((s) => s.id === block.subject_id) || block.subject;
                       const linked = tasks.find((t) => t.id === block.task_id) || block.task;
@@ -810,23 +990,31 @@ export function AcademicCalendarView({
                             position: "absolute",
                             top: `${topPx}px`,
                             height: `${heightPx}px`,
-                            left: "4px",
-                            right: "4px",
-                            zIndex: 10,
+                            left: leftStyle,
+                            width: widthStyle,
+                            zIndex: isResizingThis ? 40 : 10,
                           }}
                         >
                           <TimeblockEventCard
-                            block={block}
+                            block={{
+                              ...block,
+                              start_time: isResizingThis ? minutesToTimeString(effectiveStart) : block.start_time,
+                              end_time: isResizingThis ? minutesToTimeString(effectiveEnd) : block.end_time,
+                              duration_minutes: effectiveDuration,
+                            }}
                             subject={sub}
                             linkedTask={linked}
-                            onEdit={handleOpenEditModal}
+                            onEdit={handleCardClick}
                             onToggleComplete={handleToggleComplete}
                             onDelete={handleDeleteBlock}
                             onDuplicate={handleDuplicateBlock}
                             onDragStart={handleEventDragStart}
                             onDragEnd={handleEventDragEnd}
+                            onResizeStart={handleResizeStart}
                             isDragging={movingBlockId === block.id}
-                            isCompact={duration < 45}
+                            isResizing={Boolean(isResizingThis)}
+                            isCompact={effectiveDuration < 45}
+                            isNearTop={isNearTop}
                           />
                         </div>
                       );

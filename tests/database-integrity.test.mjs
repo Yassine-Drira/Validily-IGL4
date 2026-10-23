@@ -106,3 +106,35 @@ test("Bookmarks Dynamic Connection: Bookmarks queried directly from database", (
     "Bookmarks page must not fake user bookmarks with static slicing"
   );
 });
+
+test("Supabase Data API Hardening: October 30 breaking change compliance migration", () => {
+  const migrationPath = path.join(
+    process.cwd(),
+    "supabase",
+    "migrations",
+    "20261022000000_data_api_grants_hardening.sql"
+  );
+  assert.ok(
+    fs.existsSync(migrationPath),
+    "Migration 20261022000000_data_api_grants_hardening.sql must exist"
+  );
+
+  const content = fs.readFileSync(migrationPath, "utf-8");
+  assert.ok(
+    content.includes("ALTER DEFAULT PRIVILEGES IN SCHEMA public"),
+    "Migration must configure ALTER DEFAULT PRIVILEGES for future table creations"
+  );
+  assert.ok(
+    content.includes("GRANT SELECT ON TABLE public.%I TO anon"),
+    "Migration must grant SELECT to anon role"
+  );
+  assert.ok(
+    content.includes("GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.%I TO authenticated"),
+    "Migration must grant CRUD to authenticated role"
+  );
+  assert.ok(
+    content.includes("GRANT ALL ON TABLE public.%I TO service_role"),
+    "Migration must grant bypass privileges to service_role"
+  );
+});
+

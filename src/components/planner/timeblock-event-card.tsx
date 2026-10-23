@@ -18,8 +18,11 @@ interface TimeblockEventCardProps {
   onDuplicate?: (block: CalendarTimeblock) => void;
   onDragStart?: (e: React.DragEvent, block: CalendarTimeblock) => void;
   onDragEnd?: (e: React.DragEvent) => void;
+  onResizeStart?: (e: React.PointerEvent, block: CalendarTimeblock, edge: "top" | "bottom") => void;
   isDragging?: boolean;
+  isResizing?: boolean;
   isCompact?: boolean;
+  isNearTop?: boolean;
   className?: string;
 }
 
@@ -33,8 +36,11 @@ export function TimeblockEventCard({
   onDuplicate,
   onDragStart,
   onDragEnd,
+  onResizeStart,
   isDragging = false,
+  isResizing = false,
   isCompact = false,
+  isNearTop = false,
   className = "",
 }: TimeblockEventCardProps) {
   const isCompleted = block.is_completed;
@@ -52,7 +58,7 @@ export function TimeblockEventCard({
       <div
         role="button"
         tabIndex={0}
-        draggable={true}
+        draggable={!isResizing}
         onDragStart={(e) => onDragStart?.(e, block)}
         onDragEnd={onDragEnd}
         onClick={() => onEdit(block)}
@@ -63,35 +69,56 @@ export function TimeblockEventCard({
           }
         }}
         className={cn(
-          "group relative h-full w-full rounded-xl px-2 py-1 text-xs border transition-all cursor-grab active:cursor-grabbing select-none flex items-center justify-between gap-1.5 overflow-hidden",
+          "group relative h-full w-full rounded-xl px-2 py-1 text-xs border transition-all cursor-grab active:cursor-grabbing select-none flex items-center justify-between gap-1.5 overflow-visible shadow-[0_1px_3px_rgba(0,0,0,0.05)]",
           isDragging && "opacity-40 ring-2 ring-[#2855D9] scale-95 shadow-xl",
+          isResizing && "ring-2 ring-[#2855D9] shadow-lg cursor-ns-resize",
           isCompleted
             ? "bg-[#FAFAF7]/90 text-[#68748A] border-[#E4E8F0] opacity-75 backdrop-blur-xs"
             : cn(theme.cardBg, theme.cardBorder, theme.cardGlow),
           className
         )}
-        title={`${block.title} (${startStr} - ${endStr}) • Glisser-déposer pour déplacer`}
+        title={`${block.title} (${startStr} - ${endStr}) • Glisser pour déplacer ou étirer`}
       >
+        {/* Upper Resize Handle */}
+        {onResizeStart && (
+          <div
+            role="separator"
+            aria-label="Ajuster l'heure de début"
+            title="Glisser pour ajuster le début (15m)"
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              onResizeStart(e, block, "top");
+            }}
+            className="absolute -top-1.5 left-2 right-2 h-3 cursor-ns-resize z-40 group/top-handle flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity touch-none"
+          >
+            <div className="w-6 h-1 rounded-full bg-[#2855D9]/50 group-hover/top-handle:bg-[#2855D9] group-hover/top-handle:h-1.5 transition-all shadow-xs" />
+          </div>
+        )}
+
         <div className="flex items-center gap-1.5 min-w-0 flex-1">
           <span
             className="w-1.5 h-1.5 rounded-full shrink-0 shadow-xs"
             style={{ backgroundColor: theme.dotColor }}
           />
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleComplete(block);
-            }}
-            className={cn("text-[#68748A] hover:text-[#059669] shrink-0 transition-colors", theme.checkboxStroke)}
-            title={isCompleted ? "Marquer non terminé" : "Marquer terminé"}
-          >
-            {isCompleted ? (
-              <CheckCircle2 className="w-3.5 h-3.5 text-[#059669]" />
-            ) : (
-              <Circle className="w-3.5 h-3.5" />
-            )}
-          </button>
+          {/* Isolated Completion Checkbox */}
+          <div className="relative z-30 shrink-0">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleComplete(block);
+              }}
+              className={cn("p-0.5 -m-0.5 text-[#68748A] hover:text-[#059669] shrink-0 transition-colors cursor-pointer", theme.checkboxStroke)}
+              title={isCompleted ? "Marquer non terminé" : "Marquer terminé"}
+              aria-label={isCompleted ? "Marquer non terminé" : "Marquer terminé"}
+            >
+              {isCompleted ? (
+                <CheckCircle2 className="w-3.5 h-3.5 text-[#059669]" />
+              ) : (
+                <Circle className="w-3.5 h-3.5" />
+              )}
+            </button>
+          </div>
           <span
             className={cn(
               "font-bold truncate text-[11px] flex-1",
@@ -104,10 +131,49 @@ export function TimeblockEventCard({
 
         <div className="flex items-center gap-1 shrink-0 text-[10px] text-[#68748A] font-tabular">
           <span>{startStr}</span>
+          {displayNotes && (
+            <span className="text-[10px] opacity-75" title="Note attachée">📝</span>
+          )}
           {subject && (
             <SubjectIcon name={subject.name} slug={subject.slug} className="w-3 h-3 text-current opacity-80" />
           )}
         </div>
+
+        {/* Lower Resize Handle */}
+        {onResizeStart && (
+          <div
+            role="separator"
+            aria-label="Ajuster l'heure de fin"
+            title="Glisser pour ajuster la fin (15m)"
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              onResizeStart(e, block, "bottom");
+            }}
+            className="absolute -bottom-1.5 left-2 right-2 h-3 cursor-ns-resize z-40 group/bottom-handle flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity touch-none"
+          >
+            <div className="w-6 h-1 rounded-full bg-[#2855D9]/50 group-hover/bottom-handle:bg-[#2855D9] group-hover/bottom-handle:h-1.5 transition-all shadow-xs" />
+          </div>
+        )}
+
+        {/* Full Description Hover Card */}
+        {displayNotes && (
+          <div
+            className={cn(
+              "pointer-events-none absolute left-0 right-0 hidden group-hover:block z-50 animate-in fade-in zoom-in-95 duration-150",
+              isNearTop ? "top-[calc(100%+6px)]" : "bottom-[calc(100%+6px)]"
+            )}
+          >
+            <div className="bg-[#0F172A]/95 text-white backdrop-blur-xl border border-white/20 rounded-xl p-2.5 shadow-2xl text-xs space-y-1 max-w-[260px] w-full">
+              <div className="flex items-center justify-between gap-1 border-b border-white/10 pb-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-blue-300">📝 Note complète</span>
+                <span className="text-[10px] text-white/60 font-tabular">{startStr} - {endStr}</span>
+              </div>
+              <p className="text-[11px] text-slate-100 whitespace-pre-wrap leading-relaxed break-words font-normal max-h-36 overflow-y-auto">
+                {displayNotes}
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -117,7 +183,7 @@ export function TimeblockEventCard({
     <div
       role="button"
       tabIndex={0}
-      draggable={true}
+      draggable={!isResizing}
       onDragStart={(e) => onDragStart?.(e, block)}
       onDragEnd={onDragEnd}
       onClick={() => onEdit(block)}
@@ -128,15 +194,32 @@ export function TimeblockEventCard({
         }
       }}
       className={cn(
-        "group relative h-full w-full rounded-2xl p-2.5 text-xs border transition-all cursor-grab active:cursor-grabbing select-none flex flex-col justify-between overflow-hidden",
+        "group relative h-full w-full rounded-xl p-2 text-xs border transition-all cursor-grab active:cursor-grabbing select-none flex flex-col justify-between overflow-visible shadow-[0_2px_6px_rgba(0,0,0,0.05),0_1px_2px_rgba(0,0,0,0.03)]",
         isDragging && "opacity-40 ring-2 ring-[#2855D9] scale-95 shadow-xl",
+        isResizing && "ring-2 ring-[#2855D9] shadow-lg cursor-ns-resize",
         isCompleted
           ? "bg-[#FAFAF7]/90 text-[#68748A] border-[#E4E8F0] opacity-80 backdrop-blur-xs"
           : cn(theme.cardBg, theme.cardBorder, theme.cardGlow),
         className
       )}
-      title={`${block.title} (${startStr} - ${endStr}) • Glisser-déposer pour déplacer`}
+      title={`${block.title} (${startStr} - ${endStr}) • Glisser pour déplacer ou étirer`}
     >
+      {/* Upper Resize Handle (Top Bar) */}
+      {onResizeStart && (
+        <div
+          role="separator"
+          aria-label="Ajuster l'heure de début"
+          title="Glisser pour ajuster le début (par paliers de 15 min)"
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            onResizeStart(e, block, "top");
+          }}
+          className="absolute -top-1.5 left-3 right-3 h-3 cursor-ns-resize z-40 group/top-handle flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity touch-none"
+        >
+          <div className="w-8 h-1 rounded-full bg-[#2855D9]/50 group-hover/top-handle:bg-[#2855D9] group-hover/top-handle:h-1.5 transition-all shadow-xs" />
+        </div>
+      )}
+
       {/* Top row: Luminous Accent Bar, Checkbox & Prominent Title */}
       <div className="min-w-0 w-full">
         <div className="flex items-start gap-1.5 w-full min-w-0 pr-1">
@@ -145,25 +228,32 @@ export function TimeblockEventCard({
             <div className={cn("w-1 self-stretch rounded-full shrink-0 my-0.5", theme.accentBar)} />
           )}
 
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleComplete(block);
-            }}
-            className={cn("mt-0.5 text-[#68748A] hover:text-[#059669] shrink-0 transition-colors cursor-pointer", theme.checkboxStroke)}
-            title={isCompleted ? "Marquer non terminé" : "Marquer terminé"}
-          >
-            {isCompleted ? (
-              <CheckCircle2 className="w-4 h-4 text-[#059669] fill-[#059669]/10" />
-            ) : (
-              <Circle className="w-4 h-4" />
-            )}
-          </button>
+          {/* ISOLATED CLICKABLE CHECKBOX: High z-index (z-30) ensures completion is always immediately clickable */}
+          <div className="relative z-30 shrink-0">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleComplete(block);
+              }}
+              className={cn(
+                "p-0.5 -m-0.5 text-[#68748A] hover:text-[#059669] shrink-0 transition-all cursor-pointer rounded-full hover:bg-emerald-50 active:scale-90",
+                theme.checkboxStroke
+              )}
+              title={isCompleted ? "Marquer non terminé" : "Marquer terminé"}
+              aria-label={isCompleted ? "Marquer non terminé" : "Marquer terminé"}
+            >
+              {isCompleted ? (
+                <CheckCircle2 className="w-4 h-4 text-[#059669] fill-[#059669]/15" />
+              ) : (
+                <Circle className="w-4 h-4 hover:stroke-[#059669]" />
+              )}
+            </button>
+          </div>
 
           <h4
             className={cn(
-              "font-bold text-xs leading-snug break-words line-clamp-2 flex-1 min-w-0",
+              "font-bold text-xs leading-snug break-words line-clamp-2 flex-1 min-w-0 pr-1",
               isCompleted ? "line-through text-[#68748A]" : theme.titleText
             )}
           >
@@ -173,7 +263,7 @@ export function TimeblockEventCard({
 
         {/* Dedicated Subject & Linked Task Badges (for blocks >= 55 min) */}
         {duration >= 55 && (subject || linkedTask) && (
-          <div className="flex flex-wrap items-center gap-1 mt-1.5 pl-2.5 min-w-0">
+          <div className="flex flex-wrap items-center gap-1 mt-1 pl-2.5 min-w-0">
             {subject && (
               <span
                 className={cn(
@@ -185,7 +275,7 @@ export function TimeblockEventCard({
                 title={subject.name}
               >
                 <SubjectIcon name={subject.name} slug={subject.slug} className="w-2.5 h-2.5 shrink-0" />
-                <span className="truncate max-w-[150px]">{subject.name}</span>
+                <span className="truncate max-w-[140px]">{subject.name}</span>
               </span>
             )}
 
@@ -201,13 +291,17 @@ export function TimeblockEventCard({
           </div>
         )}
 
-        {/* Floating Hover Glass Action Overlay */}
-        <div className="absolute top-1.5 right-1.5 hidden group-hover:flex items-center gap-0.5 bg-white/95 backdrop-blur-md p-0.5 rounded-xl border border-white/80 shadow-md z-30 transition-all">
+        {/* Floating Hover Glass Action Overlay: compact icon-only & constrained so it NEVER covers the left checkbox */}
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="absolute top-1 right-1 hidden group-hover:flex items-center gap-0.5 bg-white/95 backdrop-blur-md p-0.5 rounded-lg border border-black/10 shadow-md z-20 max-w-[calc(100%-38px)] transition-all"
+        >
           <FocusTriggerButton
             title={block.title}
             estimatedMinutes={duration}
             taskId={block.task_id || undefined}
             size="sm"
+            compact={true}
           />
           {onDuplicate && (
             <button
@@ -216,8 +310,9 @@ export function TimeblockEventCard({
                 e.stopPropagation();
                 onDuplicate(block);
               }}
-              className="p-1 text-[#68748A] hover:text-[#2855D9] rounded-lg hover:bg-[#F4F6FA] transition-colors"
-              title="Dupliquer la séance vers demain (+1 j)"
+              className="p-1 text-[#68748A] hover:text-[#2855D9] rounded-md hover:bg-[#F4F6FA] transition-colors"
+              title="Dupliquer la séance (+1 j)"
+              aria-label="Dupliquer la séance"
             >
               <Copy className="w-3.5 h-3.5" />
             </button>
@@ -229,21 +324,48 @@ export function TimeblockEventCard({
                 e.stopPropagation();
                 onDelete(block.id);
               }}
-              className="p-1 text-[#68748A] hover:text-[#DC2626] rounded-lg hover:bg-[#F4F6FA] transition-colors"
-              title="Supprimer"
+              className="p-1 text-[#68748A] hover:text-[#DC2626] rounded-md hover:bg-[#F4F6FA] transition-colors"
+              title="Supprimer la séance"
+              aria-label="Supprimer la séance"
             >
               <Trash2 className="w-3.5 h-3.5" />
             </button>
           )}
         </div>
 
-        {/* Notes with Glassmorphic callout border (for blocks >= 75 min) */}
-        {displayNotes && duration >= 75 && (
-          <p className="text-[11px] text-[#475569] line-clamp-2 mt-1.5 pl-2 italic border-l-2 border-current/30 ml-2.5">
+        {/* Notes Preview inside card (for blocks >= 65 min) */}
+        {displayNotes && duration >= 65 && (
+          <p className="text-[11px] text-[#475569] line-clamp-2 mt-1 pl-2 italic border-l-2 border-current/30 ml-2.5">
             {displayNotes}
           </p>
         )}
       </div>
+
+      {/* Full Description Hover Card with Glassmorphism Pro */}
+      {displayNotes && (
+        <div
+          className={cn(
+            "pointer-events-none absolute left-0 right-0 hidden group-hover:block z-50 animate-in fade-in zoom-in-95 duration-150",
+            isNearTop ? "top-[calc(100%+6px)]" : "bottom-[calc(100%+6px)]"
+          )}
+        >
+          <div className="bg-[#0F172A]/95 text-white backdrop-blur-xl border border-white/20 rounded-xl p-3 shadow-2xl text-xs space-y-1.5 max-w-[280px] w-full">
+            <div className="flex items-center justify-between gap-1 border-b border-white/10 pb-1.5">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-blue-300">📝 Note & Description</span>
+              <span className="text-[10px] text-white/60 font-tabular">{startStr} - {endStr}</span>
+            </div>
+            <p className="text-[11px] text-slate-100 whitespace-pre-wrap leading-relaxed break-words font-normal max-h-48 overflow-y-auto [scrollbar-width:thin]">
+              {displayNotes}
+            </p>
+            {linkedTask && (
+              <div className="pt-1 border-t border-white/10 text-[10px] text-emerald-300 flex items-center gap-1">
+                <CheckSquare className="w-3 h-3 shrink-0" />
+                <span className="truncate">Tâche: {linkedTask.title}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Bottom row: Time badge & Subject indicator if short */}
       {duration < 55 ? (
@@ -252,28 +374,54 @@ export function TimeblockEventCard({
             <Clock className="w-3 h-3 opacity-70 shrink-0" />
             <span className="font-semibold">{startStr}</span>
           </div>
-          {subject && (
-            <span
-              className={cn(
-                "inline-flex items-center gap-1 px-1.5 py-0.2 rounded font-semibold text-[9px] border shadow-2xs truncate max-w-[85px]",
-                theme.badgeBg,
-                theme.badgeText,
-                theme.badgeBorder
-              )}
-              title={subject.name}
-            >
-              <SubjectIcon name={subject.name} slug={subject.slug} className="w-2.5 h-2.5 shrink-0" />
-              <span className="truncate">{subject.name}</span>
-            </span>
-          )}
+          <div className="flex items-center gap-1 shrink-0">
+            {displayNotes && (
+              <span className="text-[10px] opacity-75" title="Note attachée">📝</span>
+            )}
+            {subject && (
+              <span
+                className={cn(
+                  "inline-flex items-center gap-1 px-1.5 py-0.2 rounded font-semibold text-[9px] border shadow-2xs truncate max-w-[85px]",
+                  theme.badgeBg,
+                  theme.badgeText,
+                  theme.badgeBorder
+                )}
+                title={subject.name}
+              >
+                <SubjectIcon name={subject.name} slug={subject.slug} className="w-2.5 h-2.5 shrink-0" />
+                <span className="truncate">{subject.name}</span>
+              </span>
+            )}
+          </div>
         </div>
       ) : (
-        <div className="flex items-center justify-between gap-1 text-[10px] text-[#68748A] pt-1.5 mt-auto border-t border-black/5 font-tabular font-medium whitespace-nowrap min-w-0">
+        <div className="flex items-center justify-between gap-1 text-[10px] text-[#68748A] pt-1 mt-auto border-t border-black/5 font-tabular font-medium whitespace-nowrap min-w-0">
           <div className="flex items-center gap-1 shrink-0">
             <Clock className="w-3 h-3 opacity-70 shrink-0" />
             <span className="font-semibold">{startStr} - {endStr}</span>
           </div>
-          <span className="opacity-75 shrink-0 font-normal">({duration}m)</span>
+          <div className="flex items-center gap-1 shrink-0">
+            {displayNotes && (
+              <span className="text-[10px] opacity-75" title="Note attachée (survoler pour lire)">📝</span>
+            )}
+            <span className="opacity-75 font-normal">({duration}m)</span>
+          </div>
+        </div>
+      )}
+
+      {/* Lower Resize Handle (Bottom Bar) */}
+      {onResizeStart && (
+        <div
+          role="separator"
+          aria-label="Ajuster l'heure de fin"
+          title="Glisser pour ajuster la fin (par paliers de 15 min)"
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            onResizeStart(e, block, "bottom");
+          }}
+          className="absolute -bottom-1.5 left-3 right-3 h-3 cursor-ns-resize z-40 group/bottom-handle flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity touch-none"
+        >
+          <div className="w-8 h-1 rounded-full bg-[#2855D9]/50 group-hover/bottom-handle:bg-[#2855D9] group-hover/bottom-handle:h-1.5 transition-all shadow-xs" />
         </div>
       )}
     </div>

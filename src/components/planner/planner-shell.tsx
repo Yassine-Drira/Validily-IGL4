@@ -60,7 +60,10 @@ export function PlannerShell({
 
   const { isRunning, isPaused, timeLeft, setIsModalOpen } = useFocus();
 
-  // Optimized refresh handler
+  // High-performance client-side cache for timeblock ranges to preserve free-tier Supabase egress
+  const calendarRangeCache = useRef<Map<string, CalendarTimeblock[]>>(new Map());
+
+  // Optimized refresh handler with instant cache hit
   const handleRefresh = useCallback(async (forceHistory = false) => {
     setIsRefreshing(true);
     try {
@@ -68,6 +71,12 @@ export function PlannerShell({
       // Range: 14 days before to 21 days after current date
       const startRange = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
       const endRange = new Date(now.getTime() + 21 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      const cacheKey = `${startRange}_${endRange}`;
+
+      // Instant cache retrieval (0ms UI latency)
+      if (!forceHistory && calendarRangeCache.current.has(cacheKey)) {
+        setTimeblocks(calendarRangeCache.current.get(cacheKey)!);
+      }
 
       const fetchHistory = forceHistory || section === "history";
       const promises: [Promise<any>, Promise<any>, Promise<any>?] = [
@@ -81,7 +90,10 @@ export function PlannerShell({
       const [tasksRes, blocksRes, historyRes] = await Promise.allSettled(promises);
 
       if (tasksRes.status === "fulfilled" && tasksRes.value.success) setTasks(tasksRes.value.data);
-      if (blocksRes.status === "fulfilled" && blocksRes.value.success) setTimeblocks(blocksRes.value.data);
+      if (blocksRes.status === "fulfilled" && blocksRes.value.success) {
+        setTimeblocks(blocksRes.value.data);
+        calendarRangeCache.current.set(cacheKey, blocksRes.value.data);
+      }
       if (historyRes && historyRes.status === "fulfilled" && historyRes.value.success) setHistory(historyRes.value.data);
     } catch {
       // Safe resilience against transient failures

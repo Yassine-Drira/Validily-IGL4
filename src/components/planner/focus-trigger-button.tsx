@@ -11,6 +11,7 @@ interface FocusTriggerButtonProps {
   taskId?: string;
   className?: string;
   size?: "sm" | "md";
+  compact?: boolean;
 }
 
 export function FocusTriggerButton({
@@ -19,6 +20,7 @@ export function FocusTriggerButton({
   taskId,
   className,
   size = "sm",
+  compact = false,
 }: FocusTriggerButtonProps) {
   const {
     setIsModalOpen,
@@ -54,11 +56,15 @@ export function FocusTriggerButton({
       type="button"
       onClick={handleStartFocus}
       className={cn(
-        "inline-flex items-center gap-1.5 font-medium rounded-lg transition-all select-none",
+        "inline-flex items-center justify-center font-medium rounded-lg transition-all select-none shrink-0",
         isSessionActive
           ? "bg-[#059669]/10 text-[#059669] hover:bg-[#059669]/20 border border-[#059669]/30"
           : "bg-[#EDF2FF] text-[#2855D9] hover:bg-[#DCE7FE] border border-[#2855D9]/20",
-        size === "sm" ? "px-2 py-1 text-xs" : "px-3 py-1.5 text-sm",
+        compact
+          ? "p-1 text-xs gap-1"
+          : size === "sm"
+          ? "px-2 py-1 text-xs gap-1.5"
+          : "px-3 py-1.5 text-sm gap-1.5",
         className
       )}
       title={
@@ -66,9 +72,14 @@ export function FocusTriggerButton({
           ? "Session en cours — Ouvrir le Bosquet Focus"
           : `Lancer Focus (${estimatedMinutes} min) dans le Bosquet`
       }
+      aria-label={
+        isSessionActive
+          ? "Session Focus en cours"
+          : `Lancer Focus (${estimatedMinutes} min)`
+      }
     >
       <Play className={cn("w-3 h-3 fill-current", isSessionActive && "animate-pulse")} />
-      <span>{isSessionActive ? "En cours" : "Focus"}</span>
+      {!compact && <span>{isSessionActive ? "En cours" : "Focus"}</span>}
       <Trees className="w-3.5 h-3.5 opacity-90 text-[#059669]" />
     </button>
   );

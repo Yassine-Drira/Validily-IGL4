@@ -1255,4 +1255,134 @@ test("PLANNER-SEC-06: Strict Multi-Tenant Isolation - Comprehensive privacy audi
   assert.equal(checkGoals.data[0].title, "Alice Confidential Target");
 });
 
+// -----------------------------------------------------------------------------
+// 7. CALENDAR UX & STRETCHING TESTS
+// -----------------------------------------------------------------------------
+
+test("CALENDAR-UX-01: computeTimeblockDayLayout distinguishes contiguous tasks from overlapping tasks", async () => {
+  const { computeTimeblockDayLayout } = await import("../src/lib/planner/calendar-layout.ts");
+
+  // Case A: Consecutive tasks (13:00 - 14:00 and 14:00 - 15:00)
+  const consecutiveBlocks = [
+    {
+      id: "block-1",
+      start_time: "13:00",
+      end_time: "14:00",
+      duration_minutes: 60,
+      block_date: "2026-10-25",
+    },
+    {
+      id: "block-2",
+      start_time: "14:00",
+      end_time: "15:00",
+      duration_minutes: 60,
+      block_date: "2026-10-25",
+    },
+  ];
+
+  const consecutiveLayout = computeTimeblockDayLayout(consecutiveBlocks);
+  assert.equal(consecutiveLayout.size, 2);
+  // Both blocks should have totalCols = 1 because they are contiguous in time, NOT overlapping!
+  assert.equal(consecutiveLayout.get("block-1")?.totalCols, 1);
+  assert.equal(consecutiveLayout.get("block-1")?.colIndex, 0);
+  assert.equal(consecutiveLayout.get("block-2")?.totalCols, 1);
+  assert.equal(consecutiveLayout.get("block-2")?.colIndex, 0);
+
+  // Case B: Truly overlapping tasks (13:00 - 14:30 and 14:00 - 15:00)
+  const overlappingBlocks = [
+    {
+      id: "block-a",
+      start_time: "13:00",
+      end_time: "14:30",
+      duration_minutes: 90,
+      block_date: "2026-10-25",
+    },
+    {
+      id: "block-b",
+      start_time: "14:00",
+      end_time: "15:00",
+      duration_minutes: 60,
+      block_date: "2026-10-25",
+    },
+  ];
+
+  const overlappingLayout = computeTimeblockDayLayout(overlappingBlocks);
+  assert.equal(overlappingLayout.size, 2);
+  assert.equal(overlappingLayout.get("block-a")?.totalCols, 2);
+  assert.equal(overlappingLayout.get("block-b")?.totalCols, 2);
+  assert.notEqual(
+    overlappingLayout.get("block-a")?.colIndex,
+    overlappingLayout.get("block-b")?.colIndex
+  );
+});
+
+test("CALENDAR-UX-02: Task stretching dynamically modifies time boundaries with optimistic persistence", async () => {
+  setTestUser(USER_ALICE);
+
+  const blockRes = await createCalendarTimeblockAction({
+    title: "Stretchable Revision Block",
+    block_date: "2026-10-25",
+    start_time: "10:00",
+    end_time: "11:00",
+    duration_minutes: 60,
+  });
+  assert.ok(blockRes.success && blockRes.data);
+
+  // Extend upper bar (start 45 min earlier: 09:15)
+  const stretchTopRes = await updateCalendarTimeblockAction(blockRes.data.id, {
+    start_time: "09:15",
+    end_time: "11:00",
+    duration_minutes: 105,
+  });
+  assert.equal(stretchTopRes.success, true);
+  assert.equal(stretchTopRes.data?.start_time, "09:15");
+  assert.equal(stretchTopRes.data?.duration_minutes, 105);
+
+  // Extend lower bar (end 30 min later: 11:30)
+  const stretchBottomRes = await updateCalendarTimeblockAction(blockRes.data.id, {
+    start_time: "09:15",
+    end_time: "11:30",
+    duration_minutes: 135,
+  });
+  assert.equal(stretchBottomRes.success, true);
+  assert.equal(stretchBottomRes.data?.end_time, "11:30");
+  assert.equal(stretchBottomRes.data?.duration_minutes, 135);
+});
+
+test("CALENDAR-UX-03: Component contracts ensure unblocked checkbox, compact focus button, and hover description", async () => {
+  const cardCode = fs.readFileSync(
+    path.resolve(process.cwd(), "src/components/planner/timeblock-event-card.tsx"),
+    "utf-8"
+  );
+
+  // 1. Completion checkbox is isolated in z-30 container and never covered
+  assert.ok(cardCode.includes("relative z-30 shrink-0"));
+  assert.ok(cardCode.includes("onToggleComplete(block)"));
+
+  // 2. Action bar is constrained to max-w-[calc(100%-38px)] and has lower z-index (z-20)
+  assert.ok(cardCode.includes("max-w-[calc(100%-38px)]"));
+  assert.ok(cardCode.includes("z-20"));
+
+  // 3. Focus trigger button is passed compact={true}
+  assert.ok(cardCode.includes("compact={true}"));
+
+  // 4. Upper and lower resize handles exist with cursor-ns-resize and onResizeStart
+  assert.ok(cardCode.includes("cursor-ns-resize"));
+  assert.ok(cardCode.includes('onResizeStart(e, block, "top")'));
+  assert.ok(cardCode.includes('onResizeStart(e, block, "bottom")'));
+
+  // 5. Full description hover card is present with whitespace-pre-wrap
+  assert.ok(cardCode.includes("📝 Note & Description") || cardCode.includes("📝 Note complète"));
+  assert.ok(cardCode.includes("whitespace-pre-wrap"));
+  assert.ok(cardCode.includes("group-hover:block"));
+
+  // 6. FocusTriggerButton supports compact mode
+  const focusBtnCode = fs.readFileSync(
+    path.resolve(process.cwd(), "src/components/planner/focus-trigger-button.tsx"),
+    "utf-8"
+  );
+  assert.ok(focusBtnCode.includes("compact?: boolean"));
+  assert.ok(focusBtnCode.includes("!compact && <span>"));
+});
+
 
