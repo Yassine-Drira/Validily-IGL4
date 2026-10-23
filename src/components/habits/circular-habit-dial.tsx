@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from "react";
-import type { HabitWithTodayState, DayCompletionStatus, HabitCategory } from "@/types/database";
-import { getLocalTodayDateString, addDaysToDateString } from "@/lib/habits/habit-engine";
+import type { HabitWithTodayState, DayCompletionStatus, HabitCategory, HabitCheckin } from "@/types/database";
+import { getLocalTodayDateString, addDaysToDateString, getDayCompletionStatus } from "@/lib/habits/habit-engine";
 import {
   Flame,
   Sparkles,
@@ -176,21 +176,30 @@ function SingleDialRenderer({
   const hubRadius = numRings <= 4 ? 76 : numRings <= 6 ? 64 : 54;
   const ringWidth = (outerRadius - hubRadius) / numRings;
 
-  // Calculate completion stats for this specific wheel
+  // Calculate completion stats for this specific wheel using exact check-in data
   const dialStats = useMemo(() => {
     let completedCells = 0;
     const totalCells = numDays * habits.length;
 
     for (const habit of habits) {
+      const checkinMap = new Map<string, HabitCheckin>();
+      if (habit.recentCheckins) {
+        for (const c of habit.recentCheckins) {
+          checkinMap.set(c.date, c);
+        }
+      }
+      if (habit.todayCheckin) {
+        checkinMap.set(habit.todayCheckin.date || todayStr, habit.todayCheckin);
+      }
+
       for (const dStr of dateList) {
         const isToday = dStr === todayStr;
         if (isToday && habit.todayStatus === "completed") {
           completedCells++;
-        } else if (!isToday && dStr >= habit.start_date && dStr <= todayStr) {
-          const diffDays = Math.round(
-            (new Date(todayStr).getTime() - new Date(dStr).getTime()) / (1000 * 60 * 60 * 24)
-          );
-          if (diffDays <= habit.currentStreak) {
+        } else {
+          const checkin = checkinMap.get(dStr);
+          const status = getDayCompletionStatus(habit, checkin, dStr, todayStr);
+          if (status === "completed") {
             completedCells++;
           }
         }
@@ -357,6 +366,16 @@ function SingleDialRenderer({
               const r1 = hubRadius + (ringIdx + 1) * ringWidth - 2;
               const isSelectedHabit = habit.id === selectedHabitId;
 
+              const checkinMap = new Map<string, HabitCheckin>();
+              if (habit.recentCheckins) {
+                for (const c of habit.recentCheckins) {
+                  checkinMap.set(c.date, c);
+                }
+              }
+              if (habit.todayCheckin) {
+                checkinMap.set(habit.todayCheckin.date || todayStr, habit.todayCheckin);
+              }
+
               return (
                 <g key={`ring-${habit.id}`} opacity={isSelectedHabit ? 1 : 0.88}>
                   {dateList.map((dStr, dayIdx) => {
@@ -368,36 +387,37 @@ function SingleDialRenderer({
                     const a1 = (dayIdx + 1) * sliceAngle - Math.PI / 2 - angularGap;
 
                     const isToday = dStr === todayStr;
-                    const isFuture = dStr > todayStr;
-                    const isBeforeStart = dStr < habit.start_date;
-
-                    // Completion check
-                    let isDone = false;
+                    let status: DayCompletionStatus;
                     if (isToday) {
-                      isDone = habit.todayStatus === "completed";
-                    } else if (!isBeforeStart && !isFuture) {
-                      const diffDays = Math.round(
-                        (new Date(todayStr).getTime() - new Date(dStr).getTime()) /
-                          (1000 * 60 * 60 * 24)
-                      );
-                      isDone = diffDays <= habit.currentStreak;
+                      status = habit.todayStatus;
+                    } else {
+                      const checkin = checkinMap.get(dStr);
+                      status = getDayCompletionStatus(habit, checkin, dStr, todayStr);
                     }
+
+                    const isDone = status === "completed";
+                    const isFuture = status === "future";
+                    const isBeforeStart = dStr < habit.start_date;
 
                     const pathData = describeAnnularSector(cx, cy, r0, r1, a0, a1);
 
                     const fillColor = isDone
                       ? palette.fill
+                      : status === "partial"
+                      ? palette.light
                       : isFuture
                       ? "#FAFAF7"
                       : isBeforeStart
                       ? "#F4F6FA"
-                      : "#EDF2FF";
+                      : isToday
+                      ? "#EDF2FF"
+                      : "#F8FAFC";
 
                     const strokeColor = isDone
                       ? palette.fill
                       : isToday
                       ? "#2855D9"
-                      : "#E4E8F0";
+                      : "#E2E8F0";
 
                     return (
                       <path
@@ -412,8 +432,8 @@ function SingleDialRenderer({
                             habitName: habit.name,
                             dateStr: dStr,
                             dayNum: parseInt(dStr.slice(8), 10),
-                            status: isDone ? "completed" : isFuture ? "future" : "pending",
-                            color: palette.fill,
+                            status,
+                            color: isDone ? palette.fill : status === "pending" ? "#2855D9" : "#64748B",
                           })
                         }
                         onMouseLeave={() => setHoveredCell(null)}
@@ -457,7 +477,19 @@ function SingleDialRenderer({
                   fontWeight="bold"
                   fill={hoveredCell.color}
                 >
-                  {hoveredCell.status === "completed" ? "✓ Validé" : "En attente"}
+                  {hoveredCell.status === "completed"
+                    ? "✓ Validé"
+                    : hoveredCell.status === "partial"
+                    ? "⚡ Partiel"
+                    : hoveredCell.status === "skipped"
+                    ? "⏸ En pause"
+                    : hoveredCell.status === "pending"
+                    ? "○ À faire"
+                    : hoveredCell.status === "future"
+                    ? "Planifié"
+                    : hoveredCell.status === "not_scheduled"
+                    ? "Repos"
+                    : "✕ Non validé"}
                 </text>
                 <text
                   x={cx}
@@ -626,21 +658,30 @@ export function CircularHabitDial({
     return filteredHabits.slice(start, start + PAGE_SIZE);
   }, [filteredHabits, pageIndex]);
 
-  // Calculate overall completion count across all filtered habits
+  // Calculate overall completion count across all filtered habits using exact checkins
   const overallStats = useMemo(() => {
     let completedCells = 0;
     const totalCells = numDays * habits.length;
 
     for (const habit of habits) {
+      const checkinMap = new Map<string, HabitCheckin>();
+      if (habit.recentCheckins) {
+        for (const c of habit.recentCheckins) {
+          checkinMap.set(c.date, c);
+        }
+      }
+      if (habit.todayCheckin) {
+        checkinMap.set(habit.todayCheckin.date || todayStr, habit.todayCheckin);
+      }
+
       for (const dStr of dateList) {
         const isToday = dStr === todayStr;
         if (isToday && habit.todayStatus === "completed") {
           completedCells++;
-        } else if (!isToday && dStr >= habit.start_date && dStr <= todayStr) {
-          const diffDays = Math.round(
-            (new Date(todayStr).getTime() - new Date(dStr).getTime()) / (1000 * 60 * 60 * 24)
-          );
-          if (diffDays <= habit.currentStreak) {
+        } else {
+          const checkin = checkinMap.get(dStr);
+          const status = getDayCompletionStatus(habit, checkin, dStr, todayStr);
+          if (status === "completed") {
             completedCells++;
           }
         }

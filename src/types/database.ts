@@ -653,5 +653,6 @@ export interface HabitWithTodayState extends Habit {
     completedThisWeek: number;
     targetDays: number;
   };
+  recentCheckins?: HabitCheckin[];
 }
 

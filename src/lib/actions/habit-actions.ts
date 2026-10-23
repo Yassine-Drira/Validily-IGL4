@@ -264,6 +264,7 @@ export async function getHabitsAction(options?: {
               todayCheckin,
               currentStreak,
               weeklyProgress,
+              recentCheckins: habitCheckins,
             };
           });
 
@@ -322,6 +323,7 @@ export async function getHabitsAction(options?: {
         todayCheckin,
         currentStreak,
         weeklyProgress,
+        recentCheckins: habitCheckins,
       };
     });
 

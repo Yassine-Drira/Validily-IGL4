@@ -687,3 +687,49 @@ test("HABIT-ACTION-05: applyDiagnosticAdjustmentAction updates habit configurati
   assert.equal(updated?.preferred_time, "morning");
   assert.equal(updated?.target_value, 30);
 });
+
+test("HABIT-ACTION-06: Validating a habit for today strictly touches only today and never marks yesterday as completed", async () => {
+  const todayStr = "2026-10-24";
+  const yesterdayStr = "2026-10-23";
+  const created = await createHabitAction({
+    name: "Coucher Régulier",
+    habit_type: "binary",
+    target_value: 1,
+    frequency_type: "daily",
+    scheduled_days: [1, 2, 3, 4, 5, 6, 0],
+    start_date: "2026-10-20",
+  });
+  const habitId = created.data?.id;
+  assert.ok(habitId);
+
+  // Record checkin ONLY for today (2026-10-24)
+  const checkinRes = await recordCheckinAction({
+    habitId,
+    date: todayStr,
+    value: 1,
+    status: "completed",
+  });
+  assert.equal(checkinRes.success, true);
+
+  // Fetch enriched habits
+  const habitsRes = await getHabitsAction({ targetDate: todayStr });
+  const habit = habitsRes.data?.find((h) => h.id === habitId);
+  assert.ok(habit);
+  assert.equal(habit.todayStatus, "completed");
+
+  // Verify recentCheckins contains only the checked date
+  const checkinMap = new Map();
+  for (const c of habit.recentCheckins || []) {
+    checkinMap.set(c.date, c);
+  }
+  assert.equal(checkinMap.has(todayStr), true, "Today must have a check-in recorded");
+  assert.equal(checkinMap.has(yesterdayStr), false, "Yesterday must NOT have a check-in recorded");
+
+  // Verify status evaluation for yesterday and today
+  const yesterdayStatus = getDayCompletionStatus(habit, checkinMap.get(yesterdayStr), yesterdayStr, todayStr);
+  const todayStatus = getDayCompletionStatus(habit, checkinMap.get(todayStr), todayStr, todayStr);
+
+  assert.equal(yesterdayStatus, "missed", "Yesterday must evaluate to 'missed', never completed");
+  assert.equal(todayStatus, "completed", "Today must evaluate to 'completed'");
+});
+
