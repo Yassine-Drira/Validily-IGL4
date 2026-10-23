@@ -550,16 +550,17 @@ test("HABIT-ACTION-01: createHabitAction enforces validation, persists habit, an
 });
 
 test("HABIT-ACTION-02: recordCheckinAction upserts idempotently and undoCheckinAction safely removes checkin", async () => {
+  const todayStr = "2026-10-23";
   const created = await createHabitAction({
     name: "Hydratation",
     habit_type: "quantitative",
     target_value: 2000,
     unit: "ml",
     preferred_time: "anytime",
+    start_date: todayStr,
   });
 
   const habitId = created.data?.id;
-  const todayStr = "2026-10-23";
 
   // 1. Partial check-in (500 ml)
   const c1 = await recordCheckinAction({
