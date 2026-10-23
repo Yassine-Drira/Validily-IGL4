@@ -23,6 +23,7 @@ interface TimeblockEventCardProps {
   isResizing?: boolean;
   isCompact?: boolean;
   isNearTop?: boolean;
+  isParallel?: boolean;
   className?: string;
 }
 
@@ -41,6 +42,7 @@ export function TimeblockEventCard({
   isResizing = false,
   isCompact = false,
   isNearTop = false,
+  isParallel = false,
   className = "",
 }: TimeblockEventCardProps) {
   const isCompleted = block.is_completed;
@@ -191,7 +193,10 @@ export function TimeblockEventCard({
         }
       }}
       className={cn(
-        "group relative h-full w-full rounded-xl p-2 text-xs border transition-all cursor-grab active:cursor-grabbing select-none flex flex-col justify-between overflow-visible shadow-[0_2px_6px_rgba(0,0,0,0.05),0_1px_2px_rgba(0,0,0,0.03)]",
+        "group relative h-full w-full rounded-xl text-xs border transition-all cursor-grab active:cursor-grabbing select-none flex flex-col justify-between overflow-visible",
+        isParallel
+          ? "p-1.5 ring-1 ring-black/5 shadow-[0_2px_8px_rgba(0,0,0,0.06)] backdrop-blur-md"
+          : "p-2 shadow-[0_2px_6px_rgba(0,0,0,0.05),0_1px_2px_rgba(0,0,0,0.03)]",
         isDragging && "opacity-40 ring-2 ring-[#2855D9] scale-95 shadow-xl",
         isResizing && "ring-2 ring-[#2855D9] shadow-lg cursor-ns-resize",
         isCompleted
@@ -211,7 +216,7 @@ export function TimeblockEventCard({
             e.stopPropagation();
             onResizeStart(e, block, "top");
           }}
-          className="absolute -top-1.5 left-3 right-3 h-3 cursor-ns-resize z-40 group/top-handle flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity touch-none"
+          className="absolute -top-1.5 left-2 right-2 h-3 cursor-ns-resize z-40 group/top-handle flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity touch-none"
         >
           <div className="w-8 h-1 rounded-full bg-[#2855D9]/50 group-hover/top-handle:bg-[#2855D9] group-hover/top-handle:h-1.5 transition-all shadow-xs" />
         </div>
@@ -219,10 +224,16 @@ export function TimeblockEventCard({
 
       {/* Top row: Luminous Accent Bar, Checkbox & Prominent Title */}
       <div className="min-w-0 w-full">
-        <div className="flex items-start gap-1.5 w-full min-w-0 pr-1">
+        <div className="flex items-start gap-1 w-full min-w-0 pr-0.5">
           {/* Luminous left accent glow pill */}
           {!isCompleted && (
-            <div className={cn("w-1 self-stretch rounded-full shrink-0 my-0.5", theme.accentBar)} />
+            <div
+              className={cn(
+                "rounded-full shrink-0 my-0.5",
+                isParallel ? "w-0.5 self-stretch" : "w-1 self-stretch",
+                theme.accentBar
+              )}
+            />
           )}
 
           {/* ISOLATED CLICKABLE CHECKBOX: High z-index (z-30) ensures completion is always immediately clickable */}
@@ -241,16 +252,27 @@ export function TimeblockEventCard({
               aria-label={isCompleted ? "Marquer non terminé" : "Marquer terminé"}
             >
               {isCompleted ? (
-                <CheckCircle2 className="w-4 h-4 text-[#059669] fill-[#059669]/15" />
+                <CheckCircle2
+                  className={cn(
+                    "text-[#059669] fill-[#059669]/15",
+                    isParallel ? "w-3.5 h-3.5" : "w-4 h-4"
+                  )}
+                />
               ) : (
-                <Circle className="w-4 h-4 hover:stroke-[#059669]" />
+                <Circle
+                  className={cn(
+                    "hover:stroke-[#059669]",
+                    isParallel ? "w-3.5 h-3.5" : "w-4 h-4"
+                  )}
+                />
               )}
             </button>
           </div>
 
           <h4
             className={cn(
-              "font-bold text-xs leading-snug break-words line-clamp-2 flex-1 min-w-0 pr-1",
+              "font-bold text-xs leading-snug flex-1 min-w-0 pr-0.5",
+              isParallel ? "truncate whitespace-nowrap" : "line-clamp-2 break-normal",
               isCompleted ? "line-through text-[#68748A]" : theme.titleText
             )}
           >
@@ -260,11 +282,16 @@ export function TimeblockEventCard({
 
         {/* Dedicated Subject & Linked Task Badges (for blocks >= 55 min) */}
         {duration >= 55 && (subject || linkedTask) && (
-          <div className="flex flex-wrap items-center gap-1 mt-1 pl-2.5 min-w-0">
+          <div
+            className={cn(
+              "items-center gap-1 mt-1 min-w-0",
+              isParallel ? "flex pl-1.5 overflow-hidden" : "flex flex-wrap pl-2.5"
+            )}
+          >
             {subject && (
               <span
                 className={cn(
-                  "inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md font-semibold text-[10px] border shadow-2xs max-w-full min-w-0",
+                  "inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md font-semibold text-[9.5px] border shadow-2xs max-w-full min-w-0 truncate",
                   theme.badgeBg,
                   theme.badgeText,
                   theme.badgeBorder
@@ -272,13 +299,16 @@ export function TimeblockEventCard({
                 title={subject.name}
               >
                 <SubjectIcon name={subject.name} slug={subject.slug} className="w-2.5 h-2.5 shrink-0" />
-                <span className="truncate max-w-[140px]">{subject.name}</span>
+                <span className="truncate max-w-[85px]">{subject.name}</span>
               </span>
             )}
 
             {linkedTask && (
               <span
-                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-white/70 border border-black/5 text-[9px] font-medium max-w-[110px] truncate shadow-2xs"
+                className={cn(
+                  "items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-white/70 border border-black/5 text-[9px] font-medium max-w-[110px] truncate shadow-2xs",
+                  isParallel ? "hidden group-hover:inline-flex" : "inline-flex"
+                )}
                 title={`Lié à la tâche: ${linkedTask.title}`}
               >
                 <CheckSquare className="w-2.5 h-2.5 text-[#2855D9] shrink-0" />
@@ -291,7 +321,10 @@ export function TimeblockEventCard({
         {/* Floating Hover Glass Action Overlay: compact icon-only & constrained so it NEVER covers the left checkbox */}
         <div
           onClick={(e) => e.stopPropagation()}
-          className="absolute top-1 right-1 hidden group-hover:flex items-center gap-0.5 bg-white/95 backdrop-blur-md p-0.5 rounded-lg border border-black/10 shadow-md z-20 max-w-[calc(100%-38px)] transition-all"
+          className={cn(
+            "absolute top-1 right-1 hidden group-hover:flex items-center gap-0.5 bg-white/95 backdrop-blur-md p-0.5 rounded-lg border border-black/10 shadow-md z-20 transition-all",
+            isParallel ? "max-w-[calc(100%-28px)] scale-90 origin-top-right" : "max-w-[calc(100%-38px)]"
+          )}
         >
           <FocusTriggerButton
             title={block.title}
@@ -331,7 +364,7 @@ export function TimeblockEventCard({
         </div>
 
         {/* Notes Preview inside card (for blocks >= 65 min) */}
-        {displayNotes && duration >= 65 && (
+        {displayNotes && duration >= 65 && !isParallel && (
           <p className="text-[11px] text-[#475569] line-clamp-2 mt-1 pl-2 italic border-l-2 border-current/30 ml-2.5">
             {displayNotes}
           </p>
@@ -366,12 +399,12 @@ export function TimeblockEventCard({
 
       {/* Bottom row: Time badge & Subject indicator if short */}
       {duration < 55 ? (
-        <div className="flex items-center justify-between gap-1 text-[10px] text-[#68748A] pt-1 mt-auto border-t border-black/5 font-tabular font-medium whitespace-nowrap min-w-0">
-          <div className="flex items-center gap-1 shrink-0">
-            <Clock className="w-3 h-3 opacity-70 shrink-0" />
-            <span className="font-semibold">{startStr}</span>
+        <div className="flex items-center justify-between gap-1 text-[10px] text-[#68748A] pt-1 mt-auto border-t border-black/5 font-tabular font-medium min-w-0 overflow-hidden">
+          <div className="flex items-center gap-1 shrink-0 min-w-0">
+            <Clock className="w-2.5 h-2.5 opacity-70 shrink-0" />
+            <span className="font-semibold truncate text-[9.5px]">{startStr}</span>
           </div>
-          {subject && (
+          {subject && !isParallel && (
             <span
               className={cn(
                 "inline-flex items-center gap-1 px-1.5 py-0.2 rounded font-semibold text-[9px] border shadow-2xs truncate max-w-[85px]",
@@ -387,12 +420,21 @@ export function TimeblockEventCard({
           )}
         </div>
       ) : (
-        <div className="flex items-center justify-between gap-1 text-[10px] text-[#68748A] pt-1 mt-auto border-t border-black/5 font-tabular font-medium whitespace-nowrap min-w-0">
+        <div className="flex items-center justify-between gap-1 text-[10px] text-[#68748A] pt-1 mt-auto border-t border-black/5 font-tabular font-medium min-w-0 overflow-hidden">
           <div className="flex items-center gap-1 shrink-0 min-w-0">
-            <Clock className="w-3 h-3 opacity-70 shrink-0" />
-            <span className="font-semibold">{startStr} - {endStr}</span>
+            <Clock className="w-2.5 h-2.5 opacity-70 shrink-0" />
+            <span className="font-semibold truncate text-[9.5px]">
+              {startStr} - {endStr}
+            </span>
           </div>
-          <span className="opacity-75 font-normal shrink-0">({duration}m)</span>
+          <span
+            className={cn(
+              "opacity-75 font-normal shrink-0 text-[9px]",
+              isParallel ? "hidden group-hover:inline" : ""
+            )}
+          >
+            ({duration}m)
+          </span>
         </div>
       )}
 

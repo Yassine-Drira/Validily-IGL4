@@ -34,7 +34,7 @@ import { SubjectIcon } from "@/components/academic/subject-icon";
 import { FocusTriggerButton } from "./focus-trigger-button";
 import { TimeblockEventCard } from "./timeblock-event-card";
 import { TaskSelector } from "./task-selector";
-import { getLocalTodayDateString } from "@/lib/utils";
+import { getLocalTodayDateString, cn } from "@/lib/utils";
 import {
   PLANNER_COLOR_OPTIONS,
   PlannerColorKey,
@@ -959,11 +959,41 @@ export function AcademicCalendarView({
                       const dayLayouts = layoutMap.get(dateStr);
                       const layout = dayLayouts?.get(block.id) || { colIndex: 0, totalCols: 1 };
                       const isSingleCol = layout.totalCols === 1;
+                      const isParallel = layout.totalCols > 1;
 
-                      const widthPercent = 100 / layout.totalCols;
-                      const leftPercent = layout.colIndex * widthPercent;
-                      const leftStyle = isSingleCol ? "4px" : `calc(${leftPercent}% + 2px)`;
-                      const widthStyle = isSingleCol ? "calc(100% - 8px)" : `calc(${widthPercent}% - 4px)`;
+                      let leftStyle = "4px";
+                      let widthStyle = "calc(100% - 8px)";
+                      let zIndexVal = 10;
+
+                      if (!isSingleCol) {
+                        if (viewMode === "day") {
+                          const widthPercent = 100 / layout.totalCols;
+                          const leftPercent = layout.colIndex * widthPercent;
+                          leftStyle = `calc(${leftPercent}% + 2px)`;
+                          widthStyle = `calc(${widthPercent}% - 4px)`;
+                          zIndexVal = 10 + layout.colIndex;
+                        } else {
+                          // Pro Staggered Cascade in Week & 3-Days views (Apple Calendar / Notion Calendar style)
+                          if (layout.totalCols === 2) {
+                            if (layout.colIndex === 0) {
+                              leftStyle = "2px";
+                              widthStyle = "calc(72% - 2px)";
+                              zIndexVal = 10;
+                            } else {
+                              leftStyle = "calc(28% + 2px)";
+                              widthStyle = "calc(70% - 4px)";
+                              zIndexVal = 14;
+                            }
+                          } else {
+                            const stepPercent = Math.min(22, 50 / (layout.totalCols - 1));
+                            const widthPercent = Math.max(54, 100 - (layout.totalCols - 1) * stepPercent);
+                            const leftPercent = layout.colIndex * stepPercent;
+                            leftStyle = `calc(${leftPercent}% + 2px)`;
+                            widthStyle = `calc(${widthPercent}% - 4px)`;
+                            zIndexVal = 10 + layout.colIndex * 2;
+                          }
+                        }
+                      }
 
                       const startMins = parseTimeToMinutes(block.start_time);
                       const duration = block.duration_minutes || 60;
@@ -986,13 +1016,19 @@ export function AcademicCalendarView({
                       return (
                         <div
                           key={block.id}
+                          className={cn(
+                            "transition-all duration-200 ease-out",
+                            isParallel &&
+                              viewMode !== "day" &&
+                              "hover:!left-[2px] hover:!w-[calc(100%-4px)] hover:!z-40 hover:shadow-2xl"
+                          )}
                           style={{
                             position: "absolute",
                             top: `${topPx}px`,
                             height: `${heightPx}px`,
-                            left: leftStyle,
-                            width: widthStyle,
-                            zIndex: isResizingThis ? 40 : 10,
+                            left: isResizingThis ? "2px" : leftStyle,
+                            width: isResizingThis ? "calc(100% - 4px)" : widthStyle,
+                            zIndex: isResizingThis ? 50 : zIndexVal,
                           }}
                         >
                           <TimeblockEventCard
@@ -1015,6 +1051,7 @@ export function AcademicCalendarView({
                             isResizing={Boolean(isResizingThis)}
                             isCompact={effectiveDuration < 45}
                             isNearTop={isNearTop}
+                            isParallel={isParallel}
                           />
                         </div>
                       );

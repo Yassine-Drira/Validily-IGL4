@@ -1385,4 +1385,40 @@ test("CALENDAR-UX-03: Component contracts ensure unblocked checkbox, compact foc
   assert.ok(focusBtnCode.includes("!compact && <span>"));
 });
 
+test("CALENDAR-UX-04: Parallel tasks feature staggered cascading layout, overflow protection, and hover expansion", async () => {
+  const calendarCode = fs.readFileSync(
+    path.resolve(process.cwd(), "src/components/planner/academic-calendar-view.tsx"),
+    "utf-8"
+  );
+  const cardCode = fs.readFileSync(
+    path.resolve(process.cwd(), "src/components/planner/timeblock-event-card.tsx"),
+    "utf-8"
+  );
+
+  // 1. Calendar view computes parallel status and passes isParallel to cards
+  assert.ok(calendarCode.includes("const isParallel = layout.totalCols > 1;"));
+  assert.ok(calendarCode.includes("isParallel={isParallel}"));
+
+  // 2. Overlapping tasks in week/3days views use staggered cascade positioning
+  assert.ok(calendarCode.includes('widthStyle = "calc(72% - 2px)"'));
+  assert.ok(calendarCode.includes('leftStyle = "calc(28% + 2px)"'));
+
+  // 3. Staggered cards elevate and expand to 100% width on hover
+  assert.ok(calendarCode.includes("hover:!left-[2px]"));
+  assert.ok(calendarCode.includes("hover:!w-[calc(100%-4px)]"));
+  assert.ok(calendarCode.includes("hover:!z-40"));
+
+  // 4. TimeblockEventCard accepts isParallel prop
+  assert.ok(cardCode.includes("isParallel?: boolean;"));
+  assert.ok(cardCode.includes("isParallel = false"));
+
+  // 5. Title does not break words mid-syllable when parallel; uses clean truncation
+  assert.ok(cardCode.includes('isParallel ? "truncate whitespace-nowrap" : "line-clamp-2 break-normal"'));
+
+  // 6. Bottom time row prevents horizontal text overflow
+  assert.ok(cardCode.includes("min-w-0 overflow-hidden"));
+  assert.ok(cardCode.includes('isParallel ? "hidden group-hover:inline" : ""'));
+});
+
+
 
