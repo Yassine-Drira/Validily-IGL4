@@ -207,46 +207,7 @@ export function CoachChatThread({
       <div className="absolute top-0 right-0 w-96 h-96 bg-blue-50/50 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-0 left-0 w-80 h-80 bg-indigo-50/40 rounded-full blur-3xl pointer-events-none" />
 
-      {/* Thread Header - Executive Cockpit Bar */}
-      <div className="px-6 py-4 border-b border-[#E4E8F0] flex items-center justify-between bg-white/90 backdrop-blur-md relative z-10">
-        <div className="flex items-center gap-3.5">
-          <div className="relative">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-[#2855D9] via-indigo-600 to-indigo-700 flex items-center justify-center text-white shadow-sm ring-2 ring-blue-100">
-              <Sparkles className="w-5 h-5" />
-            </div>
-            <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 ring-2 ring-white flex items-center justify-center">
-              <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-            </span>
-          </div>
 
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-sm font-bold tracking-tight text-[#111A2E]">Validily AI</h2>
-              <span className="text-[10px] font-semibold tracking-wider uppercase px-2 py-0.5 rounded-full bg-[#EDF2FF] text-[#2855D9] border border-[#2855D9]/20 font-mono">
-                Tuteur & Architecte Pédagogique
-              </span>
-            </div>
-            <p className="text-xs text-[#68748A]">
-              Conseiller stratégique certifié • Synthèse personnalisée en temps réel de votre cursus IGL4
-            </p>
-          </div>
-        </div>
-
-        {/* Live Context Indicators */}
-        <div className="hidden sm:flex items-center gap-2.5">
-          <div className="px-3 py-1.5 rounded-xl bg-[#F8FAFC] border border-[#E4E8F0] text-[#111A2E] text-xs flex items-center gap-2 shadow-2xs">
-            <Clock className="w-3.5 h-3.5 text-[#2855D9]" />
-            <span className="font-tabular font-medium">
-              {Math.floor(availableMinutes / 60)}h{availableMinutes % 60}m disponibles
-            </span>
-          </div>
-
-          <div className="px-3 py-1.5 rounded-xl bg-[#F8FAFC] border border-[#E4E8F0] text-[#111A2E] text-xs flex items-center gap-2 shadow-2xs">
-            <BookOpen className="w-3.5 h-3.5 text-[#059669]" />
-            <span className="font-tabular font-medium">{activeTasksCount} devoirs</span>
-          </div>
-        </div>
-      </div>
 
       {/* Messages Scroll Area */}
       <div
