@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
-import { Search, UploadCloud, User, Menu, LogOut, Bookmark, Sparkles } from "lucide-react";
+import { Search, UploadCloud, User, Menu, LogOut, Bookmark, Sparkles, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSidebar } from "./workspace-shell";
 import { createClient } from "@/lib/supabase/client";
@@ -26,7 +26,7 @@ export interface HeaderUser {
 
 export function AppHeader({ initialUser }: { initialUser?: HeaderUser | null }) {
   const router = useRouter();
-  const { toggleMobile } = useSidebar();
+  const { toggleMobile, toggleCollapsed, isCollapsed } = useSidebar();
   const [searchQuery, setSearchQuery] = useState("");
   const [user, setUser] = useState<HeaderUser | null>(initialUser ?? null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -123,9 +123,24 @@ export function AppHeader({ initialUser }: { initialUser?: HeaderUser | null }) 
         type="button"
         onClick={toggleMobile}
         className="md:hidden min-w-[40px] min-h-[40px] flex items-center justify-center p-2 -ml-1 text-[#182235] hover:bg-[#F4F6FA] active:bg-[#EDF2FF] rounded-xl transition-all cursor-pointer shrink-0"
-        aria-label="Open navigation sidebar"
+        aria-label="Ouvrir le menu de navigation"
       >
         <Menu className="w-5 h-5 text-[#182235]" />
+      </button>
+
+      {/* Desktop Sidebar Toggle / Closer Button */}
+      <button
+        type="button"
+        onClick={toggleCollapsed}
+        className="hidden md:flex min-w-[36px] min-h-[36px] items-center justify-center p-2 text-[#68748A] hover:text-[#111A2E] hover:bg-[#F4F6FA] active:bg-[#EDF2FF] rounded-xl transition-all cursor-pointer shrink-0"
+        title={isCollapsed ? "Développer la barre latérale (Ctrl+B)" : "Réduire la barre latérale (Ctrl+B)"}
+        aria-label={isCollapsed ? "Développer la barre latérale" : "Réduire la barre latérale"}
+      >
+        {isCollapsed ? (
+          <PanelLeftOpen className="w-5 h-5 text-[#2855D9]" />
+        ) : (
+          <PanelLeftClose className="w-5 h-5 text-[#68748A]" />
+        )}
       </button>
 
       {/* Global Search Bar */}
