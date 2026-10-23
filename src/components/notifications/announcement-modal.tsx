@@ -19,6 +19,9 @@ import {
   KeyRound,
   ShieldCheck,
   Lock,
+  Compass,
+  Bot,
+  LayoutGrid,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -37,7 +40,7 @@ interface AnnouncementModalProps {
   announcement?: AnnouncementData | null;
 }
 
-const PILLARS = [
+const PILLARS_V1_3 = [
   {
     icon: Search,
     title: "SEO Officiel & Indexation",
@@ -88,6 +91,59 @@ const PILLARS = [
   },
 ];
 
+const PILLARS_V2 = [
+  {
+    icon: Compass,
+    title: "Habitudes & Cadran Polaire",
+    badge: "Comportement",
+    color: "from-amber-500/10 to-orange-500/10 border-amber-200 text-amber-700",
+    iconBg: "bg-amber-100 text-amber-700",
+    desc: "Cadran polaire circulaire inspiré des roues d'habitudes, tolérance aux pauses de révision et diagnostics de consistance.",
+  },
+  {
+    icon: Bot,
+    title: "Tuteur & Coach IA RAG",
+    badge: "Intelligence",
+    color: "from-violet-500/10 to-purple-500/10 border-violet-200 text-violet-700",
+    iconBg: "bg-violet-100 text-violet-700",
+    desc: "Synthèse de cours ancrée dans vos documents, suggestions adaptatives et quota atomique 24h avec accès VIP illimité.",
+  },
+  {
+    icon: Calendar,
+    title: "Planning & Compte à Rebours",
+    badge: "Organisation",
+    color: "from-blue-500/10 to-indigo-500/10 border-blue-200 text-blue-700",
+    iconBg: "bg-blue-100 text-blue-700",
+    desc: "Calendrier interactif 08:00–00:00, programmation de blocs d'étude en deux phases et alertes d'examens semestriels.",
+  },
+  {
+    icon: Trees,
+    title: "Bosquet Focus & Soundscapes",
+    badge: "Immersion",
+    color: "from-emerald-500/10 to-teal-500/10 border-emerald-200 text-emerald-700",
+    iconBg: "bg-emerald-100 text-emerald-700",
+    desc: "Sessions Pomodoro avec catalogue d'ambiances sonores, croissance d'arbres persistants et télémétrie sans double-comptage.",
+  },
+  {
+    icon: BookOpen,
+    title: "Bibliothèque 0ms & Fichiers",
+    badge: "Performance",
+    color: "from-cyan-500/10 to-blue-500/10 border-cyan-200 text-cyan-700",
+    iconBg: "bg-cyan-100 text-cyan-700",
+    desc: "Explorateur de ressources instantané en mémoire avec validation stricte par magic-bytes et contrôle de visibilité public/privé.",
+  },
+  {
+    icon: LayoutGrid,
+    title: "Navigation & Volet Rétractable",
+    badge: "Ergonomie",
+    color: "from-slate-500/10 to-zinc-500/10 border-slate-200 text-slate-700",
+    iconBg: "bg-slate-100 text-slate-700",
+    desc: "Barre latérale structurée en 4 sous-sections, fermeture dynamique fluide (Ctrl+B) et ergonomie tactile 44px sur mobile.",
+  },
+];
+
+const PILLARS = PILLARS_V1_3;
+
 export function AnnouncementModal({
   isOpen,
   onClose,
@@ -116,6 +172,8 @@ export function AnnouncementModal({
     announcement?.title ||
     "VALIDILY-IGL4 v1.1 — A New Chapter in Your Learning Experience";
   const targetLink = announcement?.link || "/my-space";
+  const isV2 = version === "v2.0";
+  const activePillars = isV2 ? PILLARS_V2 : PILLARS;
 
   const modalContent = (
     <div
@@ -169,7 +227,15 @@ export function AnnouncementModal({
           {/* Welcome lead */}
           <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-50/70 via-indigo-50/50 to-slate-50 border border-blue-100 text-slate-700 text-xs sm:text-sm leading-relaxed">
             <p className="font-medium">
-              Bienvenue dans <strong>VALIDILY-IGL4 {version}</strong> ! Cette mise à jour apporte des améliorations majeures pour le référencement académique, la sécurité de vos comptes et la fluidité de votre espace de travail quotidien.
+              {isV2 ? (
+                <>
+                  Bienvenue dans <strong>VALIDILY-IGL4 {version}</strong> ! Cette version majeure inaugure le suivi comportemental intelligent avec cadran polaire, le Tuteur IA RAG avec quotas atomiques, une navigation rétractable repensée et une fluidité 0ms dans tout votre espace d&apos;étude.
+                </>
+              ) : (
+                <>
+                  Bienvenue dans <strong>VALIDILY-IGL4 {version}</strong> ! Cette mise à jour apporte des améliorations majeures pour le référencement académique, la sécurité de vos comptes et la fluidité de votre espace de travail quotidien.
+                </>
+              )}
             </p>
           </div>
 
@@ -179,7 +245,7 @@ export function AnnouncementModal({
               Ce qui change pour vous (6 piliers majeurs)
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {PILLARS.map((pillar, idx) => {
+              {activePillars.map((pillar, idx) => {
                 const Icon = pillar.icon;
                 return (
                   <div

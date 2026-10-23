@@ -97,6 +97,26 @@ export interface GlobalAnnouncement {
 // Active published global announcements registry
 const ACTIVE_GLOBAL_ANNOUNCEMENTS: GlobalAnnouncement[] = [
   {
+    id: "announcement-v2-0-release",
+    type: "announcement",
+    release_version: "v2.0",
+    title: "VALIDILY-IGL4 v2.0 — Intelligence Comportementale, Coach IA RAG & Écosystème Haute Performance",
+    content: `Bienvenue dans la version majeure 2.0 de VALIDILY-IGL4 ! Cette mise à jour transforme l'application en une plateforme d'étude complète, intégrant suivi comportemental intelligent, assistance IA ancrée et navigation ergonomique.
+
+Nouveautés majeures :
+- 🧭 Intelligence des Habitudes & Cadran Polaire : Visualisez votre régularité sur un cadran polaire interactif, suivez vos séries de complétion avec tolérance aux pauses de révision et bénéficiez de diagnostics comportementaux grounded.
+- 🤖 Tuteur & Coach IA RAG : Obtenez des résumés et quiz adaptés directement ancrés dans vos cours et devoirs, régulés par un quota atomique de 24h avec accès VIP permanent.
+- 📅 Planning Académique & Compte à Rebours : Planifiez vos séances de révision dans une grille 08:00–00:00 avec programmation en 2 phases et compte à rebours précis jusqu'aux examens.
+- 🌲 Bosquet Focus & Soundscapes : Chronométrez vos sessions Pomodoro avec catalogue audio ambiant et faites croître votre Bosquet avec persistance Authoritative.
+- ⚡ Bibliothèque 0ms & Sécurité de Partage : Recherche instantanée sans latence, filtres par matière et contrôle strict de visibilité publique ou privée avec validation magic-bytes.
+- 🗂️ Navigation Repensée & Volet Rétractable : Barre latérale organisée en 4 sous-sections, fermeture dynamique fluide (Ctrl+B) et confort tactile optimisé sur mobile.
+
+Explorez votre espace et donnez une nouvelle dimension à votre réussite académique ! 🚀`,
+    link: "/habits",
+    created_at: "2026-10-24T00:00:00.000Z",
+    is_active: false, // Release Gate Safeguard: set to false until explicit release authorization
+  },
+  {
     id: "announcement-v1-3-release",
     type: "announcement",
     release_version: "v1.3",
