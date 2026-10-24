@@ -269,6 +269,7 @@ function seedInitialHabitsIfEmpty(userId: string) {
       target_value: 1,
       unit: "fois",
       frequency_type: "weekly_count",
+      scheduled_days: [1, 2, 3, 4, 5, 6, 0],
       target_days_per_week: 1,
       preferred_time: "evening",
       start_date: todayStr,
