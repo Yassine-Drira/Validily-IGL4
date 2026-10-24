@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
+import { SiteIntroOverlay } from "@/components/brand/site-intro-overlay";
 
 const inter = Inter({
   variable: "--font-sans",
@@ -120,6 +121,7 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-full flex flex-col font-sans bg-[#F4F6FA] text-[#182235] antialiased">
+        <SiteIntroOverlay />
         {children}
       </body>
     </html>

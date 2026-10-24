@@ -1,15 +1,17 @@
 "use client";
 
 import React from "react";
+import { SiteIntroOverlay } from "./site-intro-overlay";
 
 interface PremiumCardIntroProps {
   user?: any;
 }
 
 /**
- * No-op placeholder: intro animation overlay has been permanently disabled
- * in favor of instantaneous, 0-latency workspace rendering without black screens.
+ * Premium VIP Card Intro Animation Overlay
  */
 export function PremiumCardIntro(_props: PremiumCardIntroProps) {
-  return null;
+  return <SiteIntroOverlay />;
 }
+
+export { SiteIntroOverlay };

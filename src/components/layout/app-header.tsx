@@ -228,6 +228,18 @@ export function AppHeader({ initialUser }: { initialUser?: HeaderUser | null }) 
 
                 <button
                   type="button"
+                  onClick={() => {
+                    setIsDropdownOpen(false);
+                    window.dispatchEvent(new CustomEvent("validily-replay-intro"));
+                  }}
+                  className="w-full flex items-center space-x-2 px-3 py-2 rounded-xl text-[#182235] hover:bg-[#F4F6FA] transition-colors cursor-pointer text-left"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-[#D4A346]" />
+                  <span>Revoir l&apos;intro VIP</span>
+                </button>
+
+                <button
+                  type="button"
                   onClick={handleLogout}
                   className="w-full flex items-center space-x-2 px-3 py-2 rounded-xl text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
                 >
