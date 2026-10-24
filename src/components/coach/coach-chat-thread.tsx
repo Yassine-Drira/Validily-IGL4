@@ -214,6 +214,9 @@ export function CoachChatThread({
             convoRes.data!.userMessage,
             convoRes.data!.assistantMessage,
           ]);
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new CustomEvent("validily-convo-updated", { detail: { id: targetConvoId } }));
+          }
           onRefreshContext?.();
           return;
         } else if (convoRes.error) {

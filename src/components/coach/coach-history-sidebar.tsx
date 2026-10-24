@@ -89,7 +89,14 @@ export function CoachHistorySidebar({
 
   useEffect(() => {
     loadConversations();
-  }, []);
+    const handleUpdate = () => {
+      loadConversations();
+    };
+    window.addEventListener("validily-convo-updated", handleUpdate);
+    return () => {
+      window.removeEventListener("validily-convo-updated", handleUpdate);
+    };
+  }, [activeConversationId]);
 
   // Handle Search Debounce
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {

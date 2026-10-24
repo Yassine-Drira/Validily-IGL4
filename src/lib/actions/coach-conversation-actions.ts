@@ -108,6 +108,17 @@ function deriveTitleFromPrompt(prompt: string): string {
   return `${cleanCut.trim()}...`;
 }
 
+function generateUUID(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 /**
  * List coach conversations for authenticated user with cursor pagination
  */
@@ -343,7 +354,7 @@ export async function createCoachConversationAction(
     }
 
     const now = new Date().toISOString();
-    const id = `conv-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const id = generateUUID();
     const title = initialTitle?.trim() || "Nouvelle discussion";
     const titleSource = initialTitle ? "user" : "auto";
 
@@ -366,12 +377,26 @@ export async function createCoachConversationAction(
       if (supabase) {
         const { data, error } = await supabase
           .from("coach_conversations")
-          .insert(newRecord)
+          .insert({
+            id,
+            user_id: user.id,
+            title,
+            title_source: titleSource,
+            status: "active",
+            created_at: now,
+            updated_at: now,
+            last_message_at: now,
+            metadata: {},
+          })
           .select()
           .single();
 
         if (!error && data) {
-          return { success: true, data: data as CoachConversation };
+          const loaded = { ...(data as CoachConversation), message_count: 0 };
+          globalCoachConversationsState.__localCoachConversations!.set(loaded.id, loaded);
+          return { success: true, data: loaded };
+        } else if (error) {
+          console.error("createCoachConversationAction Supabase error:", error);
         }
       }
     }
@@ -628,8 +653,28 @@ export async function sendCoachConversationMessageAction(params: {
       return { success: false, error: "Le message ne peut pas être vide." };
     }
 
-    // 1. Resolve & verify ownership of conversation
-    let convo = globalCoachConversationsState.__localCoachConversations!.get(conversationId);
+    // 1. Resolve & verify ownership of conversation (check Supabase first, then local memory)
+    let convo: CoachConversation | null = null;
+    let supabase: any = null;
+    if (await isDbConfigured()) {
+      supabase = await getAdminClient();
+      if (supabase) {
+        const { data: dbConvo } = await supabase
+          .from("coach_conversations")
+          .select("*")
+          .eq("id", conversationId)
+          .eq("user_id", user.id)
+          .single();
+        if (dbConvo) {
+          convo = { ...(dbConvo as CoachConversation), message_count: 0 };
+        }
+      }
+    }
+
+    if (!convo) {
+      convo = globalCoachConversationsState.__localCoachConversations!.get(conversationId) || null;
+    }
+
     if (!convo || convo.user_id !== user.id) {
       return { success: false, error: "Conversation introuvable ou non autorisée." };
     }
@@ -652,7 +697,7 @@ export async function sendCoachConversationMessageAction(params: {
     const dateStr = targetDate || getLocalTodayDateString();
 
     // 3. Persist user message
-    const userMsgId = `msg-usr-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const userMsgId = generateUUID();
     const userMsgRecord: CoachMessageRecord = {
       id: userMsgId,
       conversation_id: conversationId,
@@ -663,8 +708,19 @@ export async function sendCoachConversationMessageAction(params: {
     };
     globalCoachConversationsState.__localCoachMessages!.set(userMsgId, userMsgRecord);
 
+    if (supabase) {
+      await supabase.from("coach_messages").insert({
+        id: userMsgId,
+        conversation_id: conversationId,
+        user_id: user.id,
+        role: "user",
+        content: trimmedContent,
+        created_at: now,
+      });
+    }
+
     // 4. Update title if first message & titleSource is "auto"
-    if (convo.title_source === "auto" && convo.title === "Nouvelle discussion") {
+    if (convo.title_source === "auto" && (convo.title === "Nouvelle discussion" || !convo.title)) {
       convo.title = deriveTitleFromPrompt(trimmedContent);
     }
     convo.updated_at = now;
@@ -672,16 +728,43 @@ export async function sendCoachConversationMessageAction(params: {
     convo.message_count = (convo.message_count || 0) + 1;
     globalCoachConversationsState.__localCoachConversations!.set(conversationId, convo);
 
-    // 5. Assemble bounded context window (strict token preservation: last 6 turns)
-    const existingMessages = Array.from(globalCoachConversationsState.__localCoachMessages!.values())
-      .filter((m) => m.conversation_id === conversationId && m.user_id === user.id)
-      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+    if (supabase) {
+      await supabase
+        .from("coach_conversations")
+        .update({
+          title: convo.title,
+          title_source: convo.title_source,
+          updated_at: now,
+          last_message_at: now,
+        })
+        .eq("id", conversationId);
+    }
 
-    // Only take the last 6 messages including the newly inserted user message
-    const boundedTurnWindow = existingMessages.slice(-6).map((m) => ({
-      role: m.role as "user" | "assistant",
-      content: m.content,
-    }));
+    // 5. Assemble bounded context window (strict token preservation: last 6 turns)
+    let boundedTurnWindow: Array<{ role: "user" | "assistant"; content: string }> = [];
+    if (supabase) {
+      const { data: dbMsgs } = await supabase
+        .from("coach_messages")
+        .select("role, content")
+        .eq("conversation_id", conversationId)
+        .order("created_at", { ascending: true })
+        .limit(6);
+      if (dbMsgs && dbMsgs.length > 0) {
+        boundedTurnWindow = dbMsgs.map((m: any) => ({
+          role: m.role as "user" | "assistant",
+          content: m.content,
+        }));
+      }
+    }
+    if (boundedTurnWindow.length === 0) {
+      const existingMessages = Array.from(globalCoachConversationsState.__localCoachMessages!.values())
+        .filter((m) => m.conversation_id === conversationId && m.user_id === user.id)
+        .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+      boundedTurnWindow = existingMessages.slice(-6).map((m) => ({
+        role: m.role as "user" | "assistant",
+        content: m.content,
+      }));
+    }
 
     // 6. RAG Retrieval for academic context
     const retrievedChunks = await retrieveAcademicContext(user.id, {
@@ -735,7 +818,7 @@ export async function sendCoachConversationMessageAction(params: {
     };
 
     // 9. Persist completed assistant response
-    const astMsgId = `msg-ast-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const astMsgId = generateUUID();
     const astNow = new Date().toISOString();
     const astMsgRecord: CoachMessageRecord = {
       id: astMsgId,
@@ -753,6 +836,26 @@ export async function sendCoachConversationMessageAction(params: {
       created_at: astNow,
     };
     globalCoachConversationsState.__localCoachMessages!.set(astMsgId, astMsgRecord);
+
+    if (supabase) {
+      await supabase.from("coach_messages").insert({
+        id: astMsgId,
+        conversation_id: conversationId,
+        user_id: user.id,
+        role: "assistant",
+        content: validatedResponse.reply,
+        structured_payload: astMsgRecord.structured_payload,
+        created_at: astNow,
+      });
+
+      await supabase
+        .from("coach_conversations")
+        .update({
+          updated_at: astNow,
+          last_message_at: astNow,
+        })
+        .eq("id", conversationId);
+    }
 
     // Update conversation metadata
     convo.updated_at = astNow;
