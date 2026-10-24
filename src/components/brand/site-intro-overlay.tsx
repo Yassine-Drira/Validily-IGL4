@@ -1,92 +1,88 @@
 "use client";
 
-import React, { useEffect, useState, useCallback, useRef } from "react";
-import { Sparkles, X } from "lucide-react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 
 export function SiteIntroOverlay() {
-  const [isOpen, setIsOpen] = useState(false);
-  const [isClosing, setIsClosing] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [statusText, setStatusText] = useState("Initialisation de l'espace...");
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const [isVisible, setIsVisible] = useState(false);
+  const [isFading, setIsFading] = useState(false);
+  const hasCheckedRef = useRef(false);
+  const timersRef = useRef<NodeJS.Timeout[]>([]);
 
-  const startIntro = useCallback(() => {
-    setIsOpen(true);
-    setIsClosing(false);
-    setProgress(0);
-    setStatusText("Initialisation du système académique...");
-
-    // Stage 1: Progress fill
-    const progressInterval = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(progressInterval);
-          return 100;
-        }
-        return prev + 10;
-      });
-    }, 90);
-
-    // Stage 2: Status text update
-    const textTimer1 = setTimeout(() => {
-      setStatusText("Chargement des ressources IGL4...");
-    }, 500);
-
-    const textTimer2 = setTimeout(() => {
-      setStatusText("Prêt • Bienvenue sur Validily");
-    }, 1050);
-
-    // Stage 3: Smooth exit curtain
-    const closeTimer = setTimeout(() => {
-      setIsClosing(true);
-      setTimeout(() => {
-        setIsOpen(false);
-        setIsClosing(false);
-      }, 550); // Matches smooth fade/scale exit
-    }, 1500);
-
-    return () => {
-      clearInterval(progressInterval);
-      clearTimeout(textTimer1);
-      clearTimeout(textTimer2);
-      clearTimeout(closeTimer);
-    };
+  const cleanupTimers = useCallback(() => {
+    timersRef.current.forEach(clearTimeout);
+    timersRef.current = [];
   }, []);
 
-  const handleSkip = useCallback(() => {
-    setIsClosing(true);
-    setTimeout(() => {
-      setIsOpen(false);
-      setIsClosing(false);
-    }, 300);
-  }, []);
+  const closeIntro = useCallback(() => {
+    setIsFading(true);
+    const endTimer = setTimeout(() => {
+      setIsVisible(false);
+      setIsFading(false);
+      cleanupTimers();
+    }, 400); // 400ms clean exit fade
+    timersRef.current.push(endTimer);
+  }, [cleanupTimers]);
+
+  const launchIntro = useCallback(() => {
+    cleanupTimers();
+    setIsVisible(true);
+    setIsFading(false);
+
+    // Exact 3-second sequence:
+    // 0.0s - 2.6s: majestic rotating 3D logo & slogan presentation
+    // 2.6s - 3.0s: smooth fade out (400ms)
+    // 3.0s: completely removed from DOM
+    const fadeTimer = setTimeout(() => {
+      setIsFading(true);
+    }, 2600);
+
+    const finishTimer = setTimeout(() => {
+      setIsVisible(false);
+      setIsFading(false);
+      cleanupTimers();
+    }, 3000);
+
+    timersRef.current.push(fadeTimer, finishTimer);
+  }, [cleanupTimers]);
 
   useEffect(() => {
-    // Check if replayed via searchParams or session
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || hasCheckedRef.current) return;
+    hasCheckedRef.current = true;
 
-    const urlParams = new URLSearchParams(window.location.search);
-    const forceReplay = urlParams.get("intro") === "replay" || urlParams.get("intro") === "vip";
-    const hasSeen = sessionStorage.getItem("validily_intro_v2_seen");
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const isReplay = urlParams.get("intro") === "replay" || urlParams.get("intro") === "vip";
+      const hasSeen = sessionStorage.getItem("validily_intro_seen_v5");
 
-    if (!hasSeen || forceReplay) {
-      sessionStorage.setItem("validily_intro_v2_seen", "true");
-      // Check prefers-reduced-motion
-      if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-        startIntro();
+      // Clean the URL immediately so it never repeats on refresh or navigation
+      if (isReplay) {
+        const cleanUrl = window.location.pathname + window.location.hash;
+        window.history.replaceState({}, document.title, cleanUrl);
       }
+
+      if (!hasSeen || isReplay) {
+        sessionStorage.setItem("validily_intro_seen_v5", "true");
+
+        // Check if user prefers reduced motion
+        const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        if (!prefersReducedMotion) {
+          launchIntro();
+        }
+      }
+    } catch {
+      // Safe fallback
     }
 
-    // Support custom trigger event: window.dispatchEvent(new CustomEvent("validily-replay-intro"))
+    // Support manual replay button in header dropdown
     const handleReplayEvent = () => {
-      startIntro();
+      launchIntro();
     };
 
     window.addEventListener("validily-replay-intro", handleReplayEvent);
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && isOpen) {
-        handleSkip();
+      if (e.key === "Escape") {
+        closeIntro();
       }
     };
 
@@ -95,172 +91,123 @@ export function SiteIntroOverlay() {
     return () => {
       window.removeEventListener("validily-replay-intro", handleReplayEvent);
       window.removeEventListener("keydown", handleKeyDown);
-      if (timerRef.current) clearTimeout(timerRef.current);
+      cleanupTimers();
     };
-  }, [startIntro, isOpen, handleSkip]);
+  }, [launchIntro, closeIntro, cleanupTimers]);
 
-  if (!isOpen) return null;
+  if (!isVisible) return null;
 
   return (
     <div
       role="dialog"
       aria-modal="true"
       aria-label="Introduction validily-IGL4"
-      onClick={handleSkip}
-      className={`fixed inset-0 z-[999999] flex flex-col items-center justify-center select-none overflow-hidden cursor-pointer transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${
-        isClosing
-          ? "opacity-0 scale-[1.04] pointer-events-none blur-sm"
-          : "opacity-100 scale-100"
+      onClick={closeIntro}
+      className={`fixed inset-0 z-[999999] flex flex-col items-center justify-center select-none overflow-hidden cursor-pointer transition-opacity duration-400 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+        isFading ? "opacity-0 pointer-events-none" : "opacity-100"
       }`}
       style={{
-        background:
-          "radial-gradient(ellipse 90% 85% at 50% 40%, #0F172A 0%, #070B14 55%, #030509 100%)",
+        background: "radial-gradient(circle at 50% 48%, #FFFFFF 0%, #F8FAFD 50%, #EDF2F8 100%)",
       }}
     >
-      {/* Background Ambient Lighting & Studio Glow */}
+      {/* Subtle Warm & Amber Ambient Floor Reflection */}
       <div
-        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[550px] h-[550px] rounded-full pointer-events-none blur-[90px] opacity-40 transition-opacity"
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full pointer-events-none blur-[100px] opacity-35"
         style={{
-          background:
-            "radial-gradient(circle, rgba(212, 163, 70, 0.35) 0%, rgba(40, 85, 217, 0.25) 45%, transparent 70%)",
+          background: "radial-gradient(circle, rgba(212, 163, 70, 0.2) 0%, rgba(40, 85, 217, 0.12) 50%, transparent 70%)",
         }}
-      />
-      <div
-        className="absolute bottom-16 left-1/2 -translate-x-1/2 w-[420px] h-[80px] pointer-events-none blur-[50px] opacity-25"
-        style={{
-          background:
-            "radial-gradient(ellipse, rgba(212, 163, 70, 0.4) 0%, transparent 70%)",
-        }}
+        aria-hidden="true"
       />
 
-      {/* Top Controls: Discrete Skip Button */}
-      <div className="absolute top-6 right-6 z-20">
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            handleSkip();
+      {/* Main Center Stage: Prestigious 3-Second Opener */}
+      <div className="relative z-10 flex flex-col items-center text-center px-6">
+        {/* Smooth 3D Rotating Playing Card Logo */}
+        <div
+          className="relative mb-6"
+          style={{
+            animation: "validilyCardRotate 3s cubic-bezier(0.2, 0.8, 0.2, 1) forwards",
+            transformStyle: "preserve-3d",
           }}
-          className="flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-medium text-slate-300 bg-white/5 border border-white/10 hover:bg-white/10 hover:border-amber-400/40 hover:text-white backdrop-blur-md transition-all shadow-sm cursor-pointer"
         >
-          <span>Passer</span>
-          <kbd className="px-1.5 py-0.5 text-[10px] font-mono rounded bg-white/10 text-slate-400">
-            Échap
-          </kbd>
-        </button>
-      </div>
-
-      {/* Main VIP Stage */}
-      <div className="relative z-10 flex flex-col items-center text-center px-4 max-w-sm w-full animate-in fade-in zoom-in-95 duration-500">
-        {/* VIP Edition Eyebrow Pill */}
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-mono uppercase tracking-[0.2em] font-semibold text-[#FDE68A] bg-[#D4A346]/10 border border-[#D4A346]/30 shadow-inner mb-6 backdrop-blur-sm">
-          <Sparkles className="w-3 h-3 text-[#D4A346] animate-pulse" />
-          <span>VIP ACADEMIC EDITION • 2026</span>
-        </div>
-
-        {/* 3D Gold Rimmed Playing Card Logo Emblem */}
-        <div className="relative group mb-6">
-          {/* Card Outer Halo */}
+          {/* Subtle Outer Card Halo */}
           <div
-            className="absolute -inset-2 rounded-[32px] blur-xl opacity-60 transition duration-700"
+            className="absolute -inset-3 rounded-[34px] blur-lg opacity-30 pointer-events-none"
             style={{
-              background:
-                "linear-gradient(135deg, rgba(212,163,70,0.5), rgba(40,85,217,0.4))",
+              background: "linear-gradient(135deg, rgba(212,163,70,0.65), rgba(40,85,217,0.45))",
             }}
           />
 
-          {/* The Luxury Card */}
+          {/* Luxury Rounded Navy Card with Gold Bevel Rim */}
           <div
-            className="relative w-36 h-44 sm:w-40 sm:h-48 rounded-[28px] p-2 flex flex-col items-center justify-center border border-[#D4A346]/50 shadow-2xl overflow-hidden"
-            style={{
-              background:
-                "linear-gradient(160deg, #111A2E 0%, #0A101D 50%, #060A13 100%)",
-              boxShadow:
-                "0 20px 50px -10px rgba(0, 0, 0, 0.8), 0 0 30px rgba(212, 163, 70, 0.25), inset 0 0 20px rgba(212, 163, 70, 0.08)",
-            }}
+            className="relative w-36 h-48 sm:w-44 sm:h-56 rounded-[28px] p-3 flex items-center justify-center border-2 border-[#D4A346] shadow-[0_20px_45px_-10px_rgba(17,26,46,0.22),0_0_25px_rgba(212,163,70,0.25)] bg-[#111A2E]"
           >
-            {/* Interior Fine Filigree Border */}
-            <div className="absolute inset-1.5 rounded-[22px] border border-[#D4A346]/20 pointer-events-none" />
-
-            {/* Specular Diagonal Light Sweep */}
-            <div
-              className="absolute -inset-full pointer-events-none opacity-40 animate-[spin_6s_linear_infinite]"
-              style={{
-                background:
-                  "conic-gradient(from 0deg at 50% 50%, transparent 0deg, rgba(212, 163, 70, 0.15) 60deg, transparent 120deg)",
-              }}
-            />
+            {/* Interior Inset Gold Filigree Border */}
+            <div className="absolute inset-1.5 rounded-[22px] border border-[#D4A346]/30 pointer-events-none" />
 
             {/* Official Validily Vector Symbol */}
-            <div className="relative w-24 h-24 sm:w-28 sm:h-28 flex items-center justify-center">
-              <svg
-                viewBox="0 0 256 256"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-                className="w-full h-full drop-shadow-md"
-              >
-                <g transform="rotate(-6 128 128)">
-                  {/* Deep Navy Rounded Card Base */}
-                  <rect
-                    x="48"
-                    y="28"
-                    width="160"
-                    height="200"
-                    rx="30"
-                    fill="#0F172A"
-                    stroke="#D4A346"
-                    strokeWidth="3.5"
-                  />
-                  {/* White Victory Checkmark */}
-                  <path
-                    d="M74 116 L124 166 L178 82 L156 68 L118 130 L92 104 Z"
-                    fill="#FFFFFF"
-                  />
-                  {/* Golden Apex Accent Sphere */}
-                  <circle cx="170" cy="70" r="16" fill="url(#apexGoldGradIntro)" />
-                  <circle cx="170" cy="70" r="8" fill="#FFF7ED" opacity="0.8" />
-                </g>
-                <defs>
-                  <radialGradient id="apexGoldGradIntro" cx="35%" cy="35%" r="70%">
-                    <stop offset="0%" stopColor="#FFF1B8" />
-                    <stop offset="50%" stopColor="#EAB308" />
-                    <stop offset="100%" stopColor="#92400E" />
-                  </radialGradient>
-                </defs>
-              </svg>
-            </div>
+            <svg
+              viewBox="0 0 256 256"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              className="w-24 h-24 sm:w-32 sm:h-32 drop-shadow-lg"
+            >
+              <g transform="rotate(-6 128 128)">
+                {/* Bold White Victory Checkmark */}
+                <path
+                  d="M74 116 L124 166 L178 82 L156 68 L118 130 L92 104 Z"
+                  fill="#FFFFFF"
+                />
+                {/* Golden Apex Accent Sphere */}
+                <circle cx="170" cy="70" r="16" fill="url(#apexGoldLightOpener)" />
+                <circle cx="170" cy="70" r="8" fill="#FFFBEB" opacity="0.9" />
+              </g>
+              <defs>
+                <radialGradient id="apexGoldLightOpener" cx="35%" cy="35%" r="70%">
+                  <stop offset="0%" stopColor="#FFF1B8" />
+                  <stop offset="50%" stopColor="#D4A346" />
+                  <stop offset="100%" stopColor="#92400E" />
+                </radialGradient>
+              </defs>
+            </svg>
           </div>
         </div>
 
-        {/* Brand Master Wordmark with Gold Shimmer */}
-        <h1 className="text-2xl sm:text-3xl font-black tracking-[0.22em] uppercase text-transparent bg-clip-text bg-gradient-to-r from-white via-[#FDE68A] to-[#D4A346] drop-shadow-sm font-sans">
+        {/* Clean, Confident Brand Wordmark */}
+        <h1 className="text-3xl sm:text-4xl font-black tracking-[0.24em] uppercase text-[#111A2E] font-sans">
           VALIDILY
         </h1>
 
-        {/* Subtitle Badge */}
-        <p className="text-[11px] sm:text-xs font-semibold tracking-[0.2em] uppercase text-slate-400 mt-1 font-sans">
-          Academic Excellence & AI System
-        </p>
+        {/* Amber-Gold Accent Divider */}
+        <div className="w-12 h-[3px] bg-[#D4A346] rounded-full my-3.5 shadow-[0_0_10px_rgba(212,163,70,0.6)]" />
 
-        {/* Hairline Chronograph Loading Bar */}
-        <div className="mt-8 w-44 sm:w-52 space-y-2">
-          <div className="h-1 w-full bg-white/10 rounded-full overflow-hidden p-[1px] border border-white/5">
-            <div
-              className="h-full rounded-full transition-all duration-200 ease-out"
-              style={{
-                width: `${progress}%`,
-                background:
-                  "linear-gradient(90deg, #2855D9 0%, #D4A346 60%, #FDE68A 100%)",
-                boxShadow: "0 0 10px rgba(212, 163, 70, 0.8)",
-              }}
-            />
-          </div>
-          <div className="flex items-center justify-between text-[10px] font-mono text-slate-400">
-            <span className="truncate pr-2">{statusText}</span>
-            <span className="text-[#FDE68A] font-semibold">{progress}%</span>
-          </div>
-        </div>
+        {/* Simple & Impressive Slogan */}
+        <p className="text-xs sm:text-sm font-semibold tracking-[0.2em] uppercase text-[#68748A] font-sans">
+          Excellence Académique & IA
+        </p>
       </div>
+
+      {/* Embedded Hardware-Accelerated Smooth 3D Rotation Keyframes */}
+      <style jsx>{`
+        @keyframes validilyCardRotate {
+          0% {
+            transform: perspective(1000px) rotateY(-180deg) scale(0.85);
+            opacity: 0;
+          }
+          20% {
+            opacity: 1;
+          }
+          60% {
+            transform: perspective(1000px) rotateY(0deg) scale(1.04);
+          }
+          80% {
+            transform: perspective(1000px) rotateY(-4deg) scale(1);
+          }
+          100% {
+            transform: perspective(1000px) rotateY(0deg) scale(1);
+            opacity: 1;
+          }
+        }
+      `}</style>
     </div>
   );
 }
