@@ -167,11 +167,24 @@ export function AnnouncementModal({
 
   if (!isOpen || !mounted || typeof document === "undefined" || !document.body) return null;
 
-  const version = announcement?.release_version || "v1.1";
+  // Derive release version robustly: from explicit prop, title or id pattern
+  const detectedVersion =
+    announcement?.release_version ||
+    (announcement?.id?.includes("v2") || announcement?.title?.includes("v2.0") || announcement?.title?.includes("V2")
+      ? "v2.0"
+      : announcement?.id?.includes("v1-3") || announcement?.title?.includes("v1.3")
+      ? "v1.3"
+      : announcement?.id?.includes("v1-2") || announcement?.title?.includes("v1.2")
+      ? "v1.2"
+      : announcement?.id?.includes("v1-1") || announcement?.title?.includes("v1.1")
+      ? "v1.1"
+      : "v2.0");
+
+  const version = detectedVersion;
   const title =
     announcement?.title ||
-    "VALIDILY-IGL4 v1.1 — A New Chapter in Your Learning Experience";
-  const targetLink = announcement?.link || "/my-space";
+    "VALIDILY-IGL4 v2.0 — Intelligence Comportementale, Roue des Habitudes & Écosystème Haute Performance";
+  const targetLink = announcement?.link || (version === "v2.0" ? "/habits" : "/my-space");
   const isV2 = version === "v2.0";
   const activePillars = isV2 ? PILLARS_V2 : PILLARS;
 

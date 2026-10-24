@@ -99,12 +99,18 @@ function getCheerMeta(type?: CheerType) {
 
 function getNotificationMeta(item: SystemNotification) {
   if (item.type === "announcement" || item.id.startsWith("announcement-")) {
+    const isV2 = item.id.includes("v2") || item.title.includes("v2.0") || item.title.includes("V2");
+    const isV1_3 = item.id.includes("v1-3") || item.title.includes("v1.3");
+    const isV1_2 = item.id.includes("v1-2") || item.title.includes("v1.2");
     const isV1_1 = item.id.includes("v1-1") || item.title.includes("v1.1");
+    const versionLabel = isV2 ? "v2.0" : isV1_3 ? "v1.3" : isV1_2 ? "v1.2" : isV1_1 ? "v1.1" : "v2.0";
+
     return {
       icon: Sparkles,
       bg: "bg-gradient-to-br from-blue-50 to-indigo-100 border-indigo-200 text-indigo-700 shadow-2xs",
       badge: "bg-indigo-600 text-white font-bold border border-indigo-700 shadow-xs",
-      chip: isV1_1 ? "Release v1.1" : "Annonce",
+      chip: `Release ${versionLabel}`,
+      versionLabel,
       emoji: "🚀",
       isSpecial: true,
       isAnnouncement: true,
@@ -489,19 +495,28 @@ export function NotificationBell({ user }: NotificationBellProps) {
                             onClick={(e) => {
                               e.stopPropagation();
                               if (!item.is_read) handleMarkAsRead(item.id);
+                              const detectedVersion =
+                                item.id.includes("v2") || item.title.includes("v2.0") || item.title.includes("V2")
+                                  ? "v2.0"
+                                  : item.id.includes("v1-3") || item.title.includes("v1.3")
+                                  ? "v1.3"
+                                  : item.id.includes("v1-2") || item.title.includes("v1.2")
+                                  ? "v1.2"
+                                  : "v1.1";
+
                               setSelectedAnnouncement({
                                 id: item.id,
                                 title: item.title,
                                 content: item.content,
                                 link: item.link,
                                 created_at: item.created_at,
-                                release_version: item.id.includes("v1-1") ? "v1.1" : undefined,
+                                release_version: detectedVersion,
                               });
                               setIsOpen(false);
                             }}
                             className="inline-flex items-center space-x-1 text-[11px] font-bold text-indigo-700 hover:text-indigo-900 hover:underline cursor-pointer"
                           >
-                            <span>Consulter la note v1.1</span>
+                            <span>Consulter la note {(meta as any).versionLabel || "v2.0"}</span>
                             <Sparkles className="w-3 h-3 text-indigo-600" />
                           </button>
                         ) : item.sender_id ? (
