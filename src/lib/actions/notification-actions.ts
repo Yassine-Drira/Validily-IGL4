@@ -114,7 +114,7 @@ Nouveautés majeures :
 Explorez votre espace et donnez une nouvelle dimension à votre réussite académique ! 🚀`,
     link: "/habits",
     created_at: "2026-10-24T00:00:00.000Z",
-    is_active: false, // Release Gate Safeguard: set to false until explicit release authorization
+    is_active: true, // Activated for Version 2.0 release
   },
   {
     id: "announcement-v1-3-release",
@@ -134,7 +134,7 @@ Nouveautés majeures :
 Explorez votre espace et profitez d'une révision encore plus fluide ! 🚀`,
     link: "/planner",
     created_at: "2026-10-20T18:00:00.000Z",
-    is_active: true,
+    is_active: false,
   },
   {
     id: "announcement-v1-2-planner-release",
