@@ -84,9 +84,13 @@ export class GroqProvider implements AIInferenceProvider {
     this.model = process.env.GROQ_MODEL || "openai/gpt-oss-120b";
   }
 
+  get effectiveApiKey(): string {
+    const raw = process.env.GROQ_API_KEY !== undefined ? process.env.GROQ_API_KEY : this.apiKey;
+    return (raw || "").replace(/^["']|["']$/g, "").trim();
+  }
+
   isConfigured(): boolean {
-    const key = process.env.GROQ_API_KEY !== undefined ? process.env.GROQ_API_KEY : this.apiKey;
-    return Boolean(key && key.trim().length > 0);
+    return this.effectiveApiKey.length > 0;
   }
 
   async generateCoachingPlan(request: AIPlanRequest): Promise<AIPlanGenerationResult> {
@@ -172,7 +176,7 @@ IMPORTANT:
         const res = await fetchWithRetry("https://api.groq.com/openai/v1/chat/completions", {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${this.apiKey}`,
+            Authorization: `Bearer ${this.effectiveApiKey}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
@@ -266,7 +270,7 @@ RULES:
         const res = await fetchWithRetry("https://api.groq.com/openai/v1/chat/completions", {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${this.apiKey}`,
+            Authorization: `Bearer ${this.effectiveApiKey}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
@@ -396,7 +400,7 @@ Respond ONLY with a valid JSON object:
           const res = await fetchWithRetry("https://api.groq.com/openai/v1/chat/completions", {
             method: "POST",
             headers: {
-              Authorization: `Bearer ${this.apiKey}`,
+              Authorization: `Bearer ${this.effectiveApiKey}`,
               "Content-Type": "application/json",
             },
             body: JSON.stringify({

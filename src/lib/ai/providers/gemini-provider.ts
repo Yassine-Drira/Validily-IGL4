@@ -23,9 +23,13 @@ export class GeminiProvider implements AIInferenceProvider {
     this.model = process.env.GEMINI_MODEL || "gemini-1.5-flash";
   }
 
+  get effectiveApiKey(): string {
+    const raw = process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_KEY || this.apiKey;
+    return (raw || "").replace(/^["']|["']$/g, "").trim();
+  }
+
   isConfigured(): boolean {
-    const key = process.env.GEMINI_API_KEY !== undefined ? process.env.GEMINI_API_KEY : this.apiKey;
-    return Boolean(key && key.trim().length > 0);
+    return this.effectiveApiKey.length > 0;
   }
 
   async generateCoachingPlan(request: AIPlanRequest): Promise<AIPlanGenerationResult> {
@@ -77,7 +81,7 @@ Return JSON with this structure:
       weak_points: masteryList.slice(0, 5).map((m) => ({ id: m.subjectId, name: m.subjectName, accuracy: m.accuracyRate })),
     };
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent?key=${this.apiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent?key=${this.effectiveApiKey}`;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8000);
 
@@ -130,7 +134,7 @@ Return JSON with this structure:
     const subName = targetSub?.name || "Génie Logiciel";
     const subId = targetSub?.id || "sub-default";
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent?key=${this.apiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent?key=${this.effectiveApiKey}`;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8000);
 
@@ -212,7 +216,7 @@ Respond with JSON:
   "proposedDrill": null
 }`;
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent?key=${this.apiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent?key=${this.effectiveApiKey}`;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 9000);
 
