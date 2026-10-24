@@ -181,8 +181,8 @@ export function SiteIntroOverlay() {
         <div className="w-12 h-[3px] bg-[#D4A346] rounded-full my-3.5 shadow-[0_0_10px_rgba(212,163,70,0.6)]" />
 
         {/* Simple & Impressive Slogan */}
-        <p className="text-xs sm:text-sm font-semibold tracking-[0.2em] uppercase text-[#68748A] font-sans">
-          Excellence Académique & IA
+        <p className="text-xs sm:text-sm font-semibold tracking-[0.24em] uppercase text-[#68748A] font-sans">
+          Excellence Académique
         </p>
       </div>
 
