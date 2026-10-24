@@ -344,7 +344,7 @@ export async function getHabitsAction(options?: {
       if (adminClient) {
         let query = adminClient
           .from("habits")
-          .select("*, goal:academic_goals(*)")
+          .select("*")
           .eq("user_id", user.id)
           .order("created_at", { ascending: true });
 
@@ -578,6 +578,11 @@ export async function updateHabitAction(
         if (!error && data) {
           await safeRevalidate("/habits");
           return { success: true, data };
+        } else if (error) {
+          console.error("updateHabitAction DB error:", error);
+          if (!isTableMissingError(error)) {
+            return { success: false, error: error.message || "Erreur lors de la mise à jour." };
+          }
         }
       }
     }
@@ -643,6 +648,11 @@ export async function deleteHabitAction(
         if (!error) {
           await safeRevalidate("/habits");
           return { success: true };
+        } else {
+          console.error("deleteHabitAction DB error:", error);
+          if (!isTableMissingError(error)) {
+            return { success: false, error: error.message || "Erreur lors de la suppression." };
+          }
         }
       }
     }
@@ -734,7 +744,18 @@ export async function recordCheckinAction(payload: {
       if (adminClient) {
         const { data, error } = await adminClient
           .from("habit_checkins")
-          .upsert(checkinRecord, { onConflict: "habit_id,date" })
+          .upsert(
+            {
+              habit_id: payload.habitId,
+              user_id: user.id,
+              date: dateStr,
+              value: val,
+              status: computedStatus,
+              notes: payload.notes || null,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: "habit_id,date" }
+          )
           .select()
           .single();
 
@@ -742,6 +763,11 @@ export async function recordCheckinAction(payload: {
           await invalidateHabitAnalyticsCache();
           await safeRevalidate("/habits");
           return { success: true, data };
+        } else if (error) {
+          console.error("recordCheckinAction DB error:", error);
+          if (!isTableMissingError(error)) {
+            return { success: false, error: error.message || "Erreur lors de l'enregistrement." };
+          }
         }
       }
     }
@@ -783,6 +809,11 @@ export async function undoCheckinAction(payload: {
           await invalidateHabitAnalyticsCache();
           await safeRevalidate("/habits");
           return { success: true };
+        } else {
+          console.error("undoCheckinAction DB error:", error);
+          if (!isTableMissingError(error)) {
+            return { success: false, error: error.message || "Erreur lors de l'annulation." };
+          }
         }
       }
     }

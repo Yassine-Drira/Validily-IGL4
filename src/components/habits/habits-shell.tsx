@@ -36,6 +36,11 @@ export function HabitsShell({
   const [goals] = useState<AcademicGoal[]>(initialGoals);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  // Keep state synchronized with server component revalidation
+  React.useEffect(() => {
+    setHabits(initialHabits);
+  }, [initialHabits]);
+
   // Modal / Drawer state
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingHabit, setEditingHabit] = useState<HabitWithTodayState | null>(null);
