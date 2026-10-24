@@ -478,3 +478,44 @@ export async function getAcademicCoachKPIsAction(
   }
 }
 
+import * as convoActions from "./coach-conversation-actions.ts";
+
+// -----------------------------------------------------------------------------
+// Coach Conversation History & Session Management Wrappers
+// -----------------------------------------------------------------------------
+export async function listCoachConversationsAction(cursor?: string, limit?: number) {
+  return convoActions.listCoachConversationsAction(cursor, limit);
+}
+
+export async function getCoachConversationMessagesAction(conversationId: string, limit?: number) {
+  return convoActions.getCoachConversationMessagesAction(conversationId, limit);
+}
+
+export async function createCoachConversationAction(initialTitle?: string) {
+  return convoActions.createCoachConversationAction(initialTitle);
+}
+
+export async function renameCoachConversationAction(conversationId: string, newTitle: string) {
+  return convoActions.renameCoachConversationAction(conversationId, newTitle);
+}
+
+export async function deleteCoachConversationAction(conversationId: string) {
+  return convoActions.deleteCoachConversationAction(conversationId);
+}
+
+export async function searchCoachConversationsAction(queryText: string, limit?: number) {
+  return convoActions.searchCoachConversationsAction(queryText, limit);
+}
+
+export async function sendCoachConversationMessageAction(params: {
+  conversationId: string;
+  content: string;
+  targetDate?: string;
+}) {
+  return convoActions.sendCoachConversationMessageAction(params);
+}
+
+export async function _resetLocalCoachConversationsStore() {
+  return convoActions._resetLocalCoachConversationsStore();
+}
+

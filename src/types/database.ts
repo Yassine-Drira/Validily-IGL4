@@ -656,3 +656,78 @@ export interface HabitWithTodayState extends Habit {
   recentCheckins?: HabitCheckin[];
 }
 
+export type CoachConversationTitleSource = "auto" | "user";
+export type CoachConversationStatus = "active" | "archived";
+
+export interface CoachConversation {
+  id: string;
+  user_id: string;
+  title: string;
+  title_source: CoachConversationTitleSource;
+  status: CoachConversationStatus;
+  created_at: string;
+  updated_at: string;
+  last_message_at: string;
+  metadata?: Record<string, any>;
+  message_count?: number;
+  last_message_preview?: string;
+}
+
+export interface CoachMessageRecord {
+  id: string;
+  conversation_id: string;
+  user_id: string;
+  role: "user" | "assistant" | "system";
+  content: string;
+  structured_payload?: any;
+  created_at: string;
+}
+
+export interface CoachConversationSearchResult {
+  conversationId: string;
+  title: string;
+  matchType: "title" | "content";
+  snippet: string;
+  lastMessageAt: string;
+}
+
+export type AIActionType = "chat" | "plan" | "drill" | "rag_quiz";
+export type AIRequestStatus = "success" | "error" | "quota_exceeded" | "rate_limited";
+
+export interface AIUsageLog {
+  id: string;
+  user_id: string;
+  provider: string;
+  model: string;
+  action_type: AIActionType;
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
+  latency_ms: number;
+  status: AIRequestStatus;
+  error_message?: string | null;
+  created_at: string;
+  user_display_name?: string | null;
+  user_email?: string | null;
+}
+
+export interface AIMonitoringSummary {
+  totalRequests: number;
+  requests24h: number;
+  totalTokens: number;
+  averageLatencyMs: number;
+  quotaBlockedCount: number;
+  providerBreakdown: Record<string, number>;
+  activeVipUsersCount: number;
+  recentLogs: AIUsageLog[];
+  userQuotas: Array<{
+    userId: string;
+    displayName: string;
+    email: string;
+    used24h: number;
+    remaining: number;
+    isVip: boolean;
+    lastActiveAt: string | null;
+  }>;
+}
+

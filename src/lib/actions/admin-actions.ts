@@ -1,15 +1,15 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { isSupabaseConfigured } from "@/lib/supabase/server";
 import { getServiceSupabase } from "@/lib/supabase/admin";
 import { Subject, Semester } from "@/types/database";
 import { invalidateRepositoryCache } from "@/lib/supabase/repository";
 import { assertAdmin } from "@/lib/auth/authorization";
 
-function safeRevalidate(path: string) {
+async function safeRevalidate(path: string) {
   try {
-    revalidatePath(path);
+    const cacheMod = await import("next/cache");
+    cacheMod.revalidatePath?.(path);
     invalidateRepositoryCache();
   } catch {
     // Outside active Next.js request context

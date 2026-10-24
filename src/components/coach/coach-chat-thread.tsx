@@ -22,6 +22,7 @@ import {
   Flame,
   CheckCheck,
   TrendingUp,
+  Copy,
 } from "lucide-react";
 import type {
   ChatMessage,
@@ -31,7 +32,12 @@ import type {
   CoachingRecommendation,
   PlanTelemetry,
 } from "@/lib/ai/types";
-import { sendCoachChatMessageAction } from "@/lib/actions/coach-actions";
+import {
+  sendCoachChatMessageAction,
+  sendCoachConversationMessageAction,
+  getCoachConversationMessagesAction,
+  createCoachConversationAction,
+} from "@/lib/actions/coach-actions";
 
 interface CoachChatThreadProps {
   date: string;
@@ -40,6 +46,10 @@ interface CoachChatThreadProps {
   activeTasksCount: number;
   weakestSubjectName?: string;
   freeSlotsCount: number;
+  activeConversationId?: string | null;
+  conversationTitle?: string;
+  onConversationCreated?: (newId: string) => void;
+  onToggleSidebar?: () => void;
   onApplyBlock: (block: ProposedTimeblock) => Promise<{ success: boolean; error?: string }>;
   onStartDrill: (subjectId?: string) => void;
   onOpenScheduleModal: () => void;
@@ -53,6 +63,10 @@ export function CoachChatThread({
   activeTasksCount,
   weakestSubjectName,
   freeSlotsCount,
+  activeConversationId,
+  conversationTitle,
+  onConversationCreated,
+  onToggleSidebar,
   onApplyBlock,
   onStartDrill,
   onOpenScheduleModal,
@@ -61,14 +75,42 @@ export function CoachChatThread({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputMessage, setInputMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingThread, setIsLoadingThread] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [applyingBlockId, setApplyingBlockId] = useState<string | null>(null);
   const [appliedBlocks, setAppliedBlocks] = useState<Set<string>>(new Set());
   const [blockError, setBlockError] = useState<{ id: string; msg: string } | null>(null);
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Load thread messages whenever activeConversationId changes
+  useEffect(() => {
+    if (!activeConversationId) {
+      setMessages([]);
+      return;
+    }
+    let isMounted = true;
+    const loadThread = async () => {
+      setIsLoadingThread(true);
+      try {
+        const res = await getCoachConversationMessagesAction(activeConversationId);
+        if (isMounted && res.success && res.data) {
+          setMessages(res.data.messages);
+        }
+      } catch (err) {
+        console.error("Error loading conversation messages:", err);
+      } finally {
+        if (isMounted) setIsLoadingThread(false);
+      }
+    };
+    loadThread();
+    return () => {
+      isMounted = false;
+    };
+  }, [activeConversationId]);
 
   // Auto-scroll inside container only on new message without moving the window
   useEffect(() => {
@@ -79,6 +121,17 @@ export function CoachChatThread({
       });
     }
   }, [messages, isLoading]);
+
+  // Handle clipboard copy
+  const handleCopy = (id: string, text: string) => {
+    try {
+      navigator.clipboard.writeText(text);
+      setCopiedMessageId(id);
+      setTimeout(() => setCopiedMessageId(null), 2000);
+    } catch (err) {
+      console.error("Failed to copy message:", err);
+    }
+  };
 
   // Suggested starter prompts with luxury cards
   const suggestedPrompts = [
@@ -139,6 +192,36 @@ export function CoachChatThread({
     setIsLoading(true);
 
     try {
+      let targetConvoId = activeConversationId;
+      if (!targetConvoId) {
+        const createRes = await createCoachConversationAction();
+        if (createRes.success && createRes.data) {
+          targetConvoId = createRes.data.id;
+          onConversationCreated?.(targetConvoId);
+        }
+      }
+
+      if (targetConvoId) {
+        const convoRes = await sendCoachConversationMessageAction({
+          conversationId: targetConvoId,
+          content,
+          targetDate: date,
+        });
+
+        if (convoRes.success && convoRes.data) {
+          setMessages((prev) => [
+            ...prev.slice(0, prev.length - 1),
+            convoRes.data!.userMessage,
+            convoRes.data!.assistantMessage,
+          ]);
+          onRefreshContext?.();
+          return;
+        } else if (convoRes.error) {
+          throw new Error(convoRes.error);
+        }
+      }
+
+      // Resilient fallback to sendCoachChatMessageAction
       const historyPayload = newHistory.map((m) => ({
         role: m.role as "user" | "assistant",
         content: m.content,
@@ -206,6 +289,48 @@ export function CoachChatThread({
       {/* Subtle luminous background wash */}
       <div className="absolute top-0 right-0 w-96 h-96 bg-blue-50/50 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-0 left-0 w-80 h-80 bg-indigo-50/40 rounded-full blur-3xl pointer-events-none" />
+
+      {/* Header with Title and Sidebar Toggle */}
+      <div className="flex items-center justify-between px-5 py-3 border-b border-[#E4E8F0] bg-white/90 backdrop-blur-xs relative z-20">
+        <div className="flex items-center gap-2.5 min-w-0">
+          {onToggleSidebar && (
+            <button
+              onClick={onToggleSidebar}
+              className="p-1.5 rounded-xl bg-[#F8FAFC] hover:bg-[#EDF2FF] text-[#68748A] hover:text-[#2855D9] border border-[#E4E8F0] hover:border-[#2855D9]/20 transition-all cursor-pointer flex items-center gap-1.5 shrink-0 shadow-2xs"
+              title="Historique des discussions"
+            >
+              <Clock className="w-3.5 h-3.5" />
+              <span className="text-[11px] font-bold hidden sm:inline">Historique</span>
+            </button>
+          )}
+
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
+            <h3 className="text-xs sm:text-sm font-bold text-[#111A2E] truncate">
+              {conversationTitle || "Dialogue Interactif"}
+            </h3>
+            {messages.length > 0 && (
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#F1F5F9] text-[#68748A] border border-[#E4E8F0] shrink-0 font-mono">
+                {messages.length} msg
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => {
+              setMessages([]);
+              onConversationCreated?.("");
+            }}
+            className="px-2.5 py-1 rounded-xl text-[11px] font-bold text-[#68748A] hover:text-[#111A2E] hover:bg-[#F8FAFC] border border-transparent hover:border-[#E4E8F0] transition-all cursor-pointer flex items-center gap-1.5"
+            title="Démarrer une nouvelle discussion vierge"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Nouveau dialogue</span>
+          </button>
+        </div>
+      </div>
 
 
 
@@ -455,7 +580,32 @@ export function CoachChatThread({
                   </div>
                 )}
 
-
+                {!isUser && (
+                  <div className="mt-3 pt-2.5 border-t border-[#E4E8F0] flex items-center justify-between text-[11px] text-[#68748A]">
+                    <button
+                      onClick={() => handleCopy(message.id, message.content)}
+                      className="inline-flex items-center gap-1.5 hover:text-[#2855D9] transition-colors cursor-pointer font-medium"
+                      title="Copier la réponse"
+                    >
+                      {copiedMessageId === message.id ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-emerald-600" />
+                          <span className="text-emerald-600 font-bold">Copié !</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5" />
+                          <span>Copier</span>
+                        </>
+                      )}
+                    </button>
+                    {message.telemetry && (
+                      <span className="text-[10px] text-[#94A3B8] font-mono">
+                        {message.telemetry.model || "Validily AI"} • {message.telemetry.latencyMs}ms
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           );

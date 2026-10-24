@@ -32,6 +32,7 @@ import {
   Volume2,
   GraduationCap,
   Mail,
+  Cpu,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -65,6 +66,7 @@ import { AdminPresenceView } from "./admin-presence-view";
 import { AdminAnalyticsView } from "./admin-analytics-view";
 import { AdminStudentsView } from "./admin-students-view";
 import { AdminEmailBroadcastView } from "./admin-email-broadcast";
+import { AdminAIMonitorView } from "./admin-ai-monitor";
 import { StudentPerformanceOverview } from "@/lib/actions/profile-actions";
 
 interface AdminManagerProps {
@@ -101,7 +103,7 @@ export function AdminManager({
   initialStudentsPerformance = [],
 }: AdminManagerProps) {
   const [activeTab, setActiveTab] = useState<
-    "curriculum" | "delegation" | "students" | "vip" | "audio" | "presence" | "analytics" | "audit" | "email"
+    "curriculum" | "delegation" | "students" | "vip" | "audio" | "presence" | "analytics" | "audit" | "email" | "ai-monitoring"
   >("curriculum");
   const [semesters, setSemesters] = useState<Semester[]>(initialSemesters);
   const [subjects, setSubjects] = useState<Subject[]>(initialSubjects);
@@ -604,6 +606,19 @@ export function AdminManager({
           <Mail className="w-3.5 h-3.5" />
           <span>Diffusion Email ({users.length})</span>
         </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("ai-monitoring")}
+          className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition-all cursor-pointer shrink-0 ${
+            activeTab === "ai-monitoring"
+              ? "bg-[#2855D9] text-white shadow-2xs"
+              : "text-[#68748A] hover:bg-[#F4F6FA]"
+          }`}
+        >
+          <Cpu className="w-3.5 h-3.5" />
+          <span>IA & Quotas</span>
+        </button>
       </div>
 
       {/* TAB 1: CURRICULUM & SUBJECT MANAGEMENT */}
@@ -1008,6 +1023,11 @@ export function AdminManager({
       {/* TAB 9: EMAIL ANNOUNCEMENTS & SMTP SERVICE */}
       {activeTab === "email" && (
         <AdminEmailBroadcastView />
+      )}
+
+      {/* TAB 10: AI USAGE & QUOTA MONITORING */}
+      {activeTab === "ai-monitoring" && (
+        <AdminAIMonitorView />
       )}
 
       {/* MODAL: CREATE OR EDIT SUBJECT WITH ICON & COLOR PICKER */}

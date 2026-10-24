@@ -41,6 +41,7 @@ import { WeaknessMatrix } from "./weakness-matrix";
 import { ScheduleDiffModal } from "./schedule-diff-modal";
 import { AdaptiveDrillModal } from "./adaptive-drill-modal";
 import { CoachChatThread } from "./coach-chat-thread";
+import { CoachHistorySidebar } from "./coach-history-sidebar";
 import { useFocus } from "@/components/focus/focus-provider";
 import Link from "next/link";
 
@@ -52,6 +53,11 @@ export function CoachShell({ initialPlan }: CoachShellProps) {
   const [plan, setPlan] = useState<AIPlanResponse>(initialPlan);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [kpis, setKpis] = useState<AcademicKPIsData | null>(null);
+
+  // Persistent conversation session state
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+  const [showHistorySidebar, setShowHistorySidebar] = useState<boolean>(true);
+  const [isMobileHistoryOpen, setIsMobileHistoryOpen] = useState<boolean>(false);
   
   // Mobile / compact tab navigation: "chat" is default primary
   const [mobileTab, setMobileTab] = useState<"chat" | "timeline" | "weaknesses">("chat");
@@ -389,24 +395,44 @@ export function CoachShell({ initialPlan }: CoachShellProps) {
 
       {/* Main Workspace Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Primary Conversational Workspace */}
+        {/* Primary Conversational Workspace with Persistent History */}
         <div
           className={`lg:col-span-7 xl:col-span-8 ${
             mobileTab !== "chat" ? "hidden lg:block" : "block"
           }`}
         >
-          <CoachChatThread
-            date={plan.date}
-            availableMinutes={plan.availableMinutes}
-            bookedMinutes={plan.bookedMinutes}
-            activeTasksCount={plan.recommendations.length}
-            weakestSubjectName={plan.weakPoints.length > 0 ? plan.weakPoints[0].subjectName : undefined}
-            freeSlotsCount={plan.freeSlots.length}
-            onApplyBlock={handleApplyBlock}
-            onStartDrill={handleStartDrill}
-            onOpenScheduleModal={() => setIsScheduleModalOpen(true)}
-            onRefreshContext={() => handleRefresh(false)}
-          />
+          <div className="flex gap-4 items-start">
+            {showHistorySidebar && (
+              <CoachHistorySidebar
+                activeConversationId={activeConversationId}
+                onSelectConversation={(id) => setActiveConversationId(id)}
+                onNewConversation={() => setActiveConversationId(null)}
+                isOpenMobile={isMobileHistoryOpen}
+                onCloseMobile={() => setIsMobileHistoryOpen(false)}
+              />
+            )}
+
+            <div className="flex-1 min-w-0">
+              <CoachChatThread
+                date={plan.date}
+                availableMinutes={plan.availableMinutes}
+                bookedMinutes={plan.bookedMinutes}
+                activeTasksCount={plan.recommendations.length}
+                weakestSubjectName={plan.weakPoints.length > 0 ? plan.weakPoints[0].subjectName : undefined}
+                freeSlotsCount={plan.freeSlots.length}
+                activeConversationId={activeConversationId}
+                onConversationCreated={(newId) => setActiveConversationId(newId)}
+                onToggleSidebar={() => {
+                  setShowHistorySidebar((prev) => !prev);
+                  setIsMobileHistoryOpen((prev) => !prev);
+                }}
+                onApplyBlock={handleApplyBlock}
+                onStartDrill={handleStartDrill}
+                onOpenScheduleModal={() => setIsScheduleModalOpen(true)}
+                onRefreshContext={() => handleRefresh(false)}
+              />
+            </div>
+          </div>
         </div>
 
         {/* Supporting Context & Live Insights Sidebar */}

@@ -287,9 +287,14 @@ export async function getAIQuotaStatus(userId: string): Promise<AIQuotaResult> {
 }
 
 /**
- * Reset quota for testing purposes
+ * Reset quota for testing or administrative replenishment
  */
 export async function resetAIQuotaForTesting(userId: string): Promise<void> {
+  await resetUserAIQuota(userId);
+}
+
+export async function resetUserAIQuota(userId: string): Promise<boolean> {
+  if (!userId) return false;
   localQuotaWindows.delete(userId);
   const creds = getKvCredentials();
   if (creds) {
@@ -300,4 +305,5 @@ export async function resetAIQuotaForTesting(userId: string): Promise<void> {
       });
     } catch {}
   }
+  return true;
 }
