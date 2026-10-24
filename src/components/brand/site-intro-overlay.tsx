@@ -50,7 +50,7 @@ export function SiteIntroOverlay() {
     try {
       const urlParams = new URLSearchParams(window.location.search);
       const isReplay = urlParams.get("intro") === "replay" || urlParams.get("intro") === "vip";
-      const hasSeen = sessionStorage.getItem("validily_intro_seen_v7");
+      const hasSeen = sessionStorage.getItem("validily_intro_seen_v8");
 
       // Clean the URL immediately so it never repeats on navigation/re-renders
       if (isReplay) {
@@ -59,7 +59,7 @@ export function SiteIntroOverlay() {
       }
 
       if (!hasSeen || isReplay) {
-        sessionStorage.setItem("validily_intro_seen_v7", "true");
+        sessionStorage.setItem("validily_intro_seen_v8", "true");
 
         const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
         if (!prefersReducedMotion) {
@@ -118,7 +118,7 @@ export function SiteIntroOverlay() {
       {/* Main Center Stage */}
       <div className="relative z-10 flex flex-col items-center text-center px-6 group">
         {/* Card Stage with Reflection */}
-        <div className="relative mb-5">
+        <div className="relative mb-5" style={{ perspective: "1400px" }}>
           {/* Top-Right Diamond Sparkle Star */}
           <div className="absolute -top-3 -right-3 z-30 pointer-events-none animate-bounce">
             <svg viewBox="0 0 24 24" className="w-6 h-6 text-[#D4A346] drop-shadow-[0_0_8px_rgba(212,163,70,0.8)] fill-current">
@@ -141,14 +141,14 @@ export function SiteIntroOverlay() {
             }}
           />
 
-          {/* The Luxury Playing Card as in Photo 1: White Card with Gold Border & Reflection */}
+          {/* Luxury 3D Rigid Card with Harmonic Damped Physics */}
           <div
             className="validily-card-opener relative w-36 h-44 sm:w-44 sm:h-52 rounded-[28px] sm:rounded-[32px] p-4 flex items-center justify-center bg-white border-2 border-[#D4A346] shadow-[0_0_30px_rgba(212,163,70,0.35),0_18px_40px_rgba(17,26,46,0.12)] overflow-hidden transition-transform duration-300 group-hover:scale-105"
           >
-            {/* Fine Inset Inner Border */}
+            {/* Fine Inset Inner Gold Border */}
             <div className="absolute inset-1.5 rounded-[22px] sm:rounded-[26px] border border-[#D4A346]/25 pointer-events-none" />
 
-            {/* Specular Diagonal Glass Light Sweep */}
+            {/* Timed Specular Glass Light Sweep (Aligned with Optical Angle of Incidence) */}
             <div className="validily-glass-sheen absolute inset-0 pointer-events-none opacity-50" />
 
             {/* Exact Real Logo Asset from public/favicon.svg as a Single Unmodified Block */}
@@ -163,35 +163,35 @@ export function SiteIntroOverlay() {
           </div>
         </div>
 
-        {/* Clean, Confident Brand Wordmark */}
-        <h1 className="text-3xl sm:text-4xl font-black tracking-[0.24em] uppercase text-[#111A2E] font-sans">
+        {/* Clean, Confident Brand Wordmark with Soft Emergence */}
+        <h1 className="validily-brand-fade text-3xl sm:text-4xl font-black tracking-[0.24em] uppercase text-[#111A2E] font-sans">
           VALIDILY
         </h1>
 
         {/* Amber-Gold Accent Divider */}
-        <div className="w-12 h-[3px] bg-[#D4A346] rounded-full my-3 shadow-[0_0_10px_rgba(212,163,70,0.6)]" />
+        <div className="validily-brand-fade w-12 h-[3px] bg-[#D4A346] rounded-full my-3 shadow-[0_0_10px_rgba(212,163,70,0.6)]" />
 
-        {/* Simple & Impressive Slogan: Clean "Excellence Académique" */}
-        <p className="text-xs sm:text-sm font-semibold tracking-[0.24em] uppercase text-[#68748A] font-sans">
+        {/* Simple & Impressive Slogan */}
+        <p className="validily-brand-fade text-xs sm:text-sm font-semibold tracking-[0.24em] uppercase text-[#68748A] font-sans">
           Excellence Académique
         </p>
 
         {/* Top-Premium Glassmorphism "Cliquer pour entrer" Pill Indicator */}
-        <div className="mt-5 inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold text-[#182235] bg-white/80 border border-white/95 shadow-[0_8px_24px_rgba(17,26,46,0.08),0_0_12px_rgba(212,163,70,0.2)] backdrop-blur-xl transition-all duration-200 group-hover:scale-105 group-hover:bg-white group-hover:border-[#D4A346]/40 cursor-pointer">
+        <div className="validily-cta-fade mt-5 inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold text-[#182235] bg-white/80 border border-white/95 shadow-[0_8px_24px_rgba(17,26,46,0.08),0_0_12px_rgba(212,163,70,0.2)] backdrop-blur-xl transition-all duration-200 group-hover:scale-105 group-hover:bg-white group-hover:border-[#D4A346]/40 cursor-pointer">
           <Sparkles className="w-3.5 h-3.5 text-[#D4A346] animate-spin-slow" />
           <span className="tracking-wide">Cliquer pour entrer</span>
           <span className="w-1.5 h-1.5 rounded-full bg-[#059669] animate-ping" />
         </div>
       </div>
 
-      {/* Hardware-Accelerated 3D Rotation without Center Seam Artifacts */}
+      {/* Physics-Based 3D Harmonic Damping & Kinetic Rotation Engine */}
       <style jsx>{`
         .validily-card-opener {
-          animation: validilyCardRotate 3s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+          animation: validilyHarmonicPhysics 2.9s cubic-bezier(0.16, 1, 0.3, 1) forwards;
           backface-visibility: hidden;
           -webkit-backface-visibility: hidden;
           transform-style: flat;
-          will-change: transform, opacity;
+          will-change: transform, opacity, box-shadow;
           -webkit-box-reflect: below 8px linear-gradient(transparent 65%, rgba(0, 0, 0, 0.08) 100%);
         }
 
@@ -199,51 +199,96 @@ export function SiteIntroOverlay() {
           background: linear-gradient(
             115deg,
             transparent 0%,
-            transparent 30%,
-            rgba(255, 255, 255, 0.8) 50%,
-            rgba(254, 240, 138, 0.4) 55%,
-            transparent 70%,
+            transparent 32%,
+            rgba(255, 255, 255, 0.85) 50%,
+            rgba(254, 240, 138, 0.45) 56%,
+            transparent 72%,
             transparent 100%
           );
-          transform: translateX(-220%) skewX(-25deg);
-          animation: validilyGlassSheen 2.2s ease-in-out infinite;
+          transform: translateX(-240%) skewX(-25deg);
+          animation: validilyOpticalSheen 2.9s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
 
-        @keyframes validilyCardRotate {
+        .validily-brand-fade {
+          animation: validilyBrandReveal 1s cubic-bezier(0.16, 1, 0.3, 1) 0.6s forwards;
+          opacity: 0;
+          transform: translateY(6px);
+        }
+
+        .validily-cta-fade {
+          animation: validilyBrandReveal 1s cubic-bezier(0.16, 1, 0.3, 1) 0.8s forwards;
+          opacity: 0;
+          transform: translateY(8px);
+        }
+
+        /*
+         * Real Physics Dynamics:
+         * 1. High initial angular velocity (momentum) on coupled 3D axes (Y principal, subtle X pitch, Z roll).
+         * 2. Centrifugal elevation lift (translateZ) while rotating.
+         * 3. Damped harmonic overshoot (overshoots by +7.5deg, counter-swings by -2deg, settles at 0deg).
+         * 4. Perfectly balanced resting state without artificial jerk.
+         */
+        @keyframes validilyHarmonicPhysics {
           0% {
-            transform: perspective(1000px) rotateY(-180deg) scale(0.85);
+            transform: perspective(1400px) rotateY(-180deg) rotateX(10deg) rotateZ(-5deg) translateZ(-60px) scale(0.86);
             opacity: 0;
+            box-shadow: 0 8px 16px rgba(17, 26, 46, 0.04), 0 0 10px rgba(212, 163, 70, 0.1);
           }
-          20% {
+          18% {
             opacity: 1;
           }
-          60% {
-            transform: perspective(1000px) rotateY(0deg) scale(1.04);
+          48% {
+            /* Passing 0deg face with peak kinetic velocity and elevation lift */
+            transform: perspective(1400px) rotateY(-8deg) rotateX(1.5deg) rotateZ(-1deg) translateZ(28px) scale(1.03);
+            box-shadow: 0 24px 50px -10px rgba(17, 26, 46, 0.2), 0 0 35px rgba(212, 163, 70, 0.35);
           }
-          80% {
-            transform: perspective(1000px) rotateY(-4deg) scale(1);
+          62% {
+            /* Harmonic overshoot apex */
+            transform: perspective(1400px) rotateY(6.5deg) rotateX(-2deg) rotateZ(1deg) translateZ(16px) scale(1.02);
+          }
+          76% {
+            /* Damped counter-swing (aerodynamic decay) */
+            transform: perspective(1400px) rotateY(-2deg) rotateX(0.8deg) rotateZ(-0.4deg) translateZ(6px) scale(1.008);
+          }
+          88% {
+            /* Micro-settle */
+            transform: perspective(1400px) rotateY(0.6deg) rotateX(-0.2deg) rotateZ(0.1deg) translateZ(1px) scale(1.002);
           }
           100% {
-            transform: perspective(1000px) rotateY(0deg) scale(1);
+            /* Pure equilibrium */
+            transform: perspective(1400px) rotateY(0deg) rotateX(0deg) rotateZ(0deg) translateZ(0px) scale(1);
             opacity: 1;
+            box-shadow: 0 18px 40px rgba(17, 26, 46, 0.12), 0 0 30px rgba(212, 163, 70, 0.35);
           }
         }
 
-        @keyframes validilyGlassSheen {
-          0% {
-            transform: translateX(-220%) skewX(-25deg);
+        /* Specular catchlight flashes across the card exactly as it turns face-on */
+        @keyframes validilyOpticalSheen {
+          0%, 35% {
+            transform: translateX(-240%) skewX(-25deg);
             opacity: 0;
           }
-          30% {
-            opacity: 0.85;
+          52% {
+            opacity: 0.9;
           }
-          65% {
-            transform: translateX(220%) skewX(-25deg);
+          75% {
+            transform: translateX(240%) skewX(-25deg);
             opacity: 0;
           }
           100% {
-            transform: translateX(220%) skewX(-25deg);
+            transform: translateX(240%) skewX(-25deg);
             opacity: 0;
+          }
+        }
+
+        @keyframes validilyBrandReveal {
+          0% {
+            opacity: 0;
+            transform: translateY(8px);
+          }
+          100% {
+            opacity: 1;
+            transform: translateY(0);
           }
         }
 
